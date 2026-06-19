@@ -12,7 +12,7 @@
 - [LLM-CONFIG.md](design/LLM-CONFIG.md) — LiteLLM 配置、模型选择、Fallback、Cost 追踪
 
 ## 迭代记录 (docs/iteration/)
-- [ITER-001 - 架构设计迭代](iteration/ITER-001.md) — 架构设计迭代总结
+- [架构设计迭代记录](iteration/ITER-架构设计-20260617.md) — 架构设计迭代总结
 
 ## 文档体系 (docs/)
 - [README.md](docs/README.md) — 文档迭代链条、版本号规范

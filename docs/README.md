@@ -45,6 +45,6 @@ docs/
 ## 版本号规范
 
 - PRD: `PRD-v{n}.md`（如 PRD-v1.md）
-- Task: `TASK-{task-name}-{timestamp}.yaml`（如 TASK-login-feature-20260619.yaml）
-- Test: `TEST-{test-name}-{timestamp}.md`（如 TEST-user-auth-20260619.md）
-- Iteration: `ITER-{task-name}-{timestamp}.md`（如 ITER-architecture-design-20260619.md）
+- Task: `TASK-{任务名}-{时间戳}.yaml`（如 `TASK-登录功能-20260619.yaml`）
+- Test: `TEST-{测试名}-{时间戳}.md`（如 `TEST-用户认证-20260619.md`）
+- Iteration: `ITER-{任务名}-{时间戳}.md`（如 `ITER-架构设计-20260617.md`）

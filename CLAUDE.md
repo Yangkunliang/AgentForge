@@ -79,7 +79,7 @@ src/
 
 （以上命令为占位符 — 实际命令以实施时的实现为准。）
 
-## 关键设计决策（来自 ITER-001）
+## 关键设计决策（来自 architecture-design 迭代）
 
 - **Harness Engineering 理念** — 将 Model 智能与工程支撑分离
 - **Skill 格式**：Markdown 指令文件（`skill.md`）+ Python 执行（`executor.py`），受 Claude Code skill-creator 启发
