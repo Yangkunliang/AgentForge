@@ -1,32 +1,33 @@
-# 多智能体框架项目文档索引
+# AgentForge 项目文档索引
 
-## 产品文档 (product-design/)
-- [PRD-多智能体框架 - 产品需求文档](docs/product-design/PRD-多智能体框架-20260617.md) — 产品定位、用户故事、核心功能、技术栈
+## 产品文档 (docs/product/)
+- [PRD-v1.md](docs/product/PRD-v1.md) — 产品定位、用户故事、核心功能、技术栈
 
-## 长期规范 (standards/)
-- [ITERATION-STANDARD.md](docs/standards/ITERATION-STANDARD.md) — 迭代目录、产物命名、checklist 字段、小步提交、本地 UI/UX Skill 使用策略
+## 技术设计文档 (docs/design/)
+- [ARCHITECTURE.md](docs/design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
+- [API-SPEC.md](docs/design/API-SPEC.md) — 完整 API 规范（认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
+- [DATABASE.md](docs/design/DATABASE.md) — 数据库实体（9张表）、索引、关系图
+- [SECURITY.md](docs/design/SECURITY.md) — 认证体系、限流、Prompt 注入防护、Skill 沙箱、审计日志
+- [LLM-CONFIG.md](docs/design/LLM-CONFIG.md) — LiteLLM 配置、模型路由、Fallback、Cost 追踪
+- [DATA-EXPORT.md](docs/design/DATA-EXPORT.md) — 训练数据导出、PII 脱敏策略
+- [FRONTEND-ARCHITECTURE.md](docs/design/FRONTEND-ARCHITECTURE.md) — Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步）
+- [RABBITMQ.md](docs/design/RABBITMQ.md) — 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理
+- [DEPLOYMENT.md](docs/design/DEPLOYMENT.md) — 本地开发环境、生产部署、Nginx 配置、数据库迁移
 
-## 当前系统架构 (architecture/)
-- [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
+## 任务清单 (docs/tasks/)
+- [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单，按 P1→P2→P3→P4 优先级排列，共 28 项
 
-## 技术设计文档 (tech-design/)
-- [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构 + 消息总线 + 数据导出 + LLM 抽象
-- [API-SPEC.md](docs/tech-design/API-SPEC.md) — API 规范、分页、Webhook、SSE 流式输出、错误码
-- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、索引、关系图
-- [SECURITY.md](docs/tech-design/SECURITY.md) — 认证、限流、沙箱、Secrets 管理
-- [LLM-CONFIG.md](docs/tech-design/LLM-CONFIG.md) — LiteLLM 配置、模型选择、Fallback、Cost 追踪
-- [DATA-EXPORT.md](docs/tech-design/DATA-EXPORT.md) — 训练数据导出、脱敏、模型训练用途
+## 迭代记录 (docs/iteration/)
+- [ITER-001.md](docs/iteration/ITER-001.md) — 架构设计迭代记录
 
-## 迭代记录 (iteration/)
-- [架构设计迭代记录](docs/iteration/ITER-架构设计-20260617.md) — 架构设计迭代总结
+## 文档体系
+- [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
 
-## 文档体系 (docs/)
-- [README.md](docs/README.md) — 文档迭代链条、版本号规范
+---
 
-## 迭代执行约定
-- 后续每一次迭代开始前，先设计任务 checklist，按模块和优先级排序。
-- 每个 checklist item 需要明确模块、优先级、产出物和验收标准。
-- 执行时遵循小步提交：完成 1 个 checklist item 后，立即勾选完成并单独 commit 一次。
-- 架构设计阶段也遵循该流程，先完成设计 checklist，再进入开发执行。
-- 根目录 `AGENTS.md` 只放仓库级 Agent 工作规范；AgentForge 产品内部的 Agent 领域模型放在 `docs/architecture/AGENT-MODEL.md`。
-- 前端 UI/UX 相关任务允许使用本地 `~/.claude/skills/ui-ux-pro-max`，但仅作为 advisory skill，输出沉淀到 `UI-DESIGN.md` 或 `UI-REVIEW.md`，不得参与后端、数据库、安全、部署、Agent 编排或核心领域模型决策。
+## 开发约定
+
+- 实现前先阅读对应设计文档，以文档为准
+- 每完成 `CHECKLIST.md` 中一项，立即勾选并单独 commit
+- 本地启动顺序：`docker compose up -d` → `alembic upgrade head` → 后端 → 前端（详见 `DEPLOYMENT.md`）
+- 前端 API 类型通过 `npm run gen:types` 自动生成，禁止手写

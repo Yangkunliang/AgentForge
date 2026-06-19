@@ -4,9 +4,15 @@
 
 ## 项目概述
 
-**AgentForge** — 面向全栈开发者的多智能体协同工作框架，让 AI Agent 像人类团队一样协作完成任务。核心理念：**Agent = Model + Harness**，Harness 为 LLM 提供"让它真正能干活的工程支撑"。
+**AgentForge** — 通用多智能体协同框架，让 AI Agent 像有纪律的团队一样协作完成任务。
 
-**当前状态：Phase 0 — 仅设计文档。** 本仓库目前只包含产品和 Technical 设计文档，尚无实现代码（不存在 `src/`、`tests/`、`pyproject.toml`）。后续会话将根据这些文档进行实现。
+核心理念：**Agent = Model + Harness**，Harness 为 LLM 提供"让它真正能干活的工程支撑"。
+
+> 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
+
+**当前状态：Phase 0 — 仅设计文档。** 本仓库目前只包含产品和技术设计文档，尚无实现代码（不存在 `src/`、`tests/`、`pyproject.toml`）。后续会话将根据这些文档进行实现。
+
+---
 
 ## 文档索引
 
@@ -14,14 +20,14 @@
 
 | 目录 | 内容 |
 |------|------|
-| `standards/` | 长期规范：迭代流程、文档命名、Skill 使用策略 |
-| `architecture/` | 当前系统架构蓝图，如 Agent 领域模型 |
-| `product-design/` | 历史产品需求（`PRD-多智能体框架-20260617.md`） |
-| `tech-design/` | 历史技术设计文档，后续逐步迁移到 `architecture/` |
-| `iteration/` | 历史迭代记录（`ITER-{task-name}-{timestamp}.md`） |
-| `iterations/` | 新迭代产物目录 |
+| `docs/product/` | 产品需求（`PRD-v1.md`） |
+| `docs/design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出、前端架构、RabbitMQ、部署 |
+| `docs/tasks/` | 任务清单（`CHECKLIST.md`） |
+| `docs/iteration/` | 迭代记录 |
 
-仓库根目录的 `MEMORY.md` 也链接了所有文档。
+根目录 `MEMORY.md` 也索引了所有文档。
+
+---
 
 ## 架构概要
 
@@ -34,7 +40,7 @@
 5. **Executor（执行编排）** — 任务分解（LLM）→ Agent 协商（Contract Net 协议）→ Skill 调用 → 结果合并
 6. **Memory（记忆状态）** — 短期记忆（对话历史）、长期记忆（任务结果持久化）、审计日志（全链路 trace_id）
 
-**支撑子系统**：消息总线（Pub/Sub 广播 + Request/Response 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM 适配器，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
+**支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
 ### 计划技术栈
 
@@ -43,58 +49,81 @@
 | 后端 | Python + FastAPI (async) |
 | LLM 网关 | LiteLLM（统一多厂商 API + Cost 追踪） |
 | 数据库 | PostgreSQL 15（SQLAlchemy 2.0 async + Alembic 迁移） |
-| 消息队列 | RabbitMQ（持久化 + ACK + 死信队列） |
-| 认证 | JWT + API Key |
+| 消息队列 | RabbitMQ（持久化 + ACK + 死信队列，详见 `docs/design/RABBITMQ.md`） |
+| 前端 | Vue 3 + Vite + Element Plus + Pinia（详见 `docs/design/FRONTEND-ARCHITECTURE.md`） |
+| 认证 | JWT（access_token 1h）+ refresh_token（HttpOnly Cookie 7d）+ API Key |
 | 重试 | tenacity（指数退避） |
 | 熔断器 | pybreaker |
-| 限流 | slowapi（Token Bucket） |
+| 限流 | slowapi（Token Bucket）+ Redis |
 
 ### 计划项目结构
 
 ```
-src/
-├── agentforge/
-│   ├── harness/     # 六层 harness（validator, router, registry, governance, executor, memory）
-│   ├── bus/         # 消息总线（pubsub, direct）
-│   ├── agents/      # Agent 实现（基类 + 内置：coder, reviewer, researcher）
-│   ├── skills/      # 插件系统（manager, loader, validator）
-│   ├── models/      # 数据模型
-│   ├── llm/         # LLM Provider 抽象（provider, litellm_adapter, config）
-│   └── exporter/    # 数据导出（JSONL, 脱敏）
-├── api/             # FastAPI 路由（main.py + tasks, agents, skills, exports）
-└── middleware/      # auth.py, rate_limit.py
+AgentForge/
+├── src/
+│   ├── agent_forge/
+│   │   ├── harness/     # 六层 harness（validator, router, registry, governance, executor, memory）
+│   │   ├── bus/         # 消息总线（pubsub, direct, init）
+│   │   ├── agents/      # Agent 实现（基类 + 内置：coder, reviewer, researcher）
+│   │   ├── skills/      # 插件系统（manager, loader, validator）
+│   │   ├── models/      # SQLAlchemy 数据模型
+│   │   ├── llm/         # LLM Provider 抽象（litellm_adapter, router, cost）
+│   │   └── exporter/    # 数据导出（JSONL, 脱敏）
+│   ├── api/             # FastAPI 路由（main.py + tasks, agents, skills, exports, dashboard, auth）
+│   └── middleware/      # auth.py, rate_limit.py
+└── web/                 # Vue 3 前端
+    └── src/
+        ├── api/         # Axios + SSE 客户端 + 自动生成类型
+        ├── stores/      # Pinia 状态（auth, task, agent, skill）
+        ├── composables/ # useSSE, useAuth, useSkillInstall
+        └── views/       # 页面组件
 ```
+
+---
 
 ## 开发工作流（实现阶段）
 
 项目遵循文档驱动的迭代链条：**PRD → Task → Design → Test → Iteration**。
 
+实现任务清单见 `docs/tasks/CHECKLIST.md`，按 P1 → P2 → P3 → P4 顺序执行，每完成一项勾选并单独 commit。
+
 实现后预期命令：
-- **构建**: `python -m build`（通过 pyproject.toml 的 PEP 621）
-- **Lint**: `ruff check src/`
-- **类型检查**: `mypy src/`
-- **测试**: `pytest tests/ -v`
-- **单文件测试**: `pytest tests/test_file.py::test_name -v`
-- **数据库迁移**: `alembic upgrade head`
-- **本地数据库**: `docker compose up -d db`（PostgreSQL 15, 端口 5432）
-- **运行 API**: `uvicorn src.api.main:app --reload`
 
-（以上命令为占位符 — 实际命令以实施时的实现为准。）
+```bash
+# 依赖服务
+docker compose up -d              # 启动 PostgreSQL + RabbitMQ + Redis
 
-## 关键设计决策（来自 architecture-design 迭代）
+# 后端
+alembic upgrade head              # 数据库迁移
+uvicorn src.api.main:app --reload # 启动 API（localhost:8000）
 
-- **Harness Engineering 理念** — 将 Model 智能与工程支撑分离
-- **Skill 格式**：Markdown 指令文件（`skill.md`）+ Python 执行（`executor.py`），受 Claude Code skill-creator 启发
-- **PostgreSQL** 统一开发/生产环境（可 Docker Compose 启动）
-- **Contract Net 协议** — Agent 协商机制（发布 → 竞标 → 评分 → 签约 → 评估）
-- Skill.md 是面向 LLM 的 Claude Code 风格 Prompt 指令；executor.py 是程序化调用入口
+# 前端
+cd web
+npm run gen:types                 # 同步后端 API 类型（后端须先启动）
+npm run dev                       # 启动前端（localhost:3000）
+
+# 代码质量
+ruff check src/
+mypy src/
+pytest tests/ -v
+```
+
+---
+
+## 关键设计决策
+
+- **Harness Engineering 理念** — 将 Model 智能与工程支撑分离，框架领域无关
+- **Skill 格式**：`skill.md`（LLM 指令，Claude Code 风格）+ `executor.py`（程序化调用入口）
+- **Contract Net 协议** — Agent 协商机制（发布招标 → 竞标 → 评分 → 签约 → 执行 → 上报）
+- **SSE 方案**：使用 `fetch + ReadableStream`，不用原生 `EventSource`（不支持自定义 Header）
+- **Token 策略**：access_token 存 localStorage（Axios 可读），refresh_token 存 HttpOnly Cookie（JS 不可读）
+- **类型同步**：`openapi-typescript` 从 FastAPI `/openapi.json` 自动生成前端类型，禁止手写
+
+---
 
 ## 使用本仓库
 
-- 目前无实现代码，重点在设计文档
-- 根目录 `AGENTS.md` 是仓库级 Agent 工作规范；产品内部 Agent 领域模型位于 `docs/architecture/AGENT-MODEL.md`
-- 新迭代遵循 `docs/standards/ITERATION-STANDARD.md`：先写 checklist，按模块和优先级执行，完成 1 项勾选并 commit 1 次
-- 前端 UI/UX 任务可使用本地 `~/.claude/skills/ui-ux-pro-max`，但仅作为 advisory skill，输出沉淀到 UI 设计文档
-- 开始实现后，核心包位于 `src/agentforge/`
-- 数据库使用 Docker Compose 本地启动（详见 `tech-design/DATABASE.md` §4.1）
-- 安全模型：双认证（JWT 用户认证 + API Key 服务间认证）、Prompt 注入防护、Skill 沙箱、全链路 trace_id 审计
+- 目前无实现代码，重点在设计文档（`docs/design/` 下 9 个文档已完备）
+- 实现任务清单：`docs/tasks/CHECKLIST.md`
+- 本地开发启动顺序：`docs/design/DEPLOYMENT.md` 第 3 节
+- 安全模型：双认证（JWT + API Key）、Prompt 注入防护、Skill 沙箱、全链路 trace_id 审计

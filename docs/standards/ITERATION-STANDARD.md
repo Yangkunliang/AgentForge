@@ -27,14 +27,42 @@ ITERATION-REVIEW.md      # 迭代复盘：完成情况、决策、遗留问题
 
 不要使用 `DESIGN.md` 这类泛名。技术设计、产品设计、UI 设计必须写全，避免人和 Agent 误读。
 
-## 4. Checklist 字段
+## 4. Task 与 Checklist 关系
 
-`TASK-CHECKLIST.md` 的每个任务项至少包含：
+`TASK-CHECKLIST.md` 只做任务索引，不堆技术细节。每个可执行任务必须拆成独立任务文件：
+
+```text
+TASK-001.md
+TASK-002.md
+TASK-003.md
+```
+
+推荐关系：
+
+```text
+PRODUCT-REQUIREMENTS.md
+  -> 用户故事
+    -> TASK-NNN.md
+      -> 技术子项 checklist
+      -> 验收标准
+      -> 产出物
+```
+
+`TASK-CHECKLIST.md` 至少维护：
+
+- 用户故事覆盖矩阵
+- 任务索引
+- 任务优先级
+- 任务依赖关系
+- 任务级完成状态
+
+每个 `TASK-NNN.md` 至少包含：
 
 - `id`：稳定编号，例如 `ARCH-P0-001`
 - `module`：所属模块
 - `priority`：`P0`、`P1`、`P2`、`P3`
 - `title`：任务标题
+- `related_requirements`：关联的用户故事或产品需求点
 - `deliverable`：产出物
 - `acceptance`：验收标准
 - `status`：`todo`、`doing`、`done`
@@ -46,6 +74,9 @@ ITERATION-REVIEW.md      # 迭代复盘：完成情况、决策、遗留问题
   module: architecture
   priority: P0
   title: 明确 MVP 架构边界
+  related_requirements:
+    - US-1
+    - US-2
   deliverable: TECHNICAL-DESIGN.md
   acceptance:
     - 明确第一阶段包含和不包含的能力
