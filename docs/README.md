@@ -22,6 +22,7 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | ARCHITECTURE.md | 整体架构、六层 Harness、执行流程 | ✅ |
+| AGENTS.md | Agent 定义、类型、能力模型、协作机制 | ✅ |
 | DATABASE.md | 数据库实体、索引、关系图 | ✅ |
 | API-SPEC.md | 完整 API 规范（含注册、Dashboard、反馈、费用、Skill 安装进度） | ✅ |
 | SECURITY.md | 认证、限流、沙箱、Secrets 管理 | ✅ |
