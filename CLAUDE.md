@@ -14,7 +14,7 @@
 
 | 目录 | 内容 |
 |------|------|
-| `docs/product/` | 产品需求（`PRD-v1.md`） |
+| `docs/product/` | 产品需求（`PRD-多智能体框架-20260617.md`） |
 | `docs/design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出 |
 | `docs/iteration/` | 迭代记录（`ITER-{task-name}-{timestamp}.md`） |
 | `docs/api/` | API 文档（空 — 实现时补充） |

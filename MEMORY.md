@@ -1,7 +1,7 @@
 # 多智能体框架项目文档索引
 
 ## 产品文档 (docs/product/)
-- [PRD-v1 - 产品需求文档](product/PRD-v1.md) — 产品定位、用户故事、核心功能、技术栈
+- [PRD-多智能体框架 - 产品需求文档](product/PRD-多智能体框架-20260617.md) — 产品定位、用户故事、核心功能、技术栈
 
 ## 技术设计文档 (docs/design/)
 - [ARCHITECTURE.md](design/ARCHITECTURE.md) — Harness 六层架构 + 消息总线 + 数据导出 + LLM 抽象

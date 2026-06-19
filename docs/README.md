@@ -44,7 +44,7 @@ docs/
 
 ## 版本号规范
 
-- PRD: `PRD-v{n}.md`（如 PRD-v1.md）
+- PRD: `PRD-{功能模块}-{时间戳}.md`（如 `PRD-多智能体框架-20260617.md`）
 - Task: `TASK-{任务名}-{时间戳}.yaml`（如 `TASK-登录功能-20260619.yaml`）
 - Test: `TEST-{测试名}-{时间戳}.md`（如 `TEST-用户认证-20260619.md`）
 - Iteration: `ITER-{任务名}-{时间戳}.md`（如 `ITER-架构设计-20260617.md`）
