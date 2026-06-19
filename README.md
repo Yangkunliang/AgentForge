@@ -9,9 +9,11 @@
 ```
 AgentForge/
 ├── docs/
-│   ├── product/       # 产品文档
-│   ├── design/        # 技术设计文档
-│   └── iteration/     # 迭代记录
+│   ├── product-design/   # 产品文档
+│   ├── tech-design/   # 技术设计文档
+│   ├── iteration/     # 迭代记录
+│   ├── tasks/         # 任务拆解
+│   └── tests/         # 测试用例
 ├── CLAUDE.md          # 开发指导
 └── MEMORY.md          # 项目记忆
 ```
@@ -20,9 +22,9 @@ AgentForge/
 
 | 目录 | 内容 |
 |------|------|
-| `docs/product/` | 产品需求（PRD） |
-| `docs/design/` | 架构、API、数据库、安全、LLM 配置等设计文档 |
-| `docs/iteration/` | 迭代记录 |
+| `product-design/` | 产品需求（PRD） |
+| `tech-design/` | 架构、API、数据库、安全、LLM 配置等设计文档 |
+| `iteration/` | 迭代记录 |
 
 详细文档请查看 [docs/README.md](docs/README.md)。
 

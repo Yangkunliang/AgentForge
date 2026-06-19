@@ -14,10 +14,9 @@
 
 | 目录 | 内容 |
 |------|------|
-| `docs/product/` | 产品需求（`PRD-多智能体框架-20260617.md`） |
-| `docs/design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出 |
-| `docs/iteration/` | 迭代记录（`ITER-{task-name}-{timestamp}.md`） |
-| `docs/api/` | API 文档（空 — 实现时补充） |
+| `product-design/` | 产品需求（`PRD-多智能体框架-20260617.md`） |
+| `tech-design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出 |
+| `iteration/` | 迭代记录（`ITER-{task-name}-{timestamp}.md`） |
 
 仓库根目录的 `MEMORY.md` 也链接了所有文档。
 
@@ -91,5 +90,5 @@ src/
 
 - 目前无实现代码，重点在设计文档
 - 开始实现后，核心包位于 `src/agentforge/`
-- 数据库使用 Docker Compose 本地启动（详见 `docs/design/DATABASE.md` §4.1）
+- 数据库使用 Docker Compose 本地启动（详见 `tech-design/DATABASE.md` §4.1）
 - 安全模型：双认证（JWT 用户认证 + API Key 服务间认证）、Prompt 注入防护、Skill 沙箱、全链路 trace_id 审计

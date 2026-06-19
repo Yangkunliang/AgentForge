@@ -10,15 +10,14 @@
 
 ```
 docs/
-├── product/           # 产品文档
-├── design/            # 技术设计文档
-├── tasks/             # 任务拆解文档
-├── tests/             # 测试用例文档
-├── api/               # API 文档
-└── iteration/         # 迭代记录
+├── product-design/   # 产品文档
+├── tech-design/   # 技术设计文档
+├── iteration/     # 迭代记录
+├── tasks/         # 任务拆解文档
+└── tests/         # 测试用例文档
 ```
 
-## 设计文档清单 (docs/design/)
+## 设计文档清单 (tech-design/)
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
