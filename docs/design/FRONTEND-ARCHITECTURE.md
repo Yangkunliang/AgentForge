@@ -1,0 +1,800 @@
+# 前端架构设计 (FRONTEND-ARCHITECTURE.md)
+
+## 1. 技术栈选型
+
+### 1.1 核心依赖
+
+| 组件 | 选型 | 说明 |
+|------|------|------|
+| 框架 | Vue 3 (Composition API + `<script setup>`) | 响应式、组合式 API、更好的 TS 支持 |
+| 构建工具 | Vite 5 | 快速 HMR、原生 ESM、轻量配置 |
+| UI 库 | Element Plus | 管理后台组件最成熟、中文文档完善 |
+| 状态管理 | Pinia | Vue 3 官方推荐、TS 友好、DevTools 支持 |
+| 路由 | Vue Router 4 | 官方路由、嵌套路由、路由守卫 |
+| HTTP 客户端 | Axios | 请求拦截器、取消令牌、响应拦截器 |
+| 类型系统 | TypeScript 5 | 全栈类型安全、API 类型自动生成 |
+| CSS 方案 | SCSS + CSS 变量 | Element Plus 主题定制、响应式断点 |
+| 图标 | @element-plus/icons-vue | 官方图标库、支持自定义 SVG |
+
+### 1.2 辅助工具
+
+| 工具 | 用途 |
+|------|------|
+| unplugin-auto-import | 自动导入 Vue/Element Plus API，减少 import 语句 |
+| unplugin-vue-components | 自动导入组件，无需手动注册 |
+| pinia-plugin-persistedstate | Pinia 状态持久化（localStorage） |
+| vueuse | 常用组合式函数集合 |
+| dayjs | 轻量级日期处理 |
+| markdown-it + dompurify | Markdown 渲染 + XSS 过滤（Skill.md 展示） |
+| openapi-typescript | 从 FastAPI /openapi.json 自动生成 TS 类型（见第 12 节） |
+
+---
+
+## 2. 项目结构
+
+```
+web/
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+├── scripts/
+│   └── gen-types.sh          # 自动生成 API 类型脚本
+├── env/
+│   ├── .env.development
+│   └── .env.production
+├── src/
+│   ├── main.ts
+│   ├── App.vue
+│   ├── env.d.ts
+│   │
+│   ├── api/
+│   │   ├── request.ts        # Axios 实例（见第 5 节）
+│   │   ├── sse.ts            # SSE 客户端（见第 6 节）
+│   │   ├── types/            # 由 openapi-typescript 生成，勿手写
+│   │   │   └── schema.d.ts   # 自动生成：npm run gen:types
+│   │   └── modules/
+│   │       ├── auth.ts
+│   │       ├── tasks.ts
+│   │       ├── agents.ts
+│   │       ├── skills.ts
+│   │       ├── exports.ts
+│   │       └── dashboard.ts  # 仪表盘聚合数据
+│   │
+│   ├── assets/
+│   │   ├── images/
+│   │   ├── styles/
+│   │   │   ├── variables.scss
+│   │   │   ├── global.scss
+│   │   │   └── responsive.scss
+│   │   └── icons/
+│   │
+│   ├── components/
+│   │   ├── Layout/
+│   │   │   ├── AppHeader.vue
+│   │   │   ├── AppSidebar.vue
+│   │   │   └── AppFooter.vue
+│   │   ├── Task/
+│   │   │   ├── TaskCard.vue
+│   │   │   ├── TaskDetail.vue
+│   │   │   ├── TaskProgress.vue
+│   │   │   ├── SubTaskList.vue
+│   │   │   ├── AgentBids.vue
+│   │   │   └── TaskFeedback.vue   # 用户反馈组件（thumbs/rating）
+│   │   ├── SSE/
+│   │   │   ├── EventStream.vue    # SSE 事件流展示
+│   │   │   └── LiveLog.vue        # 实时日志
+│   │   ├── Common/
+│   │   │   ├── EmptyState.vue
+│   │   │   ├── LoadingSpinner.vue
+│   │   │   ├── ConfirmDialog.vue
+│   │   │   ├── MarkdownRender.vue
+│   │   │   └── GlobalMessage.vue  # 全局消息提示（错误/限流/成功）
+│   │   └── Skills/
+│   │       ├── SkillCard.vue
+│   │       ├── SkillInstall.vue
+│   │       └── SkillInstallProgress.vue  # 安装进度轮询组件
+│   │
+│   ├── composables/
+│   │   ├── useAuth.ts
+│   │   ├── useTask.ts
+│   │   ├── useSSE.ts          # SSE 封装（见第 6 节）
+│   │   ├── usePagination.ts
+│   │   ├── useResponsive.ts
+│   │   └── useSkillInstall.ts # Skill 安装状态轮询
+│   │
+│   ├── directives/
+│   │   ├── v-permission.ts    # 按钮级权限（见第 9 节）
+│   │   └── v-loading.ts
+│   │
+│   ├── router/
+│   │   ├── index.ts
+│   │   ├── guards.ts
+│   │   └── routes.ts
+│   │
+│   ├── stores/
+│   │   ├── index.ts
+│   │   ├── modules/
+│   │   │   ├── auth.ts        # 用户状态 + Token 管理
+│   │   │   ├── task.ts        # 任务列表/详情 + SSE 实时更新入口
+│   │   │   ├── agent.ts
+│   │   │   ├── skill.ts
+│   │   │   └── app.ts
+│   │   └── utils/
+│   │       └── storage.ts
+│   │
+│   ├── utils/
+│   │   ├── format.ts
+│   │   ├── validate.ts
+│   │   └── eventBus.ts
+│   │
+│   └── views/
+│       ├── Login.vue
+│       ├── Register.vue
+│       ├── Dashboard.vue
+│       ├── TaskList.vue
+│       ├── TaskCreate.vue
+│       ├── TaskDetail.vue     # 包含 TaskFeedback 组件
+│       ├── AgentList.vue
+│       ├── AgentCreate.vue
+│       ├── SkillList.vue
+│       ├── SkillInstall.vue
+│       ├── Export.vue
+│       └── 404.vue
+```
+
+---
+
+## 3. 路由设计
+
+### 3.1 路由表
+
+```typescript
+const routes = [
+  { path: '/login',    component: () => import('@/views/Login.vue') },
+  { path: '/register', component: () => import('@/views/Register.vue') },
+  {
+    path: '/',
+    component: () => import('@/components/Layout/AppLayout.vue'),
+    redirect: '/dashboard',
+    meta: { requiresAuth: true },
+    children: [
+      { path: 'dashboard',      name: 'Dashboard',    component: () => import('@/views/Dashboard.vue'),    meta: { title: '仪表盘',     icon: 'Odometer', permission: 'read'  } },
+      { path: 'tasks',          name: 'TaskList',     component: () => import('@/views/TaskList.vue'),     meta: { title: '任务列表',   icon: 'List',     permission: 'read'  } },
+      { path: 'tasks/create',   name: 'TaskCreate',   component: () => import('@/views/TaskCreate.vue'),   meta: { title: '创建任务',   icon: 'Plus',     permission: 'write' } },
+      { path: 'tasks/:id',      name: 'TaskDetail',   component: () => import('@/views/TaskDetail.vue'),   meta: { title: '任务详情',   icon: 'Document', permission: 'read'  } },
+      { path: 'agents',         name: 'AgentList',    component: () => import('@/views/AgentList.vue'),    meta: { title: 'Agent 管理', icon: 'Cpu',      permission: 'read'  } },
+      { path: 'agents/create',  name: 'AgentCreate',  component: () => import('@/views/AgentCreate.vue'),  meta: { title: '创建 Agent', icon: 'Plus',     permission: 'admin' } },
+      { path: 'skills',         name: 'SkillList',    component: () => import('@/views/SkillList.vue'),    meta: { title: 'Skill 管理', icon: 'Tool',     permission: 'read'  } },
+      { path: 'skills/install', name: 'SkillInstall', component: () => import('@/views/SkillInstall.vue'), meta: { title: '安装 Skill', icon: 'Download', permission: 'admin' } },
+      { path: 'exports',        name: 'Export',       component: () => import('@/views/Export.vue'),       meta: { title: '数据导出',   icon: 'Download', permission: 'admin' } },
+    ],
+  },
+  { path: '/:pathMatch(.*)*', component: () => import('@/views/404.vue') },
+]
+```
+
+### 3.2 路由守卫
+
+```typescript
+// router/guards.ts
+router.beforeEach(async (to, _from, next) => {
+  const authStore = useAuthStore()
+
+  // 1. 无需认证的页面直接放行
+  if (!to.meta.requiresAuth) return next()
+
+  // 2. 未登录跳转登录页，保存 redirect 参数
+  if (!authStore.isLoggedIn) return next(`/login?redirect=${to.fullPath}`)
+
+  // 3. Token 快要过期（< 5 分钟）则静默刷新
+  if (authStore.tokenExpiresInSec < 300) {
+    const ok = await authStore.silentRefresh()
+    if (!ok) return next(`/login?redirect=${to.fullPath}`)
+  }
+
+  // 4. 权限检查
+  const required = to.meta.permission as string | undefined
+  if (required && !authStore.hasPermission(required)) {
+    return next('/dashboard')
+  }
+
+  // 5. 更新页面 title
+  document.title = to.meta.title ? `${to.meta.title} - AgentForge` : 'AgentForge'
+
+  next()
+})
+```
+
+---
+
+## 4. 状态管理 (Pinia)
+
+### 4.1 认证状态 (auth.ts)
+
+```typescript
+export const useAuthStore = defineStore('auth', () => {
+  const user           = ref<User | null>(null)
+  const accessToken    = ref('')
+  const tokenExpiresAt = ref(0)   // Unix timestamp（秒）
+
+  // permissions 示例：['read'] | ['read','write'] | ['read','write','admin']
+  const permissions = ref<string[]>([])
+
+  const isLoggedIn       = computed(() => !!accessToken.value && Date.now() / 1000 < tokenExpiresAt.value)
+  const tokenExpiresInSec = computed(() => tokenExpiresAt.value - Date.now() / 1000)
+  const hasPermission    = (p: string) => permissions.value.includes(p) || permissions.value.includes('admin')
+
+  async function login(username: string, password: string) {
+    const res = await loginApi({ username, password })
+    // access_token 存内存（+ localStorage 通过 persist）
+    accessToken.value    = res.access_token
+    tokenExpiresAt.value = Date.now() / 1000 + res.expires_in
+    user.value           = res.user
+    permissions.value    = res.user.permissions
+    // refresh_token 由后端 Set-Cookie: HttpOnly 自动写入，JS 不需要处理
+  }
+
+  async function silentRefresh(): Promise<boolean> {
+    try {
+      // withCredentials: true 让浏览器自动带上 HttpOnly Cookie 中的 refresh_token
+      const res = await refreshTokenApi()
+      accessToken.value    = res.access_token
+      tokenExpiresAt.value = Date.now() / 1000 + res.expires_in
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  function logout() {
+    accessToken.value    = ''
+    tokenExpiresAt.value = 0
+    user.value           = null
+    permissions.value    = []
+    // 调用后端 /auth/logout 让服务端清除 refresh_token Cookie
+    logoutApi().catch(() => {})
+  }
+
+  return { user, accessToken, tokenExpiresAt, isLoggedIn, tokenExpiresInSec, permissions, hasPermission, login, silentRefresh, logout }
+}, { persist: { paths: ['accessToken', 'tokenExpiresAt', 'permissions', 'user'] } })
+```
+
+### 4.2 任务状态 (task.ts)
+
+SSE 收到的实时事件**直接更新 task store**，不另建 stream store，避免双重维护。
+
+```typescript
+export const useTaskStore = defineStore('task', () => {
+  const taskList    = ref<TaskSummary[]>([])
+  const currentTask = ref<TaskDetail | null>(null)
+  const subTasks    = ref<SubTask[]>([])
+  const loading     = ref(false)
+  const pagination  = reactive({ page: 1, pageSize: 20, total: 0 })
+
+  // SSE 事件处理入口（由 useSSE composable 调用）
+  function handleSSEEvent(event: SSEEvent) {
+    switch (event.type) {
+      case 'task_started':
+        if (currentTask.value?.task_id === event.data.task_id)
+          currentTask.value.status = 'processing'
+        break
+      case 'sub_task_created':
+        subTasks.value.push(event.data)
+        break
+      case 'bid_received': {
+        const st = subTasks.value.find(s => s.id === event.data.sub_task_id)
+        if (st) st.bids = event.data.bids
+        break
+      }
+      case 'agent_selected': {
+        const st = subTasks.value.find(s => s.id === event.data.sub_task_id)
+        if (st) st.assigned_agent_id = event.data.agent_id
+        break
+      }
+      case 'sub_task_completed': {
+        const st = subTasks.value.find(s => s.id === event.data.sub_task_id)
+        if (st) { st.status = 'completed'; st.result = event.data.result }
+        break
+      }
+      case 'task_completed':
+      case 'task_failed':
+        if (currentTask.value?.task_id === event.data.task_id) {
+          currentTask.value.status = event.type === 'task_completed' ? 'completed' : 'failed'
+          currentTask.value.result = event.data.result
+        }
+        break
+    }
+  }
+
+  async function fetchTasks(params?: TaskListParams) { ... }
+  async function fetchTaskDetail(taskId: string) { ... }
+  async function createTask(data: TaskCreateRequest) { ... }
+  async function cancelTask(taskId: string) { ... }
+  async function submitFeedback(taskId: string, feedback: TaskFeedback) { ... }
+
+  return { taskList, currentTask, subTasks, loading, pagination, handleSSEEvent, fetchTasks, fetchTaskDetail, createTask, cancelTask, submitFeedback }
+})
+```
+
+### 4.3 Skill 状态 (skill.ts)
+
+```typescript
+export const useSkillStore = defineStore('skill', () => {
+  const skills     = ref<Skill[]>([])
+  // 支持多个 Skill 同时安装，key 为 skill_name
+  const installJobs = ref<Record<string, SkillInstallJob>>({})
+  // SkillInstallJob: { skillName, status: 'pending'|'installing'|'done'|'failed', log: string }
+
+  async function installSkill(source: string) { ... }
+  async function pollInstallStatus(installId: string, skillName: string) { ... }
+  async function fetchSkills() { ... }
+  async function uninstallSkill(name: string) { ... }
+
+  return { skills, installJobs, installSkill, pollInstallStatus, fetchSkills, uninstallSkill }
+})
+```
+
+---
+
+## 5. Token 管理策略（统一方案）
+
+### 5.1 决策：access_token 存 localStorage，refresh_token 存 HttpOnly Cookie
+
+| Token | 存储 | 理由 |
+|-------|------|------|
+| `access_token` | Pinia 内存 + localStorage（持久化） | Axios 拦截器需要读取并写入 Bearer Header，必须 JS 可访问 |
+| `refresh_token` | HttpOnly Cookie（后端 Set-Cookie） | 有效期长（7d），JS 不可读，防 XSS 窃取；刷新时浏览器自动携带 |
+
+**为什么不全部用 HttpOnly Cookie：** 若 access_token 也放 HttpOnly Cookie，Axios 无法读取，就无法构造 `Authorization: Bearer` Header；需要完全改为 Cookie 认证模式，与 API Key（X-API-Key Header）的共存方案冲突，后端中间件也要大改。
+
+**XSS 缓解措施：**
+- CSP Header（后端/Nginx 配置）：`script-src 'self'`，阻止注入脚本
+- HTTPS 强制（生产环境）
+- `access_token` 有效期短（1h），即使泄露影响有限
+- `refresh_token` 在 HttpOnly Cookie 中，XSS 无法读取
+
+### 5.2 Axios 配置 (api/request.ts)
+
+```typescript
+const request = axios.create({
+  baseURL: '/api/v1',
+  timeout: 30_000,
+  withCredentials: true,   // 携带 Cookie（让 refresh_token Cookie 随请求发送）
+})
+
+// 请求拦截器：附加 access_token
+request.interceptors.request.use(config => {
+  const { accessToken } = useAuthStore()
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
+  config.headers['X-Request-Id'] = crypto.randomUUID()
+  return config
+})
+
+// 响应拦截器：401 自动刷新，错误统一提示
+let isRefreshing = false
+let waitQueue: Array<() => void> = []
+
+request.interceptors.response.use(
+  res => res.data,
+  async err => {
+    const { config, response } = err
+    if (response?.status === 401 && !config._retry) {
+      if (isRefreshing) {
+        // 多个并发请求同时 401，排队等待刷新完成后重发
+        return new Promise(resolve => waitQueue.push(() => resolve(request(config))))
+      }
+      isRefreshing = true
+      config._retry = true
+      const ok = await useAuthStore().silentRefresh()
+      isRefreshing = false
+      waitQueue.forEach(fn => fn())
+      waitQueue = []
+      if (ok) return request(config)
+      useAuthStore().logout()
+      const redirect = encodeURIComponent(window.location.pathname)
+      router.push(`/login?redirect=${redirect}`)
+      return Promise.reject(err)
+    }
+    handleApiError(response?.status, response?.data?.error)
+    return Promise.reject(err)
+  }
+)
+
+function handleApiError(status: number, error?: { code: string; message: string }) {
+  if (status === 429) {
+    ElMessage.warning('操作过于频繁，请稍后再试')
+  } else if (status >= 500) {
+    ElMessage.error(`服务器错误：${error?.message ?? '请稍后重试'}`)
+  } else if (status >= 400 && status !== 401) {
+    ElMessage.error(error?.message ?? '请求失败')
+  }
+}
+```
+
+---
+
+## 6. SSE 流式订阅（统一方案）
+
+### 6.1 决策：使用 fetch + ReadableStream，不使用原生 EventSource
+
+原生 `EventSource` 不支持自定义 Header，无法携带 `Authorization: Bearer <token>`。使用 `fetch + ReadableStream` 可完全控制请求头，同时实现指数退避重连。
+
+### 6.2 useSSE composable (composables/useSSE.ts)
+
+```typescript
+export function useSSE(taskId: string) {
+  const taskStore = useTaskStore()
+  const authStore = useAuthStore()
+  const events    = ref<SSEEvent[]>([])
+  const connected = ref(false)
+  const error     = ref<string | null>(null)
+
+  let controller: AbortController | null = null
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let retryCount = 0
+  const MAX_RETRY = 5
+
+  async function connect() {
+    controller   = new AbortController()
+    connected.value = true
+    error.value  = null
+
+    try {
+      const res = await fetch(`/api/v1/tasks/${taskId}/stream`, {
+        headers: {
+          'Authorization': `Bearer ${authStore.accessToken}`,
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+        signal: controller.signal,
+      })
+
+      if (!res.ok || !res.body) throw new Error(`SSE 连接失败: ${res.status}`)
+
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += value
+        // SSE 消息以两个换行符分隔
+        const chunks = buffer.split('\n\n')
+        buffer = chunks.pop() ?? ''
+        for (const chunk of chunks) {
+          const parsed = parseSSEChunk(chunk)
+          if (!parsed) continue
+          events.value.push(parsed)
+          taskStore.handleSSEEvent(parsed)   // 同步到 task store
+          if (parsed.type === 'task_completed' || parsed.type === 'task_failed') {
+            disconnect()
+            return
+          }
+        }
+      }
+      retryCount = 0   // 正常结束，重置重试计数
+    } catch (e: any) {
+      if (e.name === 'AbortError') return   // 主动断开，不重连
+      connected.value = false
+      error.value = e.message
+      scheduleRetry()
+    }
+  }
+
+  function scheduleRetry() {
+    if (retryCount >= MAX_RETRY) {
+      error.value = 'SSE 连接超过最大重试次数，请刷新页面'
+      return
+    }
+    const delay = Math.min(1000 * 2 ** retryCount, 30_000)   // 指数退避，最大 30s
+    retryTimer = setTimeout(() => { retryCount++; connect() }, delay)
+  }
+
+  function parseSSEChunk(chunk: string): SSEEvent | null {
+    const lines = chunk.trim().split('\n')
+    let type = '', data = ''
+    for (const line of lines) {
+      if (line.startsWith('event:')) type = line.slice(6).trim()
+      if (line.startsWith('data:'))  data = line.slice(5).trim()
+    }
+    if (!type || !data) return null
+    try { return { type, data: JSON.parse(data) } }
+    catch { return null }
+  }
+
+  function disconnect() {
+    controller?.abort()
+    if (retryTimer) clearTimeout(retryTimer)
+    connected.value = false
+  }
+
+  onMounted(() => connect())
+  onUnmounted(() => disconnect())
+
+  return { events, connected, error, disconnect }
+}
+```
+
+---
+
+## 7. 权限模型
+
+### 7.1 权限分级
+
+| 权限级别 | permissions 值 | 可访问功能 |
+|---------|--------------|-----------|
+| `read`  | `["read"]` | 查看任务/Agent/Skill 列表、Dashboard、任务详情 |
+| `write` | `["read", "write"]` | 以上 + 创建/取消任务、提交反馈 |
+| `admin` | `["read", "write", "admin"]` | 以上 + 注册 Agent、安装/卸载 Skill、数据导出 |
+
+### 7.2 权限来源
+
+登录响应中返回 `user.permissions`，存入 auth store：
+
+```json
+{
+  "access_token": "eyJ...",
+  "expires_in": 3600,
+  "user": {
+    "id": "user-001",
+    "username": "admin",
+    "permissions": ["read", "write", "admin"]
+  }
+}
+```
+
+注意：`refresh_token` 不在响应 body 中，由后端通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Strict` 写入浏览器。
+
+### 7.3 路由级权限
+
+路由 `meta.permission` 声明所需最低权限，路由守卫校验（见第 3.2 节）。无权限时跳 Dashboard，侧边栏菜单根据权限动态过滤（无权限的菜单项不展示）。
+
+### 7.4 按钮级权限 (v-permission 指令)
+
+```typescript
+// directives/v-permission.ts
+export const vPermission: Directive = {
+  mounted(el: HTMLElement, binding: DirectiveBinding<string>) {
+    const { hasPermission } = useAuthStore()
+    if (!hasPermission(binding.value)) {
+      el.style.display = 'none'   // 隐藏，避免 layout 抖动
+    }
+  },
+  updated(el: HTMLElement, binding: DirectiveBinding<string>) {
+    const { hasPermission } = useAuthStore()
+    el.style.display = hasPermission(binding.value) ? '' : 'none'
+  }
+}
+
+// 使用示例
+// <el-button v-permission="'admin'" @click="handleInstall">安装 Skill</el-button>
+// <el-button v-permission="'write'" @click="handleCreate">创建任务</el-button>
+```
+
+---
+
+## 8. Dashboard 数据源
+
+Dashboard.vue 展示聚合数据，对应后端 `GET /api/v1/dashboard`（见 API-SPEC 第 9 节）。
+
+| 卡片/图表 | 数据字段 | 说明 |
+|---------|---------|------|
+| 任务总览 | `tasks.total / pending / processing / completed / failed` | 今日任务状态分布 |
+| Agent 状态 | `agents.active / inactive` | 在线/离线 Agent 数 |
+| Skill 数量 | `skills.total` | 已安装 Skill 数 |
+| 今日费用 | `cost.today_usd / trend_pct` | LLM 调用费用 + 环比百分比 |
+| 最近任务 | `recent_tasks[]` | 最近 5 条任务（含状态、费用） |
+| 费用趋势折线图 | `cost.daily_7d[]` | 近 7 天每日费用 |
+
+```typescript
+// api/modules/dashboard.ts
+export interface DashboardData {
+  tasks: { total: number; pending: number; processing: number; completed: number; failed: number }
+  agents: { active: number; inactive: number }
+  skills: { total: number }
+  cost: {
+    today_usd: number
+    trend_pct: number   // 正数=增加，负数=减少，相对昨日
+    daily_7d: Array<{ date: string; usd: number }>
+  }
+  recent_tasks: TaskSummary[]
+}
+
+export function getDashboard(): Promise<DashboardData> {
+  return request.get('/dashboard')
+}
+```
+
+---
+
+## 9. Skill 安装 UI 流程
+
+Skill 安装为异步操作（需执行 pip install），前端通过轮询获取进度：
+
+```
+用户提交 → POST /skills/install
+    │ 返回 { install_id, skill_name, status: 'pending' }
+    ▼
+useSkillInstall composable 每 2s 轮询
+    GET /skills/install/{install_id}
+    │ status: 'installing' → SkillInstallProgress.vue 追加日志
+    │ status: 'done'       → ElMessage.success，刷新 Skill 列表
+    │ status: 'failed'     → ElMessage.error，展示错误详情
+```
+
+```typescript
+// composables/useSkillInstall.ts
+export function useSkillInstall() {
+  const skillStore = useSkillStore()
+
+  async function install(source: string) {
+    const { install_id, skill_name } = await installSkillApi({ source })
+    skillStore.installJobs[skill_name] = { skillName: skill_name, status: 'installing', log: '' }
+    poll(install_id, skill_name)
+  }
+
+  function poll(installId: string, skillName: string) {
+    const timer = setInterval(async () => {
+      const res = await getInstallStatusApi(installId)
+      skillStore.installJobs[skillName].log    = res.log ?? ''
+      skillStore.installJobs[skillName].status = res.status
+      if (res.status === 'done') {
+        clearInterval(timer)
+        ElMessage.success(`${skillName} 安装成功`)
+        await skillStore.fetchSkills()
+      } else if (res.status === 'failed') {
+        clearInterval(timer)
+        ElMessage.error(`${skillName} 安装失败：${res.error}`)
+      }
+    }, 2000)
+  }
+
+  return { install }
+}
+```
+
+---
+
+## 10. 错误处理 UX 规范
+
+| 场景 | 展示方式 | 行为 |
+|------|---------|------|
+| 表单校验失败 | `ElForm` 内联错误 | 字段级红色提示，不弹全局 message |
+| API 4xx 业务错误 | `ElMessage.error` | 顶部弹出 3s，展示 error.message |
+| 429 限流 | `ElMessage.warning` | "操作过于频繁，请稍后再试" |
+| API 5xx 服务器错误 | `ElMessage.error` | 展示错误信息，组件内提供重试按钮 |
+| SSE 断线重连中 | `LiveLog.vue` 内 Banner | 展示"连接中断，X 秒后重连..." |
+| SSE 超过最大重试 | `LiveLog.vue` 内 Alert | 展示"连接失败，请刷新页面" + 刷新按钮 |
+| Token 过期刷新失败 | 跳转 `/login?redirect=...` | 登录成功后回跳原页面 |
+
+**约定：所有全局 ElMessage 调用统一在 `api/request.ts` 响应拦截器中处理，业务代码中不重复调用，避免重复提示。**
+
+---
+
+## 11. API 类型自动生成
+
+> 禁止手写 API 类型，从后端 OpenAPI Schema 自动生成，保证前后端类型同步。
+
+```bash
+# scripts/gen-types.sh（后端须先在 localhost:8000 启动）
+npx openapi-typescript http://localhost:8000/openapi.json -o src/api/types/schema.d.ts
+```
+
+```json
+// package.json scripts
+{
+  "gen:types": "bash scripts/gen-types.sh"
+}
+```
+
+```typescript
+// 在 API 模块中引用
+import type { components } from '@/api/types/schema'
+type Task            = components['schemas']['Task']
+type TaskCreateReq   = components['schemas']['TaskCreateRequest']
+type DashboardData   = components['schemas']['DashboardResponse']
+```
+
+**约定：`src/api/types/schema.d.ts` 不允许手动修改，后端 Schema 变更后执行 `npm run gen:types` 重新生成。**
+
+---
+
+## 12. 主题与样式
+
+### 12.1 Element Plus 主题定制
+
+```scss
+:root {
+  --el-color-primary: #409EFF;
+  --el-color-success: #67C23A;
+  --el-color-warning: #E6A23C;
+  --el-color-danger:  #F56C6C;
+  --el-color-info:    #909399;
+  --sidebar-width:    220px;
+  --header-height:    60px;
+  --page-padding:     24px;
+}
+```
+
+### 12.2 全局布局
+
+```
+┌──────────────────────────────────────────────┐
+│                   AppHeader                   │  60px
+├────────┬─────────────────────────────────────┤
+│App     │           Main Content              │
+│Sidebar │      padding: var(--page-padding)   │
+│ 220px  │                                     │
+├────────┴─────────────────────────────────────┤
+│                 AppFooter                     │  40px
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 13. 响应式策略
+
+### 13.1 断点定义
+
+```scss
+$breakpoints: (
+  xs: 480px,
+  sm: 768px,
+  md: 1024px,
+  lg: 1280px,
+  xl: 1536px,
+);
+```
+
+### 13.2 响应式行为
+
+| 断点 | 侧边栏 | 布局 | 表格 |
+|------|--------|------|------|
+| `< 768px` | 隐藏（抽屉式） | 单列 | 堆叠/横向滚动 |
+| `768px–1024px` | 折叠（图标模式） | 双列 | 紧凑模式 |
+| `> 1024px` | 展开 | 标准 | 标准模式 |
+
+---
+
+## 14. Vite 配置
+
+```typescript
+export default defineConfig({
+  plugins: [
+    vue(),
+    autoImport({ imports: ['vue', 'vue-router', 'pinia'] }),
+    components({ dirs: ['src/components'] }),
+  ],
+  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+  server: {
+    port: 3000,
+    proxy: {
+      '/api': { target: 'http://localhost:8000', changeOrigin: true },
+    },
+  },
+  build: { target: 'es2020', outDir: 'dist', sourcemap: false },
+})
+```
+
+---
+
+## 15. 与后端集成
+
+| 环境 | 前端 | 后端 | 跨域处理 |
+|------|------|------|---------|
+| 开发 | `localhost:3000` | `localhost:8000` | Vite proxy 转发 `/api` |
+| 生产 | `localhost:8080` (Nginx) | `localhost:8000` (Nginx 反向代理) | 同域，无需跨域 |
+
+---
+
+## 16. 开发工作流
+
+```bash
+npm install        # 安装依赖
+npm run dev        # 开发服务器（localhost:3000）
+npm run gen:types  # 同步后端 API 类型（后端须先启动）
+npm run build      # 生产构建 → dist/
+npm run preview    # 本地预览构建结果
+npm run lint       # ESLint + StyleLint
+```

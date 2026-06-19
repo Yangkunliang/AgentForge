@@ -1,0 +1,27 @@
+# ITER-001 - 架构设计迭代记录
+
+## 迭代信息
+- **迭代编号**: ITER-001
+- **开始时间**: 2026-06-17
+- **结束时间**: 2026-06-17
+- **状态**: 已完成
+
+## 迭代目标
+完成多智能体协同框架的架构设计，建立完整的文档迭代体系。
+
+## 产出文档
+1. `docs/product/PRD-v1.md` - 产品需求文档
+2. `docs/design/ARCHITECTURE.md` - 架构设计
+3. `docs/design/API-SPEC.md` - API 规范
+4. `docs/design/DATABASE.md` - 数据库设计
+5. `docs/design/SECURITY.md` - 安全设计
+
+## 关键决策
+1. **Harness 六层架构**: 借鉴 workorder_harness_agent 的 Harness 理念
+2. **技术栈**: Python + FastAPI + LiteLLM + PostgreSQL
+3. **Skill 格式**: Markdown 指令（skill.md）+ Python 执行（executor.py），类似 Claude Code skill-creator
+4. **数据库**: PostgreSQL（开发/生产统一，Docker 启动，SQLAlchemy + Alembic）
+5. **文档迭代体系**: 完整迭代链条（PRD → Task → Design → Test → Iteration）
+
+## 后续迭代
+- ITER-002: 核心框架开发
