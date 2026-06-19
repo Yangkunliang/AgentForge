@@ -17,3 +17,9 @@
 
 ## 文档体系 (docs/)
 - [README.md](docs/README.md) — 文档迭代链条、版本号规范
+
+## 迭代执行约定
+- 后续每一次迭代开始前，先设计任务 checklist，按模块和优先级排序。
+- 每个 checklist item 需要明确模块、优先级、产出物和验收标准。
+- 执行时遵循小步提交：完成 1 个 checklist item 后，立即勾选完成并单独 commit 一次。
+- 架构设计阶段也遵循该流程，先完成设计 checklist，再进入开发执行。
