@@ -47,4 +47,4 @@ docs/
 - PRD: `PRD-v{n}.md`（如 PRD-v1.md）
 - Task: `TASK-NNN.yaml`（如 TASK-001.yaml）
 - Test: `TEST-NNN.md`（如 TEST-001.md）
-- Iteration: `ITER-NNN.md`（如 ITER-001.md）
+- Iteration: `ITER-{task-name}-{timestamp}.md`（如 ITER-architecture-design-20260619.md）

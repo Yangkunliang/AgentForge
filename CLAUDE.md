@@ -16,7 +16,7 @@
 |------|------|
 | `docs/product/` | 产品需求（`PRD-v1.md`） |
 | `docs/design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出 |
-| `docs/iteration/` | 迭代记录（`ITER-001.md`） |
+| `docs/iteration/` | 迭代记录（`ITER-{task-name}-{timestamp}.md`） |
 | `docs/api/` | API 文档（空 — 实现时补充） |
 
 仓库根目录的 `MEMORY.md` 也链接了所有文档。
