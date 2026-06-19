@@ -29,7 +29,9 @@
 - [ ] **pyproject.toml + 目录结构**
   - 包名：`agent_forge`
   - 依赖：fastapi、sqlalchemy[asyncio]、alembic、pydantic-settings、aio-pika、litellm、tenacity、pybreaker、slowapi、asyncpg、bcrypt、python-jose[cryptography]
-  - 开发依赖：pytest、pytest-asyncio、httpx、ruff、mypy
+  - 开发依赖：pytest、pytest-asyncio、httpx、ruff、mypy、pre-commit、coverage、pytest-cov、pytest-dotenv
+  - 配置 `pyproject.toml` 中的 `[tool.pytest.ini_options]`（自动发现 `tests/**/test_*.py`，`asyncio_mode=auto`）
+  - 项目根目录 `tests/conftest.py`：全局 fixture（async_client、fake_user、mock_litellm）
 
 - [ ] **docker-compose.yml**
   - PostgreSQL 15-alpine（healthcheck: pg_isready）
@@ -82,6 +84,54 @@
 - [ ] 路由规则：`/auth/*` 10/min、`/tasks` 100/min、`/tasks/{id}` 300/min、`/skills/*` 50/min、`/dashboard` 60/min
 - [ ] 超限响应：429 + `Retry-After`
 
+### 测试基础设施
+
+- [ ] **pytest 配置**
+  - `pyproject.toml` 中 `[tool.pytest.ini_options]`：`testpaths = ["tests"]`、`pythonpath = ["src"]`、`asyncio_mode = "auto"`
+  - 根目录 `tests/conftest.py`：全局 fixture
+    - `async_client`：httpx.AsyncClient (TestClient wrapper)
+    - `fake_user`：工厂函数生成测试用户数据
+    - `db_session`：事务回滚 fixture（每个测试后自动 rollback，不污染数据库）
+    - `mock_litellm`：模拟 LLM 调用返回（避免每次测试都调 API）
+  - `pytest -v --cov=src/` 能跑通基础 health 端点测试
+
+- [ ] **API 层基础测试**（`tests/api/test_health.py`、`tests/api/test_auth.py`）
+  - `GET /health` → 200 + `{"status":"ok","db":"ok",...}`
+  - `POST /auth/register` → 201 + user data
+  - `POST /auth/login` → 200 + access_token + refresh_token cookie
+  - `POST /auth/login` with wrong password → 401
+  - 受保护端点未带 token → 401
+  - 受保护端点带过期 token → 401
+
+- [ ] **Harness 层基础测试**（`tests/harness/`）
+  - `test_validator_input`：非法输入被 Reject
+  - `test_governance_retry`：3 次指数退避后成功
+  - `test_governance_circuit_open`：连续 5 次失败后熔断器打开
+
+### Pre-commit Hooks（`.pre-commit-config.yaml`）
+
+- [ ] **阻塞式检查**（commit 时同步执行，必须全部通过）
+  - `ruff check` — lint（< 1s）
+  - `ruff format --check` — 格式化（< 1s）
+  - `mypy --strict` — 类型检查（< 5s）
+  - `pytest tests/ -x --timeout=30` — 只跑改动文件相关的单测（`pre-commit-hooks` 中用 `pyupgrade` + `pytest` 的 `--durations=0`，范围用 `staged-files` 过滤）
+  - 配置 `.pre-commit-hooks.yaml` 或 `pre-commit` 的 `files:` 正则限制
+
+- [ ] **`pre-commit install`** 后 `git commit` 自动触发检查
+
+### CI 流水线（`.github/workflows/ci.yml`）
+
+- [ ] **PR 触发**（非阻塞，评论式）
+  - `on: [pull_request]` 触发全量测试 + lint + mypy
+  - 失败时 **阻塞合并**（`status: success` 是 required check）
+  - 单元测试覆盖率阈值：≥ 60%
+
+- [ ] **LLM Code Review**（非阻塞，异步评论）
+  - `on: [pull_request_target]` 触发
+  - 调用 AgentForge 自身 /review API（或 liteLLM）对 diff 做评论
+  - 评论挂在 PR 上，不阻塞合并按钮
+  - 支持 `@claude review` 手动触发（issue_comment 事件）
+
 ## 产出物
 
 - `pyproject.toml`
@@ -93,9 +143,19 @@
 - `src/agent_forge/auth/jwt.py`
 - `src/middleware/rate_limit.py`
 
+### 新增产出物
+
+- `tests/conftest.py` — 全局 pytest fixtures
+- `tests/api/test_health.py`、`tests/api/test_auth.py` — API 层基础测试
+- `tests/harness/test_validator.py`、`tests/harness/test_governance.py` — Harness 层基础测试
+- `.pre-commit-config.yaml` — pre-commit hooks 配置
+- `.github/workflows/ci.yml` — CI pipeline（测试 + lint + LLM review）
+- `docs/tech-design/TESTING.md` — 测试策略设计文档
+
 ## 参考文档
 
 - `docs/tech-design/DATABASE.md`
 - `docs/tech-design/SECURITY.md`
 - `docs/tech-design/API-SPEC.md` 第 2 节
 - `docs/tech-design/DEPLOYMENT.md` 第 3 节
+- `docs/tech-design/TESTING.md`（新增，本任务产出）
