@@ -1,148 +1,61 @@
-# Agent 设计规范
+# AgentForge 仓库级 Agent 工作规范
 
-## 1. Agent 定义
+## 1. 项目定位
 
-**Agent** 是 AgentForge 框架中的核心执行单元，基于 LLM 的智能体，具备以下能力：
+AgentForge 是面向生产的多智能体协同框架。当前阶段以架构设计和文档规范为先，开发执行在架构 checklist 明确后推进。
 
-- **感知**：接收任务输入，理解任务目标
-- **思考**：分析任务、规划执行步骤
-- **执行**：调用 Skill 完成任务
-- **协作**：与其他 Agent 协商分工
+## 2. 工作原则
 
-**公式**：`Agent = Model + Harness + Skills`
+- 架构先行：先明确范围、模块边界、数据流、接口和验收标准，再进入实现。
+- 小步迭代：每次迭代先建立任务 checklist，按模块和优先级排序。
+- 小步提交：完成 1 个 checklist item 后，立即勾选完成并单独 commit 一次。
+- 文档同步：目录、规范、架构和迭代产物发生变化时，同步更新 `docs/README.md` 与 `MEMORY.md`。
+- 避免混淆：根目录 `AGENTS.md` 只放仓库级 Agent 工作规范；AgentForge 产品中的 Agent 领域模型放在 `docs/architecture/AGENT-MODEL.md`。
 
-## 2. Agent 类型
+## 3. 文档目录约定
 
-| 类型 | 描述 | 内置 |
-|------|------|------|
-| Coder | 代码编写、重构、调试 | ✅ |
-| Reviewer | 代码审查、问题发现 | ✅ |
-| Researcher | 信息检索、知识整理 | ✅ |
-| Planner | 任务拆解、流程规划 | ✅ |
-| Custom | 自定义 Agent | — |
+- `docs/standards/`：长期规范，例如文档命名、迭代流程、提交节奏、Skill 使用策略。
+- `docs/architecture/`：当前系统架构蓝图，例如 Agent 模型、Harness、API、数据库、安全、前端架构。
+- `docs/iterations/`：每次迭代生成的过程文档，按日期和主题建目录。
+- `docs/product-design/`、`docs/tech-design/`、`docs/iteration/`：历史文档目录，迁移时应保持索引可追溯。
 
-## 3. Agent 能力模型
+## 4. 迭代产物命名
 
-```yaml
-Agent:
-  id: UUID
-  name: string
-  type: enum[coder, reviewer, researcher, planner, custom]
-  description: string
-  model: string              # LLM 模型标识
-  capabilities: []          # 能力标签列表
-  skills: []                # 绑定的 Skill
-  status: enum[active, inactive]
-  metadata:
-    max_concurrency: int    # 最大并发任务数
-    timeout: int            # 任务超时时间(秒)
+新迭代目录建议使用以下文件名：
+
+```text
+docs/iterations/YYYY-MM-DD-topic/
+├── PRODUCT-REQUIREMENTS.md
+├── TASK-CHECKLIST.md
+├── TECHNICAL-DESIGN.md
+├── UI-DESIGN.md
+├── TEST-PLAN.md
+└── ITERATION-REVIEW.md
 ```
 
-## 4. 协作机制
+`UI-DESIGN.md` 仅在涉及 UI/UX 时创建。
 
-### 4.1 Contract Net 协议
+## 5. 本地 UI/UX Skill 使用约束
 
-Agent 间通过 Contract Net 协议进行任务协商：
+前端 UI/UX 设计类任务允许使用本地已安装的 `ui-ux-pro-max` skill：
 
-```
-1. 发布(Announce)   → 发布者广播任务需求
-2. 竞标(Bid)        → 候选者评估并提交方案
-3. 评分(Award)      → 发布者评估并选择执行者
-4. 执行(Execute)    → 中标者执行任务
-5. 结果(Result)     → 返回执行结果
+```text
+~/.claude/skills/ui-ux-pro-max
 ```
 
-### 4.2 降级策略
+使用边界：
 
-当主 Agent 失败时，自动切换备选：
+- 仅作为 advisory skill 使用。
+- 仅用于 UI design、UX review、design system、frontend visual spec 等任务。
+- 输出必须沉淀到 `UI-DESIGN.md` 或 `UI-REVIEW.md`。
+- 不得用于后端架构、数据库、安全、部署、Agent 编排或核心领域模型决策。
+- 该 skill 属于开发过程辅助能力，不默认进入 AgentForge 产品运行时的 SkillRegistry。
 
-```yaml
-fallback:
-  max_retries: 3
-  strategy: sequential      # sequential / parallel
-  agents: []               # 备选 Agent 列表
-```
+## 6. 验证要求
 
-## 5. 内置 Agent
+文档类变更至少检查：
 
-### 5.1 Coder
-
-**职责**：代码编写与重构
-
-**能力标签**：`code`, `refactor`, `debug`
-
-**默认 Skill**：
-- `write-code`：生成代码
-- `review-code`：代码审查
-- `fix-bug`：Bug 修复
-
-### 5.2 Reviewer
-
-**职责**：代码质量审查
-
-**能力标签**：`review`, `quality`, `security`
-
-**默认 Skill**：
-- `check-style`：代码风格检查
-- `check-security`：安全漏洞检测
-- `check-performance`：性能分析
-
-### 5.3 Researcher
-
-**职责**：信息检索与整理
-
-**能力标签**：`research`, `search`, `analysis`
-
-**默认 Skill**：
-- `web-search`：网络搜索
-- `doc-read`：文档阅读理解
-- `summarize`：内容摘要
-
-### 5.4 Planner
-
-**职责**：任务规划与分解
-
-**能力标签**：`planning`, `decomposition`, `coordination`
-
-**默认 Skill**：
-- `task-split`：任务拆分
-- `estimate`：工作量评估
-- `schedule`：进度规划
-
-## 6. Agent 注册
-
-Agent 通过 API 或配置注册：
-
-```bash
-# 注册 Agent
-POST /api/v1/agents
-{
-  "name": "my-coder",
-  "type": "coder",
-  "model": "gpt-4",
-  "capabilities": ["code", "refactor"],
-  "skills": ["write-code", "review-code"]
-}
-
-# 列出 Agent
-GET /api/v1/agents
-
-# 更新 Agent
-PUT /api/v1/agents/{id}
-
-# 删除 Agent
-DELETE /api/v1/agents/{id}
-```
-
-## 7. 状态管理
-
-| 状态 | 说明 |
-|------|------|
-| `active` | 可接收任务 |
-| `inactive` | 暂停服务 |
-| `busy` | 任务执行中 |
-| `error` | 异常状态 |
-
----
-
-*文档版本: v1.0 | 创建日期: 2026-06-19*
+- 链接和路径是否准确。
+- 规范与目录结构是否一致。
+- 是否存在同名但语义不同的文档。
+- 是否更新了相关索引。

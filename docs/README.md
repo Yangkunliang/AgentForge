@@ -10,19 +10,31 @@
 
 ```
 docs/
+├── standards/      # 长期规范：文档、迭代、Skill 使用策略
+├── architecture/   # 当前系统架构蓝图
 ├── product-design/   # 产品文档
 ├── tech-design/   # 技术设计文档
 ├── iteration/     # 迭代记录
-├── tasks/         # 任务拆解文档
-└── tests/         # 测试用例文档
+└── iterations/    # 新迭代产物目录
 ```
+
+## 长期规范 (standards/)
+
+| 文档 | 说明 | 状态 |
+|------|------|------|
+| ITERATION-STANDARD.md | 迭代目录、产物命名、checklist 字段、小步提交、本地 UI/UX Skill 使用策略 | ✅ |
+
+## 当前系统架构 (architecture/)
+
+| 文档 | 说明 | 状态 |
+|------|------|------|
+| AGENT-MODEL.md | AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制 | ✅ |
 
 ## 设计文档清单 (tech-design/)
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | ARCHITECTURE.md | 整体架构、六层 Harness、执行流程 | ✅ |
-| AGENTS.md | Agent 定义、类型、能力模型、协作机制 | ✅ |
 | DATABASE.md | 数据库实体、索引、关系图 | ✅ |
 | API-SPEC.md | 完整 API 规范（含注册、Dashboard、反馈、费用、Skill 安装进度） | ✅ |
 | SECURITY.md | 认证、限流、沙箱、Secrets 管理 | ✅ |
@@ -36,15 +48,16 @@ docs/
 
 每个功能迭代遵循完整链条：
 
-1. **PRD** → 产品需求（做什么）
-2. **Task** → 任务拆解（怎么拆）
-3. **Design** → 技术方案（怎么实现）
-4. **Test** → 测试用例（怎么验证）
-5. **Iteration** → 迭代总结（学到了什么）
+1. **PRODUCT-REQUIREMENTS.md** → 产品需求（做什么）
+2. **TASK-CHECKLIST.md** → 任务拆解、优先级、验收标准
+3. **TECHNICAL-DESIGN.md** → 技术方案（怎么实现）
+4. **UI-DESIGN.md** → UI/UX 设计（仅 UI 相关迭代需要）
+5. **TEST-PLAN.md** → 测试与验收方案
+6. **ITERATION-REVIEW.md** → 迭代总结（学到了什么）
 
 ## 版本号规范
 
-- PRD: `PRD-{功能模块}-{时间戳}.md`（如 `PRD-多智能体框架-20260617.md`）
-- Task: `TASK-{任务名}-{时间戳}.yaml`（如 `TASK-登录功能-20260619.yaml`）
-- Test: `TEST-{测试名}-{时间戳}.md`（如 `TEST-用户认证-20260619.md`）
-- Iteration: `ITER-{任务名}-{时间戳}.md`（如 `ITER-架构设计-20260617.md`）
+- 新迭代目录：`docs/iterations/YYYY-MM-DD-topic/`
+- 标准产物：`PRODUCT-REQUIREMENTS.md`、`TASK-CHECKLIST.md`、`TECHNICAL-DESIGN.md`、`TEST-PLAN.md`、`ITERATION-REVIEW.md`
+- UI 相关迭代增加：`UI-DESIGN.md`
+- 历史 `PRD-*`、`TASK-*`、`TEST-*`、`ITER-*` 文件保留可追溯，后续新迭代使用新命名规范

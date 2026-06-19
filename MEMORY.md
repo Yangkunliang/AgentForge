@@ -1,19 +1,24 @@
 # 多智能体框架项目文档索引
 
 ## 产品文档 (product-design/)
-- [PRD-多智能体框架 - 产品需求文档](product-design/PRD-多智能体框架-20260617.md) — 产品定位、用户故事、核心功能、技术栈
+- [PRD-多智能体框架 - 产品需求文档](docs/product-design/PRD-多智能体框架-20260617.md) — 产品定位、用户故事、核心功能、技术栈
+
+## 长期规范 (standards/)
+- [ITERATION-STANDARD.md](docs/standards/ITERATION-STANDARD.md) — 迭代目录、产物命名、checklist 字段、小步提交、本地 UI/UX Skill 使用策略
+
+## 当前系统架构 (architecture/)
+- [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
 
 ## 技术设计文档 (tech-design/)
-- [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) — Harness 六层架构 + 消息总线 + 数据导出 + LLM 抽象
-- [AGENTS.md](tech-design/AGENTS.md) — Agent 定义、类型、能力模型、协作机制
-- [API-SPEC.md](tech-design/API-SPEC.md) — API 规范、分页、Webhook、SSE 流式输出、错误码
-- [DATABASE.md](tech-design/DATABASE.md) — 数据库实体、索引、关系图
-- [SECURITY.md](tech-design/SECURITY.md) — 认证、限流、沙箱、Secrets 管理
-- [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) — LiteLLM 配置、模型选择、Fallback、Cost 追踪
-- [DATA-EXPORT.md](tech-design/DATA-EXPORT.md) — 训练数据导出、脱敏、模型训练用途
+- [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构 + 消息总线 + 数据导出 + LLM 抽象
+- [API-SPEC.md](docs/tech-design/API-SPEC.md) — API 规范、分页、Webhook、SSE 流式输出、错误码
+- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、索引、关系图
+- [SECURITY.md](docs/tech-design/SECURITY.md) — 认证、限流、沙箱、Secrets 管理
+- [LLM-CONFIG.md](docs/tech-design/LLM-CONFIG.md) — LiteLLM 配置、模型选择、Fallback、Cost 追踪
+- [DATA-EXPORT.md](docs/tech-design/DATA-EXPORT.md) — 训练数据导出、脱敏、模型训练用途
 
 ## 迭代记录 (iteration/)
-- [架构设计迭代记录](iteration/ITER-架构设计-20260617.md) — 架构设计迭代总结
+- [架构设计迭代记录](docs/iteration/ITER-架构设计-20260617.md) — 架构设计迭代总结
 
 ## 文档体系 (docs/)
 - [README.md](docs/README.md) — 文档迭代链条、版本号规范
@@ -23,3 +28,5 @@
 - 每个 checklist item 需要明确模块、优先级、产出物和验收标准。
 - 执行时遵循小步提交：完成 1 个 checklist item 后，立即勾选完成并单独 commit 一次。
 - 架构设计阶段也遵循该流程，先完成设计 checklist，再进入开发执行。
+- 根目录 `AGENTS.md` 只放仓库级 Agent 工作规范；AgentForge 产品内部的 Agent 领域模型放在 `docs/architecture/AGENT-MODEL.md`。
+- 前端 UI/UX 相关任务允许使用本地 `~/.claude/skills/ui-ux-pro-max`，但仅作为 advisory skill，输出沉淀到 `UI-DESIGN.md` 或 `UI-REVIEW.md`，不得参与后端、数据库、安全、部署、Agent 编排或核心领域模型决策。

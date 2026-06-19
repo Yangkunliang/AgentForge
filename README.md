@@ -9,12 +9,14 @@
 ```
 AgentForge/
 ├── docs/
+│   ├── standards/      # 长期规范：文档、迭代、Skill 使用策略
+│   ├── architecture/   # 当前系统架构蓝图
 │   ├── product-design/   # 产品文档
 │   ├── tech-design/   # 技术设计文档
 │   ├── iteration/     # 迭代记录
-│   ├── tasks/         # 任务拆解
-│   └── tests/         # 测试用例
-├── CLAUDE.md          # 开发指导
+│   └── iterations/    # 新迭代产物目录
+├── AGENTS.md          # 仓库级 Agent 工作规范
+├── CLAUDE.md          # Claude Code 开发指导
 └── MEMORY.md          # 项目记忆
 ```
 
@@ -22,9 +24,12 @@ AgentForge/
 
 | 目录 | 内容 |
 |------|------|
+| `standards/` | 长期规范：迭代流程、文档命名、Skill 使用策略 |
+| `architecture/` | 当前系统架构蓝图，例如 Agent 领域模型 |
 | `product-design/` | 产品需求（PRD） |
-| `tech-design/` | 架构、API、数据库、安全、LLM 配置等设计文档 |
-| `iteration/` | 迭代记录 |
+| `tech-design/` | 历史技术设计文档，后续逐步迁移到 `architecture/` |
+| `iteration/` | 历史迭代记录 |
+| `iterations/` | 新迭代产物目录 |
 
 详细文档请查看 [docs/README.md](docs/README.md)。
 

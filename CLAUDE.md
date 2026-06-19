@@ -14,9 +14,12 @@
 
 | 目录 | 内容 |
 |------|------|
-| `product-design/` | 产品需求（`PRD-多智能体框架-20260617.md`） |
-| `tech-design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出 |
-| `iteration/` | 迭代记录（`ITER-{task-name}-{timestamp}.md`） |
+| `standards/` | 长期规范：迭代流程、文档命名、Skill 使用策略 |
+| `architecture/` | 当前系统架构蓝图，如 Agent 领域模型 |
+| `product-design/` | 历史产品需求（`PRD-多智能体框架-20260617.md`） |
+| `tech-design/` | 历史技术设计文档，后续逐步迁移到 `architecture/` |
+| `iteration/` | 历史迭代记录（`ITER-{task-name}-{timestamp}.md`） |
+| `iterations/` | 新迭代产物目录 |
 
 仓库根目录的 `MEMORY.md` 也链接了所有文档。
 
@@ -89,6 +92,9 @@ src/
 ## 使用本仓库
 
 - 目前无实现代码，重点在设计文档
+- 根目录 `AGENTS.md` 是仓库级 Agent 工作规范；产品内部 Agent 领域模型位于 `docs/architecture/AGENT-MODEL.md`
+- 新迭代遵循 `docs/standards/ITERATION-STANDARD.md`：先写 checklist，按模块和优先级执行，完成 1 项勾选并 commit 1 次
+- 前端 UI/UX 任务可使用本地 `~/.claude/skills/ui-ux-pro-max`，但仅作为 advisory skill，输出沉淀到 UI 设计文档
 - 开始实现后，核心包位于 `src/agentforge/`
 - 数据库使用 Docker Compose 本地启动（详见 `tech-design/DATABASE.md` §4.1）
 - 安全模型：双认证（JWT 用户认证 + API Key 服务间认证）、Prompt 注入防护、Skill 沙箱、全链路 trace_id 审计
