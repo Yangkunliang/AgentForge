@@ -3,11 +3,15 @@ import type { LoginForm, RegisterForm, AuthResponse } from '@/types'
 
 export const authApi = {
   login: (data: LoginForm) => {
-    return request.post<AuthResponse>('/auth/login', data)
+    return request.post<AuthResponse>('/auth/login', data, {
+      authEndpoint: true,
+    })
   },
 
   register: (data: RegisterForm) => {
-    return request.post<AuthResponse>('/auth/register', data)
+    return request.post<AuthResponse>('/auth/register', data, {
+      authEndpoint: true,
+    })
   },
 
   refresh: () => {

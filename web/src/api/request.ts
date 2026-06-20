@@ -2,6 +2,12 @@ import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestCo
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    authEndpoint?: boolean
+  }
+}
+
 const request: AxiosInstance = axios.create({
   baseURL: '/api/v1',
   timeout: 30000,
@@ -29,7 +35,11 @@ request.interceptors.response.use(
   (response) => {
     return response
   },
-  async (error: AxiosError<{ detail?: string; message?: string }>) => {
+  async (error: AxiosError<{ detail?: string | { msg?: string }[]; message?: string }>) => {
+    if (error.config?.authEndpoint) {
+      return Promise.reject(error)
+    }
+
     const status = error.response?.status
 
     switch (status) {
@@ -51,7 +61,7 @@ request.interceptors.response.use(
         break
       default:
         const message = error.response?.data?.detail || error.response?.data?.message || '请求失败'
-        ElMessage.error(message)
+        ElMessage.error(typeof message === 'string' ? message : '请求失败')
     }
 
     return Promise.reject(error)
