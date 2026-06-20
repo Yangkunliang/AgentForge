@@ -64,6 +64,7 @@ docs/
 | TASK-002 | 2025-06-20 | 任务管理与 Agent 管理 API | ✅ 已完成 |
 | TASK-003 | 2025-06-20 | Harness 核心 + RabbitMQ + SSE | ✅ 已完成 |
 | TASK-004 | 2025-06-20 | Skill 管理 + Dashboard + 费用统计 + 数据导出 | ✅ 已完成 |
+| TASK-005 | 2025-06-20 | 前端工作台（Vue 3 + Element Plus + SSE） | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2025-06-20-task-agent-management-api/`
@@ -101,6 +102,20 @@ docs/
   - Dashboard API（任务统计、Agent 状态、费用趋势）
   - 费用统计 API（每日费用、模型成本分布）
   - 数据导出 API（JSONL 格式、三级脱敏策略）
+
+### TASK-005 详细信息
+- **目录**：`docs/iterations/2025-06-20-frontend-workbench/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-frontend-workbench/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2025-06-20-frontend-workbench/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-frontend-workbench/TECHNICAL-DESIGN.md)
+- **核心功能**：
+  - 前端项目骨架（Vite + Vue 3 + TypeScript + Element Plus + Pinia）
+  - API 层（Axios 实例、模块化 API、类型生成脚本）
+  - 状态管理（auth、task、agent、skill、app stores）
+  - SSE 客户端（fetch + ReadableStream、指数退避重连）
+  - 页面组件（Login、Register、Dashboard、Task、Agent、Skill、Export）
+  - 路由守卫和权限控制
 
 ## 版本号规范
 
