@@ -31,7 +31,10 @@ class SubTask(Base):
 
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     description: Mapped[str] = mapped_column(Text)
-    status: Mapped[SubTaskStatus] = mapped_column(sa_Enum(SubTaskStatus), default=SubTaskStatus.PENDING)
+    status: Mapped[SubTaskStatus] = mapped_column(
+        sa_Enum(SubTaskStatus, native_enum=False, values_callable=lambda e: [m.value for m in e]),
+        default=SubTaskStatus.PENDING,
+    )
     assigned_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum as PyEnum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum as sa_Enum, ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum as sa_Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -39,13 +40,16 @@ class Task(Base, TimestampMixin):
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     description: Mapped[str] = mapped_column(Text)
-    status: Mapped[TaskStatus] = mapped_column(sa_Enum(TaskStatus), default=TaskStatus.PENDING)
+    status: Mapped[TaskStatus] = mapped_column(
+        sa_Enum(TaskStatus, native_enum=False, values_callable=lambda e: [m.value for m in e]),
+        default=TaskStatus.PENDING,
+    )
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
-    priority: Mapped[TaskPriority] = mapped_column(sa_Enum(TaskPriority), default=TaskPriority.MEDIUM)
-    trace_id: Mapped[str] = mapped_column(String(64), index=True)
+    priority: Mapped[int] = mapped_column(Integer, default=1)
+    trace_id: Mapped[str] = mapped_column(String(64), index=True, nullable=True)
 
-    completed_at: Mapped[str | None] = mapped_column(nullable=True)  # ISO datetime string
-    total_cost_usd: Mapped[float] = mapped_column(default=0.0)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
 
     # Relationships
     user = relationship("User", back_populates="tasks")

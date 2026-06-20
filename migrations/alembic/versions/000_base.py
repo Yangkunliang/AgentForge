@@ -35,7 +35,11 @@ def upgrade() -> None:
         sa.Column("name", sa.String(100), unique=True, nullable=False),
         sa.Column("description", sa.Text, nullable=True),
         sa.Column("manifest", sa.JSON, nullable=False),
-        sa.Column("created_by", sa.String(50), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("version", sa.String(20), nullable=False, server_default="0.0.0"),
+        sa.Column("entry_point", sa.String(255), nullable=True, server_default=""),
+        sa.Column("dependencies", sa.JSON, nullable=True),
+        sa.Column("installed_at", sa.String(50), nullable=True),
+        sa.Column("created_by", sa.String(50), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
@@ -47,6 +51,10 @@ def upgrade() -> None:
         sa.Column("name", sa.String(100), unique=True, nullable=False),
         sa.Column("type", sa.String(50), nullable=False),
         sa.Column("config", sa.JSON, nullable=False, default=dict),
+        sa.Column("capabilities", sa.JSON, nullable=True),
+        sa.Column("model", sa.String(100), nullable=True),
+        sa.Column("status", sa.String(20), nullable=False, server_default="active"),
+        sa.Column("description", sa.String(500), nullable=True),
         sa.Column("created_by", sa.String(50), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -70,7 +78,11 @@ def upgrade() -> None:
         sa.Column("priority", sa.Integer, nullable=False, default=0),
         sa.Column("parent_id", sa.String(50), sa.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True),
         sa.Column("assignee_id", sa.String(50), sa.ForeignKey("users.id"), nullable=True),
+        sa.Column("user_id", sa.String(50), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("created_by", sa.String(50), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("result", sa.Text, nullable=True),
+        sa.Column("trace_id", sa.String(64), nullable=True),
+        sa.Column("total_cost_usd", sa.Float, nullable=False, default=0.0, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
@@ -122,6 +134,20 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+    )
+
+    # 创建 skill_installs 表
+    op.create_table(
+        "skill_installs",
+        sa.Column("id", sa.String(50), primary_key=True),
+        sa.Column("skill_name", sa.String(100), nullable=False),
+        sa.Column("source", sa.String(500), nullable=False),
+        sa.Column("version", sa.String(20), nullable=False),
+        sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
+        sa.Column("log", sa.Text, nullable=True),
+        sa.Column("error", sa.Text, nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
 
     # 创建索引

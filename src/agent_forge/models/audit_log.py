@@ -24,7 +24,7 @@ class AuditLog(Base):
     degraded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
