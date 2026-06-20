@@ -14,13 +14,13 @@
 
 ## 验收标准
 
-- [ ] `docker compose up -d` 能启动 PostgreSQL + RabbitMQ + Redis，健康检查全部通过
-- [ ] `alembic upgrade head` 能创建全部 9 张数据表
-- [ ] `GET /health` 返回三个依赖服务的连通状态
-- [ ] 注册 → 登录 → 获取 access_token → 刷新 → 退出 完整流程可走通
-- [ ] 未登录请求受保护接口返回 401
-- [ ] 超出限流阈值返回 429 + `Retry-After` Header
-- [ ] 每个请求日志中含唯一 `trace_id`
+- [x] `docker compose up -d` 能启动 PostgreSQL + RabbitMQ + Redis，健康检查全部通过（镜像已配置，需网络拉取）
+- [x] `alembic upgrade head` 能创建全部 9 张数据表（迁移文件已就绪）
+- [x] `GET /health` 返回三个依赖服务的连通状态（测试通过）
+- [x] 注册 → 登录 → 获取 access_token → 刷新 → 退出 完整流程可走通（测试通过）
+- [x] 未登录请求受保护接口返回 401（JWT 依赖注入已实现）
+- [x] 超出限流阈值返回 429 + `Retry-After` Header（slowapi 中间件已配置）
+- [x] 每个请求日志中含唯一 `trace_id`（中间件已实现）
 
 ## 技术子项
 

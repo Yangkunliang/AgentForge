@@ -23,6 +23,7 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | ITERATION-STANDARD.md | 迭代目录、产物命名、checklist 字段、小步提交、本地 UI/UX Skill 使用策略 | ✅ |
+| DEVELOPMENT-GUIDE.md | 环境配置、启动步骤、测试方法、开发规范 | ✅ |
 
 ## 当前系统架构 (architecture/)
 
