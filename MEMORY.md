@@ -25,6 +25,10 @@
   - [PRODUCT-REQUIREMENTS.md](docs/iterations/2025-06-20-task-agent-management-api/PRODUCT-REQUIREMENTS.md) — 产品需求文档
   - [TASK-CHECKLIST.md](docs/iterations/2025-06-20-task-agent-management-api/TASK-CHECKLIST.md) — 任务清单和问题解决记录
   - [TECHNICAL-DESIGN.md](docs/iterations/2025-06-20-task-agent-management-api/TECHNICAL-DESIGN.md) — 技术设计文档
+- [2025-06-20-harness-core-rabbitmq-sse/](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/) — TASK-003 Harness 核心 + RabbitMQ + SSE
+  - [PRODUCT-REQUIREMENTS.md](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/PRODUCT-REQUIREMENTS.md) — 产品需求文档
+  - [TASK-CHECKLIST.md](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/TASK-CHECKLIST.md) — 任务清单
+  - [TECHNICAL-DESIGN.md](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/TECHNICAL-DESIGN.md) — 技术设计文档
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范

@@ -62,6 +62,7 @@ docs/
 |------|------|------|------|
 | TASK-001 | 2025-06-20 | 项目基础设施与认证系统 | ✅ 已完成 |
 | TASK-002 | 2025-06-20 | 任务管理与 Agent 管理 API | ✅ 已完成 |
+| TASK-003 | 2025-06-20 | Harness 核心 + RabbitMQ + SSE | 📝 文档已完成，待实现 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2025-06-20-task-agent-management-api/`
@@ -74,6 +75,19 @@ docs/
   - Agent 管理 API（CRUD 操作）
   - 权限控制和认证
   - 完整的单元测试覆盖
+
+### TASK-003 详细信息
+- **目录**：`docs/iterations/2025-06-20-harness-core-rabbitmq-sse/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-harness-core-rabbitmq-sse/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2025-06-20-harness-core-rabbitmq-sse/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-harness-core-rabbitmq-sse/TECHNICAL-DESIGN.md)
+- **核心功能**（待实现）：
+  - RabbitMQ 消息总线（Exchange/Queue 拓扑）
+  - Harness 六层架构（Validator、Router、Registry、Governance、Executor、Memory）
+  - SSE 流式输出（10 种事件类型）
+  - LLM Provider 抽象层（LiteLLM、模型路由、Cost 追踪）
+  - Agent 基类和内置 Agent（Coder、Reviewer、Researcher）
 
 ## 版本号规范
 
