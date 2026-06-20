@@ -22,6 +22,11 @@ PROMPT_INJECTION_BLACKLIST = [
     "new instructions",
     "stop following",
     "ignore instructions",
+    "忽略",
+    "无视",
+    "覆盖",
+    "绕过",
+    "新指令",
 ]
 
 

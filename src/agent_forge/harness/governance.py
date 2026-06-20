@@ -57,15 +57,13 @@ class CircuitBreaker:
     async def call(self, func: Callable, *args, **kwargs):
         """使用熔断器调用函数"""
         try:
-            result = await func(*args, **kwargs)
-            self.breaker.success()
+            result = await self.breaker.call_async(func, *args, **kwargs)
             return result
         except pybreaker.CircuitBreakerError:
             logger.warning(f"Circuit breaker '{self.name}' is OPEN, request rejected")
             self._is_open = True
             raise
         except Exception as e:
-            self.breaker.failure()
             logger.error(f"Circuit breaker '{self.name}' recorded failure: {e}")
             raise
 
