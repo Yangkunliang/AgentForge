@@ -15,6 +15,12 @@ from agent_forge.skills.manager import SkillManager
 @pytest.mark.asyncio
 class TestSkillManager:
     async def test_register_and_get_skill(self, db: AsyncSession):
+        result = await db.execute(select(Skill).where(Skill.name == "test-skill"))
+        existing = result.scalar_one_or_none()
+        if existing:
+            await db.delete(existing)
+            await db.commit()
+
         skill = await SkillManager.register_skill(
             db, "test-skill", "1.0.0", "Test skill", "test_skill.main"
         )
