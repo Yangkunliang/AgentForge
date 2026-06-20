@@ -33,6 +33,15 @@ AgentForge/
 
 详细文档请查看 [docs/README.md](docs/README.md)。
 
+### 快速链接
+
+| 文档 | 说明 |
+|------|------|
+| [开发指南](docs/standards/DEVELOPMENT-GUIDE.md) | 环境配置、启动步骤、测试方法 |
+| [API 规范](docs/tech-design/API-SPEC.md) | API 端点设计 |
+| [数据库设计](docs/tech-design/DATABASE.md) | 数据模型与表结构 |
+| [安全设计](docs/tech-design/SECURITY.md) | 认证、授权、限流策略 |
+
 ## 核心特性
 
 - **多 Agent 协同**：基于 Contract Net 协议的 Agent 间动态协商与任务分配
