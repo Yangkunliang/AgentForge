@@ -5,7 +5,9 @@ from __future__ import annotations
 from .agent import Agent
 from .agent_skill import AgentSkill
 from .api_key import APIKey
+from .audit_log import AuditLog
 from .conversation import Conversation
+from .memory_entry import MemoryEntry
 from .skill import Skill
 from .subtask import SubTask
 from .task import Task, TaskPriority, TaskStatus
@@ -16,7 +18,9 @@ __all__ = [
     "Agent",
     "AgentSkill",
     "APIKey",
+    "AuditLog",
     "Conversation",
+    "MemoryEntry",
     "Skill",
     "SubTask",
     "Task",
