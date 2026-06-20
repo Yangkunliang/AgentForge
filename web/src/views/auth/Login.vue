@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import type { LoginForm } from '@/types'
 
 const authStore = useAuthStore()
+const formRef = ref()
 
 const form = reactive<LoginForm>({
   username: '',
   password: '',
 })
 
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+  ],
+}
+
 async function handleSubmit() {
   try {
+    await formRef.value.validate()
     await authStore.login(form)
   } catch {
     // 错误已在 store 中处理
@@ -26,8 +37,8 @@ async function handleSubmit() {
       <h1 class="title">AgentForge</h1>
       <p class="subtitle">多智能体协同框架</p>
 
-      <el-form :model="form" class="login-form" @submit.prevent="handleSubmit">
-        <el-form-item>
+      <el-form :model="form" :rules="rules" ref="formRef" class="login-form" @submit.prevent="handleSubmit">
+        <el-form-item prop="username">
           <el-input
             v-model="form.username"
             placeholder="用户名"
@@ -35,7 +46,7 @@ async function handleSubmit() {
             :prefix-icon="User"
           />
         </el-form-item>
-        <el-form-item>
+        <el-form-item prop="password">
           <el-input
             v-model="form.password"
             type="password"

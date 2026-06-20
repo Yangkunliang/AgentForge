@@ -11,8 +11,7 @@ test.describe('Authentication', () => {
   test('should show validation error on empty fields', async ({ page }) => {
     await page.goto('/login')
     await page.click('button[type="submit"]')
-    // Element Plus 表单验证会显示错误提示
-    await expect(page.locator('.el-form-item__error')).toBeVisible()
+    await expect(page.locator('.el-form-item__error').first()).toBeVisible()
   })
 
   test('should navigate to register page', async ({ page }) => {
