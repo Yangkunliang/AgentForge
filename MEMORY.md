@@ -20,6 +20,12 @@
 ## 迭代记录 (docs/iteration/)
 - [ITER-001.md](docs/iteration/ITER-001.md) — 架构设计迭代记录
 
+## 迭代产物 (docs/iterations/)
+- [2025-06-20-task-agent-management-api/](docs/iterations/2025-06-20-task-agent-management-api/) — TASK-002 任务管理与 Agent 管理 API
+  - [PRODUCT-REQUIREMENTS.md](docs/iterations/2025-06-20-task-agent-management-api/PRODUCT-REQUIREMENTS.md) — 产品需求文档
+  - [TASK-CHECKLIST.md](docs/iterations/2025-06-20-task-agent-management-api/TASK-CHECKLIST.md) — 任务清单和问题解决记录
+  - [TECHNICAL-DESIGN.md](docs/iterations/2025-06-20-task-agent-management-api/TECHNICAL-DESIGN.md) — 技术设计文档
+
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
 

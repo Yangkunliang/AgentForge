@@ -23,6 +23,7 @@ class TaskStatus(str, PyEnum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class TaskPriority(str, PyEnum):

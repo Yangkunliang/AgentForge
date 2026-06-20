@@ -30,6 +30,7 @@ class Agent(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(100), unique=True)
     capabilities: Mapped[list[str]] = mapped_column(JSON, default=list)
     model: Mapped[str] = mapped_column(String(100))  # LLM model name
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default=AgentStatus.ACTIVE)
 
     # Relationships

@@ -8,7 +8,7 @@ from .api_key import APIKey
 from .conversation import Conversation
 from .skill import Skill
 from .subtask import SubTask
-from .task import Task
+from .task import Task, TaskPriority, TaskStatus
 from .task_execution import TaskExecution
 from .user import User
 
@@ -20,6 +20,8 @@ __all__ = [
     "Skill",
     "SubTask",
     "Task",
+    "TaskPriority",
+    "TaskStatus",
     "TaskExecution",
     "User",
 ]

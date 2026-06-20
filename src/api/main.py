@@ -109,7 +109,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # ── 路由挂载 ──────────────────────────────────────────────────
 
-from api.routes import health, auth  # noqa: E402
+from api.routes import agents, auth, health, tasks  # noqa: E402
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
+app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])

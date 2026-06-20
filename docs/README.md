@@ -56,6 +56,25 @@ docs/
 5. **TEST-PLAN.md** → 测试与验收方案
 6. **ITERATION-REVIEW.md** → 迭代总结（学到了什么）
 
+## 迭代历史
+
+| 迭代 | 日期 | 主题 | 状态 |
+|------|------|------|------|
+| TASK-001 | 2025-06-20 | 项目基础设施与认证系统 | ✅ 已完成 |
+| TASK-002 | 2025-06-20 | 任务管理与 Agent 管理 API | ✅ 已完成 |
+
+### TASK-002 详细信息
+- **目录**：`docs/iterations/2025-06-20-task-agent-management-api/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-task-agent-management-api/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2025-06-20-task-agent-management-api/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-task-agent-management-api/TECHNICAL-DESIGN.md)
+- **核心功能**：
+  - 任务管理 API（创建、查询、取消、反馈）
+  - Agent 管理 API（CRUD 操作）
+  - 权限控制和认证
+  - 完整的单元测试覆盖
+
 ## 版本号规范
 
 - 新迭代目录：`docs/iterations/YYYY-MM-DD-topic/`

@@ -68,7 +68,7 @@ async def fake_user(db_session: AsyncSession) -> User:
         username="testuser",
         email="test@example.com",
         password_hash=hash_password("TestPass123"),
-        permissions=["read"],
+        permissions=["read", "admin"],
     )
     db_session.add(user)
     await db_session.commit()
@@ -83,14 +83,19 @@ def async_client(test_session_factory, fake_user):
     from fastapi.testclient import TestClient
 
     from api.main import app
+    from middleware.auth import get_current_user
 
     async def override_get_session():
         async with test_session_factory() as session:
             yield session
 
-    app.dependency_overrides[get_async_session] = override_get_session
+    async def override_get_current_user():
+        return fake_user
 
-    client = TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides[get_async_session] = override_get_session
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    client = TestClient(app, raise_server_exceptions=True)
     try:
         yield client
     finally:
