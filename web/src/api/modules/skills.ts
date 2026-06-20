@@ -1,5 +1,5 @@
 import request from '../request'
-import type { Skill, SkillInstall, InstallSkillForm } from '@/types'
+import type { Skill, InstallSkillForm } from '@/types'
 
 export const skillsApi = {
   list: () => {
