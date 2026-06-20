@@ -26,10 +26,6 @@ function formatCost(cost: number): string {
   return cost.toFixed(4)
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString()
-}
-
 function goToTask(taskId: string) {
   router.push(`/tasks/${taskId}`)
 }

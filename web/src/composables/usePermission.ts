@@ -8,13 +8,11 @@ export function usePermission() {
     return authStore.hasPermission(permission)
   }
 
-  function isAdmin(): boolean {
-    return authStore.isAdmin
-  }
+  const isAdmin = computed(() => authStore.isAdmin)
 
-  const canManageAgents = computed(() => isAdmin())
-  const canInstallSkills = computed(() => isAdmin())
-  const canExportData = computed(() => isAdmin())
+  const canManageAgents = computed(() => authStore.isAdmin)
+  const canInstallSkills = computed(() => authStore.isAdmin)
+  const canExportData = computed(() => authStore.isAdmin)
 
   return {
     hasPermission,

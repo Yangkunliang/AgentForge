@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskStore } from '@/stores/task'
-import type { TaskListParams } from '@/api/modules/tasks'
 
 const router = useRouter()
 const taskStore = useTaskStore()

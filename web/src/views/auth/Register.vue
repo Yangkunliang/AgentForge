@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import type { RegisterForm } from '@/types'
 
-const router = useRouter()
 const authStore = useAuthStore()
 
 const form = reactive<RegisterForm>({

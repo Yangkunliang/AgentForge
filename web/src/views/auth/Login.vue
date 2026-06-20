@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import type { LoginForm } from '@/types'
 
-const router = useRouter()
 const authStore = useAuthStore()
 
 const form = reactive<LoginForm>({
