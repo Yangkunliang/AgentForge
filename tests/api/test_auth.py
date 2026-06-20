@@ -64,7 +64,7 @@ def test_login_success(async_client, fake_user):
     """POST /auth/login 返回 200 + access_token"""
     resp = async_client.post(
         "/api/v1/auth/login",
-        data={
+        json={
             "username": "testuser",
             "password": "TestPass123",
         },
@@ -81,7 +81,7 @@ def test_login_wrong_password(async_client, fake_user):
     """错误密码返回 401"""
     resp = async_client.post(
         "/api/v1/auth/login",
-        data={
+        json={
             "username": "testuser",
             "password": "WrongPassword1",
         },

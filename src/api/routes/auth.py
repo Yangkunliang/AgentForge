@@ -48,6 +48,11 @@ class UserRegisterRequest(BaseModel):
         return v
 
 
+class UserLoginRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
 class UserResponse(BaseModel):
     user_id: str
     username: str
@@ -106,17 +111,17 @@ async def register(body: UserRegisterRequest, db: AsyncSession = Depends(get_asy
 
 @router.post("/login", tags=["auth"])
 async def login(
-    form: OAuth2PasswordRequestForm = Depends(),
+    body: UserLoginRequest,
     db: AsyncSession = Depends(get_async_session),
 ) -> dict:
     """用户登录：验证密码，返回 access_token，写入 refresh_token Cookie"""
     # 通过用户名或邮箱查找用户
     result = await db.execute(
-        select(User).where((User.username == form.username) | (User.email == form.username))
+        select(User).where((User.username == body.username) | (User.email == body.username))
     )
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(form.password, user.password_hash):
+    if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
