@@ -32,10 +32,10 @@ PRODUCT-REQUIREMENTS / PRD
 | 状态 | 任务 | 优先级 | 关联需求 | 依赖 | 说明 |
 |---|---|---|---|---|---|
 | [x] | [TASK-001：项目基础设施 & 认证系统](TASK-001.md) | P1 | US-5，支撑全部 US | 无 | 建立后端工程、数据库、认证、限流和 trace 基础 |
-| [ ] | [TASK-002：任务管理 & Agent 管理 API](TASK-002.md) | P1 | US-1、US-2 | TASK-001 | 提供任务和 Agent 的基础 API 入口 |
-| [ ] | [TASK-003：Harness 核心 + RabbitMQ + SSE](TASK-003.md) | P2 | US-1、US-2、US-5 | TASK-001、TASK-002 | 落地多 Agent 编排、Contract Net、实时流式过程 |
-| [ ] | [TASK-004：Skill 插件系统 & 辅助 API](TASK-004.md) | P2 | US-3、US-4、US-5 | TASK-001、TASK-003 | 实现 Skill 安装、Dashboard、成本、导出、Webhook |
-| [ ] | [TASK-005：前端工作台 & UI/UX 体验](TASK-005.md) | P3 | US-1、US-2、US-3、US-4、US-5 | TASK-001、TASK-002、TASK-003、TASK-004 | 建立 Vue 3 前端工作台、SSE 可视化、权限页面和管理界面 |
+| [x] | [TASK-002：任务管理 & Agent 管理 API](TASK-002.md) | P1 | US-1、US-2 | TASK-001 | 提供任务和 Agent 的基础 API 入口 |
+| [x] | [TASK-003：Harness 核心 + RabbitMQ + SSE](TASK-003.md) | P2 | US-1、US-2、US-5 | TASK-001、TASK-002 | 落地多 Agent 编排、Contract Net、实时流式过程 |
+| [x] | [TASK-004：Skill 插件系统 & 辅助 API](TASK-004.md) | P2 | US-3、US-4、US-5 | TASK-001、TASK-003 | 实现 Skill 安装、Dashboard、成本、导出、Webhook |
+| [x] | [TASK-005：前端工作台 & UI/UX 体验](TASK-005.md) | P3 | US-1、US-2、US-3、US-4、US-5 | TASK-001、TASK-002、TASK-003、TASK-004 | 建立 Vue 3 前端工作台、SSE 可视化、权限页面和管理界面 |
 
 ## 执行顺序
 
