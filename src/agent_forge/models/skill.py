@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Text
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
 
     from .agent_skill import AgentSkill
     from .task_execution import TaskExecution
+    from .user import User
 
 
 class Skill(Base, TimestampMixin):
@@ -23,12 +23,15 @@ class Skill(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(primary_key=True)  # UUID str
 
     name: Mapped[str] = mapped_column(String(100), unique=True)
-    version: Mapped[str] = mapped_column(String(20))  # Semantic Versioning
+    version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     description: Mapped[str] = mapped_column(Text)
-    entry_point: Mapped[str] = mapped_column(String(255))  # e.g. "code_review.main"
+    entry_point: Mapped[str | None] = mapped_column(String(255), nullable=True)
     manifest: Mapped[dict] = mapped_column(JSON, default=dict)
     dependencies: Mapped[list[str]] = mapped_column(JSON, default=list)
-    installed_at: Mapped[str] = mapped_column(nullable=True)  # ISO datetime string
+    installed_at: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
 
     # Relationships
     agent_skills: Mapped[list["AgentSkill"]] = relationship(
