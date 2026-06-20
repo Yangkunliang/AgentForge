@@ -45,6 +45,7 @@ class Task(Base, TimestampMixin):
     trace_id: Mapped[str] = mapped_column(String(64), index=True)
 
     completed_at: Mapped[str | None] = mapped_column(nullable=True)  # ISO datetime string
+    total_cost_usd: Mapped[float] = mapped_column(default=0.0)
 
     # Relationships
     user = relationship("User", back_populates="tasks")

@@ -54,6 +54,12 @@ async def db_session(test_session_factory) -> AsyncGenerator[AsyncSession, None]
 
 
 @pytest_asyncio.fixture
+async def db(db_session: AsyncSession) -> AsyncSession:
+    """别名：更简洁的 db fixture"""
+    return db_session
+
+
+@pytest_asyncio.fixture
 async def fake_user(db_session: AsyncSession) -> User:
     """工厂函数：创建测试用户"""
     from sqlalchemy import select

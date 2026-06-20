@@ -62,7 +62,8 @@ docs/
 |------|------|------|------|
 | TASK-001 | 2025-06-20 | 项目基础设施与认证系统 | ✅ 已完成 |
 | TASK-002 | 2025-06-20 | 任务管理与 Agent 管理 API | ✅ 已完成 |
-| TASK-003 | 2025-06-20 | Harness 核心 + RabbitMQ + SSE | 📝 文档已完成，待实现 |
+| TASK-003 | 2025-06-20 | Harness 核心 + RabbitMQ + SSE | ✅ 已完成 |
+| TASK-004 | 2025-06-20 | Skill 管理 + Dashboard + 费用统计 + 数据导出 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2025-06-20-task-agent-management-api/`
@@ -82,12 +83,24 @@ docs/
   - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-harness-core-rabbitmq-sse/PRODUCT-REQUIREMENTS.md)
   - [TASK-CHECKLIST.md](iterations/2025-06-20-harness-core-rabbitmq-sse/TASK-CHECKLIST.md)
   - [TECHNICAL-DESIGN.md](iterations/2025-06-20-harness-core-rabbitmq-sse/TECHNICAL-DESIGN.md)
-- **核心功能**（待实现）：
+- **核心功能**：
   - RabbitMQ 消息总线（Exchange/Queue 拓扑）
   - Harness 六层架构（Validator、Router、Registry、Governance、Executor、Memory）
   - SSE 流式输出（10 种事件类型）
   - LLM Provider 抽象层（LiteLLM、模型路由、Cost 追踪）
   - Agent 基类和内置 Agent（Coder、Reviewer、Researcher）
+
+### TASK-004 详细信息
+- **目录**：`docs/iterations/2025-06-20-skill-dashboard-cost-exports/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-skill-dashboard-cost-exports/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2025-06-20-skill-dashboard-cost-exports/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-skill-dashboard-cost-exports/TECHNICAL-DESIGN.md)
+- **核心功能**：
+  - Skill 管理 API（安装、卸载、进度查询）
+  - Dashboard API（任务统计、Agent 状态、费用趋势）
+  - 费用统计 API（每日费用、模型成本分布）
+  - 数据导出 API（JSONL 格式、三级脱敏策略）
 
 ## 版本号规范
 
