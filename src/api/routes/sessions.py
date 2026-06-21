@@ -227,20 +227,33 @@ async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, desc
     多 Agent 的协作细节（Contract Net、子任务分配）在 executor 内完成，
     这里只关心最终结果。
     """
+    from agent_forge.config import settings
     from agent_forge.database import async_session_factory
     from agent_forge.api.sse import emit_task_completed, emit_task_failed, get_sse_manager
+    from agent_forge.llm.provider import LLMConfig, get_llm_provider
 
     sse = get_sse_manager()
+    llm = get_llm_provider()
 
     try:
         # 推送开始事件
         await emit_task_started(task_id, task_id)
 
-        # TODO: 接入真实 executor
-        # result = await executor.execute_task(task)
-        # 目前 mock 一个响应，待 TASK-003 executor 完成后替换
-        await asyncio.sleep(0.5)
-        result_content = f"已收到您的请求：「{description}」\n\n（多 Agent 正在处理中，executor 接入后将返回真实结果）"
+        # 使用 LLM Provider 流式生成回复
+        llm_config = LLMConfig(
+            model=settings.default_model or "openai/gpt-4o-mini",
+            temperature=settings.default_temperature,
+            max_tokens=settings.max_tokens,
+        )
+        full_content = ""
+        async for chunk in llm.stream_complete(description, llm_config):
+            if chunk:
+                full_content += chunk
+                # 逐片段推送 SSE llm_response 事件
+                await sse.publish(task_id, "llm_response", {"delta": chunk})
+
+        if not full_content:
+            full_content = "抱歉，未能生成回复，请重试。"
 
         # 更新数据库
         async with async_session_factory() as db:
@@ -249,19 +262,19 @@ async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, desc
             task = task_result.scalar_one_or_none()
             if task:
                 task.status = TaskStatus.COMPLETED
-                task.result = result_content
+                task.result = full_content
                 task.completed_at = datetime.now(timezone.utc)
 
             # 更新 assistant 消息内容
             msg_result = await db.execute(select(Message).where(Message.id == assistant_msg_id))
             msg = msg_result.scalar_one_or_none()
             if msg:
-                msg.content = result_content
+                msg.content = full_content
 
             await db.commit()
 
         # 推送完成事件（前端 useSSE 监听此事件更新气泡）
-        await emit_task_completed(task_id, {"content": result_content})
+        await emit_task_completed(task_id, {"content": full_content})
 
     except Exception as exc:
         logger.exception(f"Task {task_id} failed: {exc}")
