@@ -8,58 +8,67 @@ import DOMPurify from 'dompurify'
 
 // ── 配置 marked ──────────────────────────────────────────────
 
+function unescapeHtml(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
 const renderer: Partial<Renderer> = {
-  // 代码块：注入语言标签 + 复制按钮占位（由组件事件处理）
-  code({ text, lang }) {
+  // marked v12+ uses positional args: code(code: string, infostring: string, escaped: boolean)
+  code(code, infostring, escaped) {
+    const rawText = (escaped ? unescapeHtml(code) : code) ?? ''
+    const lang = infostring?.trim() || ''
     const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext'
-    const highlighted = hljs.highlight(text, { language }).value
+    const highlighted = hljs.highlight(rawText, { language }).value
+
+    console.log('[code renderer] lang:', lang, '| rawText length:', rawText.length)
+    console.log('[code renderer] rawText[:100]:', rawText.slice(0, 100))
+    console.log('[code renderer] highlighted[:100]:', highlighted.slice(0, 100))
+
     return `
 <div class="code-block" data-lang="${language}">
   <div class="code-block__header">
     <span class="code-block__lang">${language}</span>
-    <button class="code-block__copy" data-code="${encodeURIComponent(text)}">复制</button>
+    <button class="code-block__copy" data-code="${encodeURIComponent(rawText)}">复制</button>
   </div>
   <pre><code class="hljs language-${language}">${highlighted}</code></pre>
 </div>`
   },
 
-  // 行内代码
-  codespan({ text }) {
-    return `<code class="inline-code">${text}</code>`
+  codespan(text) {
+    return `<code class="inline-code">${text ?? ''}</code>`
   },
 
-  // 图片：加懒加载 + 点击放大标记
-  image({ href, title, text }) {
+  image(href, title, text) {
+    if (!href) return text ?? ''
     const titleAttr = title ? ` title="${title}"` : ''
-    return `<img src="${href}" alt="${text}"${titleAttr} class="chat-image" loading="lazy" data-zoomable />`
+    return `<img src="${href}" alt="${text ?? ''}"${titleAttr} class="chat-image" loading="lazy" data-zoomable />`
   },
 
-  // 链接：新标签打开，防钓鱼
-  link({ href, title, text }) {
+  link(href, title, text) {
+    if (!href) return text ?? ''
     const titleAttr = title ? ` title="${title}"` : ''
-    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`
+    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text ?? ''}</a>`
   },
 }
 
 marked.use({
   renderer: renderer as Renderer,
-  gfm: true,       // GitHub Flavored Markdown（表格、任务列表等）
-  breaks: true,    // 单换行转 <br>
+  gfm: true,
+  breaks: true,
 })
 
 // ── 思考过程解析 ─────────────────────────────────────────────
 
 export interface ParsedMessage {
-  /** 思考过程原始文本（来自 <think>...</think>），可能为空 */
   thinking: string
-  /** 主体内容（去掉 think 块后的剩余部分） */
   body: string
 }
 
-/**
- * 解析消息，提取 <think>...</think> 思考过程
- * 支持流式（think 块未闭合时也能提取已有内容）
- */
 export function parseThinking(raw: string): ParsedMessage {
   const openTag = '<think>'
   const closeTag = '</think>'
@@ -73,7 +82,6 @@ export function parseThinking(raw: string): ParsedMessage {
   const end = raw.indexOf(closeTag, contentStart)
 
   if (end === -1) {
-    // think 块还未闭合（流式中）
     return {
       thinking: raw.slice(contentStart),
       body: raw.slice(0, start),
@@ -88,13 +96,19 @@ export function parseThinking(raw: string): ParsedMessage {
 
 // ── 渲染入口 ─────────────────────────────────────────────────
 
-/**
- * 将 markdown 字符串渲染为安全 HTML
- */
 export function renderMarkdown(md: string): string {
   const html = marked.parse(md) as string
-  return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-lang', 'data-code', 'data-zoomable', 'loading', 'target', 'rel'],
-    ADD_TAGS: ['button'],
+
+  console.log('[renderMarkdown] marked output (code block section):',
+    html.slice(html.indexOf('<div class="code-block"'), html.indexOf('<div class="code-block"') + 300))
+
+  const sanitized = DOMPurify.sanitize(html, {
+    ADD_TAGS: ['button', 'span', 'pre', 'code'],
+    ADD_ATTR: ['data-lang', 'data-code', 'data-zoomable', 'loading', 'target', 'rel', 'class'],
   })
+
+  console.log('[renderMarkdown] after DOMPurify (code block section):',
+    sanitized.slice(sanitized.indexOf('<div class="code-block"'), sanitized.indexOf('<div class="code-block"') + 300))
+
+  return sanitized
 }
