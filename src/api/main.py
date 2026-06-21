@@ -62,7 +62,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "X-API-Key", "X-Request-Id", "Content-Type"],
 )
 
@@ -109,7 +109,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # ── 路由挂载 ──────────────────────────────────────────────────
 
-from api.routes import agents, auth, dashboard, health, skills, tasks  # noqa: E402
+from api.routes import agents, auth, dashboard, health, llm, sessions, skills, tasks  # noqa: E402
+from agent_forge.api.sse import sse_router  # noqa: E402
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
@@ -117,3 +118,6 @@ app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(skills.router, prefix="/api/v1/skills", tags=["skills"])
+app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
+app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
+app.include_router(sse_router, prefix="/api/v1", tags=["sse"])

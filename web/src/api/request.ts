@@ -5,6 +5,7 @@ import router from '@/router'
 declare module 'axios' {
   interface AxiosRequestConfig {
     authEndpoint?: boolean
+    _retry?: boolean
   }
 }
 
@@ -25,28 +26,76 @@ request.interceptors.request.use(
     }
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
-// 响应拦截器：处理错误
+// 并发 401 时的队列管理
+let isRefreshing = false
+let waitingQueue: Array<(token: string) => void> = []
+
+function onRefreshed(token: string) {
+  waitingQueue.forEach((cb) => cb(token))
+  waitingQueue = []
+}
+
+async function silentRefresh(): Promise<string | null> {
+  try {
+    const response = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true })
+    const newToken = response.data.access_token
+    localStorage.setItem('access_token', newToken)
+    return newToken
+  } catch {
+    localStorage.removeItem('access_token')
+    router.push('/login')
+    return null
+  }
+}
+
+// 响应拦截器
 request.interceptors.response.use(
-  (response) => {
-    return response
-  },
+  (response) => response,
   async (error: AxiosError<{ detail?: string | { msg?: string }[]; message?: string }>) => {
-    if (error.config?.authEndpoint) {
+    const originalConfig = error.config as InternalAxiosRequestConfig & { _retry?: boolean; authEndpoint?: boolean }
+
+    // auth 接口本身不做自动续期（防止死循环）
+    if (originalConfig?.authEndpoint) {
       return Promise.reject(error)
     }
 
     const status = error.response?.status
 
+    // 401 且还没重试过：自动续期
+    if (status === 401 && !originalConfig._retry) {
+      originalConfig._retry = true
+
+      if (isRefreshing) {
+        // 其他请求已在刚新中，排队等待新 token
+        return new Promise((resolve) => {
+          waitingQueue.push((token: string) => {
+            originalConfig.headers.Authorization = `Bearer ${token}`
+            resolve(request(originalConfig))
+          })
+        })
+      }
+
+      isRefreshing = true
+      const newToken = await silentRefresh()
+      isRefreshing = false
+
+      if (newToken) {
+        // 通知队列中等待的请求一并重试
+        onRefreshed(newToken)
+        // 重试原始请求
+        originalConfig.headers.Authorization = `Bearer ${newToken}`
+        return request(originalConfig)
+      }
+
+      // refresh 失败（已在 silentRefresh 里跳转登录）
+      return Promise.reject(error)
+    }
+
+    // 其他错误统一提示
     switch (status) {
-      case 401:
-        // Token 过期，尝试刷新
-        await silentRefresh()
-        break
       case 403:
         ElMessage.error('权限不足')
         break
@@ -60,28 +109,15 @@ request.interceptors.response.use(
         ElMessage.error('服务器错误')
         break
       default:
-        const message = error.response?.data?.detail || error.response?.data?.message || '请求失败'
-        ElMessage.error(typeof message === 'string' ? message : '请求失败')
+        if (status !== 401) {
+          const message = error.response?.data?.detail || error.response?.data?.message || '请求失败'
+          ElMessage.error(typeof message === 'string' ? message : '请求失败')
+        }
     }
 
     return Promise.reject(error)
   }
 )
-
-// Silent refresh token
-async function silentRefresh(): Promise<string | null> {
-  try {
-    const response = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true })
-    const newToken = response.data.access_token
-    localStorage.setItem('access_token', newToken)
-    return newToken
-  } catch {
-    // Refresh 失败，清除 token 并跳转登录
-    localStorage.removeItem('access_token')
-    router.push('/login')
-    return null
-  }
-}
 
 export default request
 export { silentRefresh }

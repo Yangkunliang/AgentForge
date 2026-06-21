@@ -27,7 +27,11 @@ class User(Base, TimestampMixin):
     permissions: Mapped[dict] = mapped_column(JSON, default=list)
 
     # Relationships
-    tasks: Mapped[list["Task"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    tasks: Mapped[list["Task"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="[Task.user_id]",
+    )
     api_keys: Mapped[list["APIKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:

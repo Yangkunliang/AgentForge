@@ -21,8 +21,8 @@ PRODUCT-REQUIREMENTS / PRD
 
 | 用户故事 | 产品目标 | 覆盖任务 |
 |---|---|---|
-| US-1 | 输入自然语言需求，系统自动拆解并分派给合适 Agent | [TASK-002](TASK-002.md)、[TASK-003](TASK-003.md)、[TASK-005](TASK-005.md) |
-| US-2 | Agent 自动完成产品设计、UI 设计、任务拆解 | [TASK-002](TASK-002.md)、[TASK-003](TASK-003.md)、[TASK-005](TASK-005.md) |
+| US-1 | 输入自然语言需求，系统自动拆解并分派给合适 Agent | [TASK-002](TASK-002.md)、[TASK-003](TASK-003.md)、[TASK-005](TASK-005.md)、[TASK-006](TASK-006.md) |
+| US-2 | Agent 自动完成产品设计、UI 设计、任务拆解 | [TASK-002](TASK-002.md)、[TASK-003](TASK-003.md)、[TASK-005](TASK-005.md)、[TASK-006](TASK-006.md) |
 | US-3 | 快速导入新的 Skill 插件 | [TASK-004](TASK-004.md)、[TASK-005](TASK-005.md) |
 | US-4 | 导出训练数据，优化模型和 Agent 路由 | [TASK-004](TASK-004.md)、[TASK-005](TASK-005.md) |
 | US-5 | 查看安全 API 调用记录，用于审计和合规 | [TASK-001](TASK-001.md)、[TASK-003](TASK-003.md)、[TASK-004](TASK-004.md)、[TASK-005](TASK-005.md) |
@@ -36,6 +36,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-003：Harness 核心 + RabbitMQ + SSE](TASK-003.md) | P2 | US-1、US-2、US-5 | TASK-001、TASK-002 | 落地多 Agent 编排、Contract Net、实时流式过程 |
 | [x] | [TASK-004：Skill 插件系统 & 辅助 API](TASK-004.md) | P2 | US-3、US-4、US-5 | TASK-001、TASK-003 | 实现 Skill 安装、Dashboard、成本、导出、Webhook |
 | [x] | [TASK-005：前端工作台 & UI/UX 体验](TASK-005.md) | P3 | US-1、US-2、US-3、US-4、US-5 | TASK-001、TASK-002、TASK-003、TASK-004 | 建立 Vue 3 前端工作台、SSE 可视化、权限页面和管理界面 |
+| [ ] | [TASK-006：面向用户的对话工作台（Chat UI）](TASK-006.md) | P2 | US-1、US-2 | TASK-001、TASK-002、TASK-003 | 用户侧对话界面：会话列表、流式气泡、SSE 接入，多 Agent 细节对用户透明 |
 
 ## 执行顺序
 
@@ -45,6 +46,7 @@ TASK-001
     -> TASK-003
       -> TASK-004
         -> TASK-005
+      -> TASK-006  （可与 TASK-004 并行，依赖 TASK-003 SSE 稳定后启动）
 ```
 
 前端任务 `TASK-005` 可以在 API 合同稳定后提前进行 UI 设计，但正式联调依赖后端核心 API 和 SSE 事件格式稳定。

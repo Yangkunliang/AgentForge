@@ -149,9 +149,9 @@ async def login(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="strict",
+        samesite="lax",
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
-        path="/api/v1/auth/refresh",
+        path="/api/v1/auth",
     )
     return resp
 
@@ -199,6 +199,6 @@ async def logout(request: Request) -> dict:
     resp = JSONResponse(content={"detail": "logged_out"})
     resp.delete_cookie(
         key="refresh_token",
-        path="/api/v1/auth/refresh",
+        path="/api/v1/auth",
     )
     return resp

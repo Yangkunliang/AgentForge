@@ -67,8 +67,14 @@ class LiteLLMProvider(LLMProvider):
     def __init__(self):
         try:
             import litellm
+            from agent_forge.config import settings
             self.litellm = litellm
             self._available = True
+            # 如果配置了自定义 base_url，全局注入（适用于 OpenAI-compatible 接口，如百炼）
+            if settings.llm_base_url:
+                litellm.api_base = settings.llm_base_url
+            if settings.api_key:
+                litellm.api_key = settings.api_key
             logger.info("LiteLLM provider initialized")
         except ImportError:
             logger.warning("LiteLLM not installed, using fallback")

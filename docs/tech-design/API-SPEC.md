@@ -66,7 +66,7 @@ Content-Type: application/json
 ```
 
 **说明：**
-- `refresh_token` 通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Strict; Path=/api/v1/auth/refresh` 写入浏览器，不在响应 body 中返回
+- `refresh_token` 通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Lax; Path=/api/v1/auth` 写入浏览器，不在响应 body 中返回
 - `access_token` 有效期 1h，`refresh_token` 有效期 7d
 
 ### 2.3 刷新 Token

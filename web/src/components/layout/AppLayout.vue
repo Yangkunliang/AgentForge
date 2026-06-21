@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
+
+const route = useRoute()
+const isFullHeight = computed(() => route.meta.fullHeight === true)
 </script>
 
 <template>
@@ -8,7 +13,7 @@ import AppSidebar from './AppSidebar.vue'
     <AppHeader />
     <div class="app-main">
       <AppSidebar />
-      <main class="app-content">
+      <main class="app-content" :class="{ 'app-content--full': isFullHeight }">
         <router-view />
       </main>
     </div>
@@ -33,5 +38,11 @@ import AppSidebar from './AppSidebar.vue'
   padding: $spacing-lg;
   overflow-y: auto;
   background: #f5f7fa;
+
+  &--full {
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+  }
 }
 </style>

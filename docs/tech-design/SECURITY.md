@@ -20,10 +20,12 @@ ALGORITHM = "HS256"
 
 ### 1.3 refresh_token 存储与传递
 
-- 登录时后端通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Strict; Path=/api/v1/auth/refresh` 写入浏览器
+- 登录时后端通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Lax; Path=/api/v1/auth` 写入浏览器
 - 前端 JS 不可读取（HttpOnly），无需处理
 - 刷新时浏览器自动携带该 Cookie，后端从 Cookie 读取
 - 退出登录时后端清除该 Cookie
+
+> **注意**：Cookie Path 为 `/api/v1/auth`（而非精确的 `/api/v1/auth/refresh`），确保浏览器在请求 `/api/v1/auth/refresh` 时能正确携带。SameSite 设为 `Lax`（而非 `Strict`），兼容本地开发环境下的跨域场景。
 
 ---
 
@@ -105,11 +107,13 @@ allowed_dependencies:
 ```python
 CORS_CONFIG = {
     "origins": ["http://localhost:3000"],   # 开发环境；生产由环境变量 CORS_ORIGINS 注入
-    "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     "allow_credentials": True,             # 必须开启，否则浏览器不会携带 Cookie（refresh_token）
     "allow_headers": ["Authorization", "X-API-Key", "X-Request-Id", "Content-Type"],
 }
 ```
+
+> **注意**：必须显式包含 `OPTIONS`，否则浏览器跨域预检（preflight）请求会返回 405，导致后续 POST/PATCH 等请求失败。
 
 ---
 
@@ -157,7 +161,7 @@ CORS_CONFIG = {
 
 ## 10. CSRF 防护
 
-- `refresh_token` Cookie 设置 `SameSite=Strict`，阻止跨站请求自动携带
+- `refresh_token` Cookie 设置 `SameSite=Lax`，在绝大多数跨站请求场景下阻止自动携带；生产环境可升级为 `Strict`
 - `access_token` 通过 Authorization Header 传递，CSRF 无法伪造 Header
 - 生产环境 CORS 严格配置，仅允许指定 Origin
 

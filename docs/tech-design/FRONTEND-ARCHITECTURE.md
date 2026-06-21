@@ -360,43 +360,63 @@ export const useSkillStore = defineStore('skill', () => {
 const request = axios.create({
   baseURL: '/api/v1',
   timeout: 30_000,
-  withCredentials: true,   // 携带 Cookie（让 refresh_token Cookie 随请求发送）
 })
 
 // 请求拦截器：附加 access_token
 request.interceptors.request.use(config => {
-  const { accessToken } = useAuthStore()
-  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
-  config.headers['X-Request-Id'] = crypto.randomUUID()
+  const token = localStorage.getItem('access_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// 响应拦截器：401 自动刷新，错误统一提示
+// 并发 401 的队列管理
 let isRefreshing = false
-let waitQueue: Array<() => void> = []
+let waitingQueue: Array<(token: string) => void> = []
 
+// 响应拦截器：401 自动续期 + 并发安全
 request.interceptors.response.use(
-  res => res.data,
+  res => res,
   async err => {
-    const { config, response } = err
-    if (response?.status === 401 && !config._retry) {
-      if (isRefreshing) {
-        // 多个并发请求同时 401，排队等待刷新完成后重发
-        return new Promise(resolve => waitQueue.push(() => resolve(request(config))))
-      }
-      isRefreshing = true
+    const config = err.config
+    // auth 接口本身不做自动续期（防止死循环）
+    if (config?.authEndpoint) return Promise.reject(err)
+
+    if (err.response?.status === 401 && !config._retry) {
       config._retry = true
-      const ok = await useAuthStore().silentRefresh()
+
+      if (isRefreshing) {
+        // 其他并发请求排队等待新 token
+        return new Promise(resolve => {
+          waitingQueue.push((token: string) => {
+            config.headers.Authorization = `Bearer ${token}`
+            resolve(request(config))
+          })
+        })
+      }
+
+      isRefreshing = true
+      // 浏览器自动携带 HttpOnly Cookie 中的 refresh_token
+      const res = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true })
+      const newToken = res.data.access_token
+      localStorage.setItem('access_token', newToken)
       isRefreshing = false
-      waitQueue.forEach(fn => fn())
-      waitQueue = []
-      if (ok) return request(config)
-      useAuthStore().logout()
-      const redirect = encodeURIComponent(window.location.pathname)
-      router.push(`/login?redirect=${redirect}`)
-      return Promise.reject(err)
+
+      // 通知队列中所有等待请求一并重试
+      waitingQueue.forEach(cb => cb(newToken))
+      waitingQueue = []
+
+      // 重试原始请求
+      config.headers.Authorization = `Bearer ${newToken}`
+      return request(config)
     }
-    handleApiError(response?.status, response?.data?.error)
+
+    // refresh 失败 → 清除 token 跳登录
+    if (err.response?.status === 401) {
+      localStorage.removeItem('access_token')
+      router.push('/login')
+    }
+
+    handleApiError(err.response?.status, err.response?.data?.error)
     return Promise.reject(err)
   }
 )
@@ -406,10 +426,19 @@ function handleApiError(status: number, error?: { code: string; message: string 
     ElMessage.warning('操作过于频繁，请稍后再试')
   } else if (status >= 500) {
     ElMessage.error(`服务器错误：${error?.message ?? '请稍后重试'}`)
-  } else if (status >= 400 && status !== 401) {
+  } else if (status && status >= 400 && status !== 401) {
     ElMessage.error(error?.message ?? '请求失败')
   }
 }
+```
+
+**并发续期流程：**
+```
+请求 A 401 → isRefreshing=true → 调 /auth/refresh → 得到新 token
+请求 B 401 → isRefreshing=true → 进入 waitingQueue 排队
+请求 C 401 → isRefreshing=true → 进入 waitingQueue 排队
+                               ↓
+refresh 完成 → 通知队列 → B、C 自动重试，用户无感知
 ```
 
 ---
@@ -544,7 +573,7 @@ export function useSSE(taskId: string) {
 }
 ```
 
-注意：`refresh_token` 不在响应 body 中，由后端通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Strict` 写入浏览器。
+注意：`refresh_token` 不在响应 body 中，由后端通过 `Set-Cookie: refresh_token=...; HttpOnly; SameSite=Lax; Path=/api/v1/auth` 写入浏览器。
 
 ### 7.3 路由级权限
 

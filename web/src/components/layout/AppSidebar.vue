@@ -14,11 +14,13 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { path: '/chat', label: '对话', icon: 'ChatDotRound' },
   { path: '/dashboard', label: 'Dashboard', icon: 'Odometer' },
   { path: '/tasks', label: '任务', icon: 'List' },
   { path: '/agents', label: 'Agent', icon: 'User', adminOnly: true },
   { path: '/skills', label: 'Skill', icon: 'Grid' },
   { path: '/exports', label: '导出', icon: 'Download', adminOnly: true },
+  { path: '/settings/llm', label: 'LLM 配置', icon: 'Setting' },
 ]
 
 const visibleMenuItems = computed(() => {

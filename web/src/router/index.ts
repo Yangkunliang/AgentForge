@@ -21,7 +21,20 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/dashboard',
+        redirect: '/chat',
+      },
+      {
+        path: 'chat',
+        name: 'Chat',
+        component: () => import('@/views/chat/Index.vue'),
+        meta: { fullHeight: true },
+      },
+      {
+        path: 'chat/:sessionId',
+        name: 'ChatSession',
+        component: () => import('@/views/chat/Index.vue'),
+        props: true,
+        meta: { fullHeight: true },
       },
       {
         path: 'dashboard',
@@ -67,6 +80,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/exports/Index.vue'),
         meta: { permission: 'admin' },
       },
+      {
+        path: 'settings/llm',
+        name: 'LLMSettings',
+        component: () => import('@/views/settings/LLMConfig.vue'),
+      },
     ],
   },
 ]
@@ -93,7 +111,7 @@ router.beforeEach((to, _from, next) => {
   }
 
   if ((to.path === '/login' || to.path === '/register') && authStore.token) {
-    next('/dashboard')
+    next('/chat')
     return
   }
 

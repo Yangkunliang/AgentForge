@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -38,6 +40,32 @@ class Settings(BaseSettings):
 
     # Rate limiting
     rate_limit_default: str = "100/minute"
+
+    # LLM
+    llm_base_url: str = Field(default="", validation_alias="LLM_BASE_URL")
+    api_key: str = Field(default="", validation_alias="LLM_API_KEY")
+    default_model: str = Field(default="openai/gpt-4o-mini", validation_alias="LLM_MODEL")
+    default_temperature: float = 0.7
+    max_tokens: int = 4096
+    # 多模型路由: vision / image_gen 自动纳入
+    vision_model: str = Field(default="", validation_alias="VL_MODEL")
+    image_gen_model: str = Field(default="", validation_alias="T2I_MODEL")
+    model_routes: str = Field(default="{}", validation_alias="MODEL_ROUTES")  # JSON: {"claude": "anthropic/claude-3-5-sonnet", ...}
+
+    @property
+    def model_routes_map(self) -> dict[str, str]:
+        """合并用户自定义 routes + 多模态模型为自动 route"""
+        routes: dict[str, str] = {}
+        if self.model_routes:
+            try:
+                routes = json.loads(self.model_routes)
+            except json.JSONDecodeError:
+                pass
+        if self.vision_model:
+            routes["vision"] = self.vision_model
+        if self.image_gen_model:
+            routes["image_gen"] = self.image_gen_model
+        return routes
 
     # Logging
     log_level: str = "INFO"

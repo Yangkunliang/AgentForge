@@ -67,8 +67,10 @@ async def create_task(
     task = Task(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
+        created_by=current_user.id,
+        title=body.description[:255],
         description=body.description,
-        priority=TaskPriority(body.priority),
+        priority={"low": 0, "medium": 1, "high": 2}[body.priority],
         trace_id=trace_id,
         status=TaskStatus.PENDING,
         result=None,

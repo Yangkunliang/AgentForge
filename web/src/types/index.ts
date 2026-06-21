@@ -163,15 +163,44 @@ export type SSEEventType =
   | 'bid_received'
   | 'agent_selected'
   | 'message'
+  | 'llm_response'
   | 'skill_called'
   | 'skill_result'
   | 'sub_task_completed'
   | 'task_completed'
   | 'task_failed'
+  | 'heartbeat'
 
 export interface SSEEvent {
   event: SSEEventType
   data: Record<string, unknown>
+}
+
+// 会话相关
+export interface Session {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  task_id?: string
+  created_at: string
+  // 前端临时状态
+  streaming?: boolean
+  // 图片附件（用户上传或 AI 输出）
+  images?: ChatImage[]
+}
+
+export interface ChatImage {
+  url: string
+  alt?: string
+  /** 'upload' = 用户上传；'generated' = AI 生成 */
+  type: 'upload' | 'generated'
 }
 
 // 通用响应
