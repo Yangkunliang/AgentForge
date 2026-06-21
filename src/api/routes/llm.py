@@ -65,24 +65,24 @@ async def update_llm_config(body: LLMConfigIn) -> dict:
 
     # API Key
     if body.api_key is not None:
-        lines["API_KEY"] = body.api_key
+        lines["LLM_API_KEY"] = body.api_key
         changes.append("api_key")
-        os.environ["API_KEY"] = body.api_key
+        os.environ["LLM_API_KEY"] = body.api_key
 
     # 默认模型
-    lines["DEFAULT_MODEL"] = body.default_model
+    lines["LLM_MODEL"] = body.default_model
     changes.append("default_model")
-    os.environ["DEFAULT_MODEL"] = body.default_model
+    os.environ["LLM_MODEL"] = body.default_model
 
     # 多模态模型
     if body.vision_model:
-        lines["VISION_MODEL"] = body.vision_model
+        lines["VL_MODEL"] = body.vision_model
         changes.append("vision_model")
-        os.environ["VISION_MODEL"] = body.vision_model
+        os.environ["VL_MODEL"] = body.vision_model
     if body.image_gen_model:
-        lines["IMAGE_GEN_MODEL"] = body.image_gen_model
+        lines["T2I_MODEL"] = body.image_gen_model
         changes.append("image_gen_model")
-        os.environ["IMAGE_GEN_MODEL"] = body.image_gen_model
+        os.environ["T2I_MODEL"] = body.image_gen_model
 
     # Model Routes
     lines["MODEL_ROUTES"] = json.dumps(body.model_routes) if body.model_routes else ""
