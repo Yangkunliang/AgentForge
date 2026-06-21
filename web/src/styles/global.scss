@@ -15,21 +15,17 @@ body {
   height: 100%;
 }
 
-// 布局
+// 布局 — AppLayout 现为三列横向结构（导航列 + 内容区）
 .app-layout {
   height: 100%;
   display: flex;
-  flex-direction: column;
-}
-
-.app-main {
-  display: flex;
-  flex: 1;
+  flex-direction: row;
   overflow: hidden;
 }
 
 .app-content {
   flex: 1;
+  min-width: 0;
   padding: $spacing-lg;
   overflow-y: auto;
   background: #f5f7fa;

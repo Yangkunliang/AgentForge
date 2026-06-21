@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from agent_forge.api.sse import get_sse_manager, emit_task_started
 from agent_forge.database import get_async_session
-from agent_forge.models import Task, TaskPriority, TaskStatus, User
+from agent_forge.models import Task, TaskStatus, User
 from agent_forge.models.session import Session, Message
 from middleware.auth import get_current_user
 
@@ -169,7 +169,7 @@ async def send_message(
         created_by=current_user.id,
         title=body.content.strip()[:100],
         description=body.content,
-        priority=1,  # MEDIUM
+        priority=1,  # TaskPriority.MEDIUM -> int 1
         trace_id=str(uuid.uuid4()),
         status=TaskStatus.PENDING,
     )

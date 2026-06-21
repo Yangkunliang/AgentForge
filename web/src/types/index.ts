@@ -156,6 +156,19 @@ export interface Webhook {
   description?: string
 }
 
+// 工具调用
+export interface WebSearchResult {
+  title: string
+  snippet: string
+  url: string
+}
+
+export interface WebSearchResponse {
+  query: string
+  results: WebSearchResult[]
+  total: number
+}
+
 // SSE 事件
 export type SSEEventType =
   | 'task_started'

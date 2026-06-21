@@ -1,4 +1,7 @@
-"""LLM Provider 抽象层"""
+"""LLM Provider 抽象层
+
+为所有 LLM 调用注入统一的 system prompt，约束 thinking 格式与行为准则。
+"""
 
 from __future__ import annotations
 
@@ -11,6 +14,43 @@ if TYPE_CHECKING:
     from litellm import ModelResponse
 
 logger = logging.getLogger("agent_forge.llm")
+
+# ── 默认 System Prompt ──────────────────────────────────────────
+# 约束 LLM 在 reasoning/thinking 中禁止使用 markdown headers，
+# 确保前端 <thinking> 折叠块渲染不会产生刺眼的 "screaming headers"。
+
+DEFAULT_SYSTEM_PROMPT: str = (
+    "你是一个多智能体协同框架的 AI 助手。请遵循以下回答规范：\n"
+    "\n"
+    "## 思考过程\n"
+    "- 如需推理分析，请在 <thinking>...</thinking> 标签内完成。\n"
+    "- 思考过程请使用**平铺直叙的段落文字**，不要使用 markdown 标题（### 等）、\n"
+    "  任务列表或大写字母标题（如 SUMMARY、KEY LINKS）。\n"
+    "- 如需列举要点，请使用 - 短横线列表或 1. 2. 数字列表。\n"
+    "\n"
+    "## 正文回复\n"
+    "- 在 <thinking> 标签之外输出面向用户的正式回复。\n"
+    "- 可以使用完整的 markdown 格式（标题、列表、表格等）。\n"
+    "\n"
+    "## 可用工具\n"
+    "- web_search: 网络搜索工具。当需要查找最新信息、验证事实、检索特定内容时调用。\n"
+    "  参数：\n"
+    "    - query: 搜索关键词（必填）\n"
+    "    - max_results: 返回结果数量（默认 5）\n"
+    "  调用方式：使用 HTTP GET 或 POST 到 /api/v1/tools/web-search，传入 query 参数。\n"
+    "  返回结果包含 title、snippet、url 三个字段。\n"
+)
+
+
+def _build_messages(prompt: str, system_prompt: str) -> list[dict]:
+    """构造 messages 列表：始终在头部注入 system message。
+
+    对于不支持 system role 的旧版模型，自动前置到 prompt 开头。
+    """
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt},
+    ]
 
 
 @dataclass
@@ -100,10 +140,12 @@ class LiteLLMProvider(LLMProvider):
         import time
         start_time = time.time()
 
+        messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
+
         try:
             response = await self.litellm.acompletion(
                 model=config.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
             )
@@ -142,10 +184,12 @@ class LiteLLMProvider(LLMProvider):
 
         config = config or LLMConfig(model="gpt-4o")
 
+        messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
+
         try:
             response = await self.litellm.acompletion(
                 model=config.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
                 stream=True,

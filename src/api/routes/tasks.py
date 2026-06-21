@@ -25,6 +25,19 @@ router = APIRouter()
 logger = logging.getLogger("agent_forge")
 
 
+_INT_TO_PRIORITY = {0: TaskPriority.LOW, 1: TaskPriority.MEDIUM, 2: TaskPriority.HIGH}
+
+
+def _resolve_priority(value: int | str | TaskPriority) -> str:
+    """将整数或字符串统一转成 TaskPriority value 字符串"""
+    if isinstance(value, TaskPriority):
+        return value.value
+    if isinstance(value, int):
+        return _INT_TO_PRIORITY.get(value, TaskPriority.MEDIUM).value
+    # 已经是字符串时直接走枚举校验
+    return TaskPriority(value).value
+
+
 def _task_to_dict(task: Task) -> dict:
     """将 Task 模型转为字典（避免 Pydantic from_attributes 的 async 问题）"""
     from sqlalchemy import inspect as sa_inspect
@@ -47,7 +60,7 @@ def _task_to_dict(task: Task) -> dict:
         "id": task.id,
         "description": task.description,
         "status": task.status.value if hasattr(task.status, "value") else task.status,
-        "priority": task.priority.value if hasattr(task.priority, "value") else task.priority,
+        "priority": _resolve_priority(task.priority),
         "result": task.result,
         "trace_id": task.trace_id,
         "created_at": task.created_at,
@@ -98,8 +111,11 @@ async def list_tasks(
         query = query.where(Task.status == TaskStatus(status_filter))
         count_query = count_query.where(Task.status == TaskStatus(status_filter))
     if priority:
-        query = query.where(Task.priority == TaskPriority(priority))
-        count_query = count_query.where(Task.priority == TaskPriority(priority))
+        priority_int = {
+            "low": 0, "medium": 1, "high": 2,
+        }.get(priority.lower(), 1)
+        query = query.where(Task.priority == priority_int)
+        count_query = count_query.where(Task.priority == priority_int)
 
     # 分页
     query = query.offset((page - 1) * per_page).limit(per_page)
@@ -119,7 +135,7 @@ async def list_tasks(
                 "id": t.id,
                 "description": t.description,
                 "status": t.status.value if hasattr(t.status, "value") else t.status,
-                "priority": t.priority.value if hasattr(t.priority, "value") else t.priority,
+                "priority": _resolve_priority(t.priority),
                 "trace_id": t.trace_id,
                 "created_at": t.created_at,
                 "completed_at": t.completed_at,

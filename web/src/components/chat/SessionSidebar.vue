@@ -5,6 +5,8 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { useSessionStore } from '@/stores/session'
 import type { Session } from '@/types'
 
+const emit = defineEmits<{ (e: 'collapse'): void }>()
+
 const router = useRouter()
 const sessionStore = useSessionStore()
 
@@ -57,15 +59,27 @@ function formatTime(dateStr: string): string {
 
 <template>
   <aside class="session-sidebar">
+    <!-- Header: CodeSoul + 折叠按钮 -->
     <div class="sidebar-header">
+      <span class="sidebar-brand">CodeSoul</span>
+      <button class="collapse-btn" title="折叠侧边栏" @click="emit('collapse')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 9l-3 3 3 3"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 新建对话 -->
+    <div class="new-chat-wrap">
       <button class="new-chat-btn" @click="handleNew">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
         </svg>
         新建对话
       </button>
     </div>
 
+    <!-- 会话列表 -->
     <div class="session-list">
       <div
         v-for="session in sessionStore.sessions"
@@ -114,17 +128,55 @@ function formatTime(dateStr: string): string {
 
 <style scoped lang="scss">
 .session-sidebar {
-  width: 260px;
+  width: 220px;
   height: 100%;
-  background: #f9f9f9;
+  background: #fff;
   border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
+// ── Header ───────────────────────────────────────────────────
 .sidebar-header {
-  padding: 16px 12px 12px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  font-size: 15px;
+  font-weight: 600;
+  color: #409eff;
+  letter-spacing: 0.01em;
+}
+
+.collapse-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+}
+
+// ── New chat ─────────────────────────────────────────────────
+.new-chat-wrap {
+  padding: 10px 10px 8px;
 }
 
 .new-chat-btn {
@@ -132,50 +184,45 @@ function formatTime(dateStr: string): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border: 1px dashed #d1d5db;
-  border-radius: 8px;
+  border-radius: $border-radius-md;
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
-  color: #374151;
-  transition: background 0.15s;
+  font-size: 13px;
+  color: #6b7280;
+  transition: background 0.15s, border-color 0.15s;
 
   &:hover {
-    background: #f0f0f0;
+    background: #f9fafb;
+    border-color: #9ca3af;
   }
 }
 
+// ── Session list ─────────────────────────────────────────────
 .session-list {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 8px 16px;
+  padding: 4px 6px 16px;
 }
 
 .session-item {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 10px 10px;
-  border-radius: 8px;
+  padding: 9px 10px;
+  border-radius: $border-radius-md;
   cursor: pointer;
   transition: background 0.15s;
 
   &:hover {
-    background: #efefef;
-
-    .session-actions {
-      opacity: 1;
-    }
+    background: #f3f4f6;
+    .session-actions { opacity: 1; }
   }
 
   &--active {
-    background: #e8e8fc;
-
-    .session-title {
-      color: #4f46e5;
-      font-weight: 500;
-    }
+    background: #eff6ff;
+    .session-title { color: #409eff; font-weight: 500; }
   }
 }
 
@@ -185,7 +232,7 @@ function formatTime(dateStr: string): string {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 180px;
 }
 
 .session-time {
@@ -214,7 +261,7 @@ function formatTime(dateStr: string): string {
     display: flex;
     align-items: center;
 
-    &:hover { background: #e0e0e0; color: #111; }
+    &:hover { background: #e5e7eb; color: #111; }
   }
 
   .delete-btn:hover { color: #ef4444; }
@@ -223,7 +270,7 @@ function formatTime(dateStr: string): string {
 .rename-input {
   width: 100%;
   font-size: 13px;
-  border: 1px solid #6366f1;
+  border: 1px solid #409eff;
   border-radius: 4px;
   padding: 2px 6px;
   outline: none;

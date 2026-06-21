@@ -109,8 +109,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # ── 路由挂载 ──────────────────────────────────────────────────
 
-from api.routes import agents, auth, dashboard, health, llm, sessions, skills, tasks  # noqa: E402
+from api.routes import agents, auth, dashboard, health, llm, sessions, skills, tasks, tools  # noqa: E402
 from agent_forge.api.sse import sse_router  # noqa: E402
+from agent_forge.skills import builtin  # noqa: E402
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
@@ -121,3 +122,8 @@ app.include_router(skills.router, prefix="/api/v1/skills", tags=["skills"])
 app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
 app.include_router(llm.router, prefix="/api/v1", tags=["llm"])
 app.include_router(sse_router, prefix="/api/v1", tags=["sse"])
+app.include_router(  # noqa: F821
+    tools.router,  # type: ignore[name-defined]
+    prefix="/api/v1",
+    tags=["tools"],
+)

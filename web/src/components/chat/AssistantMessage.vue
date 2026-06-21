@@ -29,13 +29,29 @@ watch(
 
 // ── 主体 Markdown 渲染 ────────────────────────────────────────
 
+// 转义 HTML 特殊字符，防止流式期间粗精渲染 XSS
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 const renderedBody = computed(() => {
   if (!parsed.value.body) return ''
+  // 流式过程用纯文本占位，避免 markdown 解析不完整 token 导致 undefined
+  if (props.message.streaming) {
+    return `<p style="white-space:pre-wrap">${escapeHtml(parsed.value.body)}</p>`
+  }
   return renderMarkdown(parsed.value.body)
 })
 
 const renderedThinking = computed(() => {
   if (!parsed.value.thinking) return ''
+  if (props.message.streaming) {
+    return `<p style="white-space:pre-wrap">${escapeHtml(parsed.value.thinking)}</p>`
+  }
   return renderMarkdown(parsed.value.thinking)
 })
 

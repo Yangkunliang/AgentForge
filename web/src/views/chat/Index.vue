@@ -2,29 +2,40 @@
 import { ref, watch, nextTick, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
+import { useAppStore } from '@/stores/app'
 import { useChat } from '@/composables/useChat'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
-import type { ChatMessage } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
+const appStore = useAppStore()
+
+const isMobile = computed(() => appStore.isMobile)
 
 const inputText = ref('')
 const messagesEl = ref<HTMLElement | null>(null)
 const sidebarVisible = ref(true)
 const autoCreating = ref(false)
+const sessionDrawerVisible = ref(false)
 
-// 当前会话 ID 从路由取
 const sessionId = ref(route.params.sessionId as string | undefined)
 
-const { sending, sendMessage: _send } = useChat()
+const { sending, sendMessage: _send, abort: abortStream } = useChat()
+
+// 折叠后 topbar 显示当前会话标题
+const topbarTitle = computed(() => {
+  if (!sidebarVisible.value && sessionStore.currentSession?.title) {
+    return sessionStore.currentSession.title
+  }
+  return null
+})
+
 async function send() {
   const content = inputText.value.trim()
   if (!content || sending.value || autoCreating.value) return
 
-  // 没有有效 sessionId 时，自动创建一个新会话
   if (!sessionId.value) {
     autoCreating.value = true
     try {
@@ -39,55 +50,49 @@ async function send() {
   }
 
   inputText.value = ''
-  await _send(content, sessionId.value)
+  _send(content, sessionId.value)
+}
+
+function stopStreaming() {
+  abortStream()
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+  if (e.key === 'Enter' && e.ctrlKey && !e.shiftKey && !e.metaKey) {
     e.preventDefault()
     send()
   }
 }
 
-// 消息变化时自动滚底
 watch(
   () => sessionStore.messages.length,
   async () => {
     await nextTick()
-    if (messagesEl.value) {
-      messagesEl.value.scrollTop = messagesEl.value.scrollHeight
-    }
+    if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   },
 )
 
-// 流式追加时也滚底
 watch(
   () => sessionStore.messages.map((m) => m.content).join(''),
   async () => {
     await nextTick()
-    if (messagesEl.value) {
-      messagesEl.value.scrollTop = messagesEl.value.scrollHeight
-    }
+    if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   },
 )
 
 onMounted(async () => {
   await sessionStore.fetchSessions()
-
   if (sessionId.value) {
-    // 校验 sessionId 是否真实存在
     const session = sessionStore.sessions.find((s) => s.id === sessionId.value)
     if (session) {
       await sessionStore.selectSession(session)
     } else {
-      // ID 无效（已删除或伪造），清除路由回到空白还
       sessionId.value = undefined
       router.replace('/chat')
     }
   }
 })
 
-// 路由切换时同步 sessionId
 watch(
   () => route.params.sessionId,
   async (id) => {
@@ -96,6 +101,7 @@ watch(
       const session = sessionStore.sessions.find((s) => s.id === id)
       if (session) await sessionStore.selectSession(session)
     }
+    sessionDrawerVisible.value = false
   },
 )
 
@@ -104,7 +110,7 @@ async function handleNewChat() {
   router.push(`/chat/${session.id}`)
 }
 
-// ── 图片上传 ────────────────────────────────────────────────
+// ── 图片上传 ──────────────────────────────────────────────────
 const pendingImages = ref<{ url: string; file: File }[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -117,10 +123,8 @@ function onFileChange(e: Event) {
   if (!files) return
   for (const file of Array.from(files)) {
     if (!file.type.startsWith('image/')) continue
-    const url = URL.createObjectURL(file)
-    pendingImages.value.push({ url, file })
+    pendingImages.value.push({ url: URL.createObjectURL(file), file })
   }
-  // reset input
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
@@ -132,50 +136,84 @@ function removePendingImage(idx: number) {
 
 <template>
   <div class="chat-layout">
-    <!-- 侧边栏 -->
-    <SessionSidebar v-show="sidebarVisible" />
+    <!-- 桌面端：SessionSidebar 内联，支持折叠 -->
+    <Transition name="sidebar">
+      <SessionSidebar
+        v-show="sidebarVisible"
+        class="chat-sidebar-desktop"
+        @collapse="sidebarVisible = false"
+      />
+    </Transition>
+
+    <!-- 移动端：会话历史抄屉 -->
+    <el-drawer
+      v-model="sessionDrawerVisible"
+      :with-header="false"
+      direction="ltr"
+      size="80%"
+      class="session-drawer"
+    >
+      <SessionSidebar class="session-drawer-sidebar" @collapse="sessionDrawerVisible = false" />
+    </el-drawer>
 
     <!-- 主区域 -->
     <div class="chat-main">
-      <!-- 顶栏 -->
-      <div class="chat-topbar">
-        <button class="toggle-sidebar" @click="sidebarVisible = !sidebarVisible" title="切换侧边栏">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+      <!-- 桌面端顶栏 -->
+      <div class="chat-topbar chat-topbar--desktop">
+        <!-- 展开按钮（侧边栏折叠时显示） -->
+        <button
+          v-if="!sidebarVisible"
+          class="topbar-btn"
+          title="展开侧边栏"
+          @click="sidebarVisible = true"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M13 9l3 3-3 3"/>
           </svg>
         </button>
-        <span class="session-name">{{ sessionStore.currentSession?.title ?? 'AgentForge' }}</span>
+        <span v-if="!sidebarVisible" class="topbar-divider" />
+
+        <!-- slogan 常驻 / 折叠后补充显示当前会话标题 -->
+        <div class="topbar-info">
+          <span class="topbar-slogan">全栈开发者的智能工作台</span>
+          <span v-if="topbarTitle" class="topbar-session-title">{{ topbarTitle }}</span>
+        </div>
+      </div>
+
+      <!-- 移动端顶栏 -->
+      <div class="chat-topbar chat-topbar--mobile">
+        <button class="mobile-history-btn" @click="sessionDrawerVisible = true" title="会话历史">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>历史</span>
+        </button>
+        <span class="session-name">{{ sessionStore.currentSession?.title ?? '新对话' }}</span>
+        <button class="mobile-new-btn" @click="handleNewChat" title="新建对话">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
       </div>
 
       <!-- 消息区 -->
       <div ref="messagesEl" class="messages-area">
-        <!-- 空状态 -->
         <div v-if="!sessionId || sessionStore.messages.length === 0" class="welcome">
-          <div class="welcome-icon">✦</div>
+          <div class="welcome-icon">✶</div>
           <h2>有什么可以帮你的？</h2>
           <p>输入任何问题，多 Agent 将协同为你处理</p>
         </div>
 
-        <!-- 消息气泡 -->
         <template v-for="msg in sessionStore.messages" :key="msg.id">
-          <!-- 用户消息 -->
           <div v-if="msg.role === 'user'" class="user-message">
             <div class="bubble">
               <div v-if="msg.images?.length" class="user-images">
-                <img
-                  v-for="img in msg.images"
-                  :key="img.url"
-                  :src="img.url"
-                  :alt="img.alt"
-                  class="user-image-thumb"
-                />
+                <img v-for="img in msg.images" :key="img.url" :src="img.url" :alt="img.alt" class="user-image-thumb" />
               </div>
               <span v-if="msg.content">{{ msg.content }}</span>
             </div>
             <div class="avatar">我</div>
           </div>
-
-          <!-- AI 消息 -->
           <AssistantMessage v-else :message="msg" />
         </template>
       </div>
@@ -185,26 +223,20 @@ function removePendingImage(idx: number) {
         <div class="input-box" :class="{ 'input-box--disabled': !sessionId }">
           <textarea
             v-model="inputText"
-            :placeholder="'输入消息，Enter 发送 / Shift+Enter 换行'"
+            :placeholder="isMobile ? '输入消息...' : '输入消息，Ctrl+Enter 发送 / Enter 换行'"
             :disabled="sending || autoCreating"
             rows="1"
             @keydown="onKeydown"
             @input="(e) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 160) + 'px' }"
           />
-          <button
-            class="send-btn"
-            :disabled="!inputText.trim() || sending || autoCreating"
-            @click="send"
-          >
-            <svg v-if="!sending" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
-            </svg>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
-              <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-            </svg>
+          <button v-if="!sending" class="send-btn" :disabled="!inputText.trim() || autoCreating" @click="send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z" /></svg>
+          </button>
+          <button v-else class="stop-btn" @click="stopStreaming" title="停止生成">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
           </button>
         </div>
-        <p class="input-hint">AgentForge 由 AI 驱动，重要信息请以实际情况为准</p>
+        <p class="input-hint">CodeSoul 由 AI 驱动，重要信息请以实际情况为准</p>
       </div>
     </div>
   </div>
@@ -225,40 +257,81 @@ function removePendingImage(idx: number) {
   min-width: 0;
 }
 
-// 顶栏
+// ── 顶栏 ─────────────────────────────────────────────────────
 .chat-topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
+  gap: 10px;
+  padding: 0 20px;
+  height: 52px;
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
-  z-index: 1;
-
-  .toggle-sidebar {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #6b7280;
-    display: flex;
-    align-items: center;
-    padding: 4px;
-    border-radius: 4px;
-
-    &:hover { background: #f3f4f6; }
-  }
-
-  .session-name {
-    font-size: 14px;
-    font-weight: 500;
-    color: #111827;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  flex-shrink: 0;
 }
 
-// 消息区
+.chat-topbar--desktop { display: flex; }
+.chat-topbar--mobile  { display: none; }
+
+.topbar-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: #f3f4f6; color: #374151; }
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 16px;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+
+.topbar-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.topbar-slogan {
+  font-size: 12px;
+  color: #9ca3af;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.topbar-session-title {
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+// ── 侧边栏过渡动画 ────────────────────────────────────────────
+.sidebar-enter-active,
+.sidebar-leave-active {
+  transition: width 0.22s ease, opacity 0.18s ease;
+  overflow: hidden;
+}
+.sidebar-enter-from,
+.sidebar-leave-to {
+  width: 0 !important;
+  opacity: 0;
+}
+
+// ── 消息区 ────────────────────────────────────────────────────
 .messages-area {
   flex: 1;
   overflow-y: auto;
@@ -278,26 +351,11 @@ function removePendingImage(idx: number) {
   text-align: center;
   padding: 60px 0;
 
-  .welcome-icon {
-    font-size: 48px;
-    color: #6366f1;
-    margin-bottom: 16px;
-  }
-
-  h2 {
-    font-size: 22px;
-    font-weight: 600;
-    color: #111827;
-    margin: 0 0 8px;
-  }
-
-  p {
-    font-size: 14px;
-    margin: 0;
-  }
+  .welcome-icon { font-size: 48px; color: #409eff; margin-bottom: 16px; }
+  h2 { font-size: 22px; font-weight: 600; color: #111827; margin: 0 0 8px; }
+  p  { font-size: 14px; margin: 0; }
 }
 
-// 用户消息气泡
 .user-message {
   display: flex;
   align-items: flex-start;
@@ -307,7 +365,7 @@ function removePendingImage(idx: number) {
   flex-direction: row-reverse;
 
   .bubble {
-    background: #6366f1;
+    background: #409eff;
     color: #fff;
     border-radius: 16px 4px 16px 16px;
     padding: 10px 14px;
@@ -331,7 +389,7 @@ function removePendingImage(idx: number) {
   }
 }
 
-// 输入区
+// ── 输入区 ────────────────────────────────────────────────────
 .input-area {
   padding: 16px 20px 20px;
   border-top: 1px solid #e5e7eb;
@@ -347,14 +405,8 @@ function removePendingImage(idx: number) {
   padding: 10px 12px;
   transition: border-color 0.15s;
 
-  &:focus-within {
-    border-color: #6366f1;
-    background: #fff;
-  }
-
-  &--disabled {
-    opacity: 0.6;
-  }
+  &:focus-within { border-color: #409eff; background: #fff; }
+  &--disabled { opacity: 0.6; }
 
   textarea {
     flex: 1;
@@ -368,7 +420,6 @@ function removePendingImage(idx: number) {
     min-height: 24px;
     max-height: 160px;
     overflow-y: auto;
-
     &::placeholder { color: #9ca3af; }
   }
 }
@@ -377,7 +428,7 @@ function removePendingImage(idx: number) {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: #6366f1;
+  background: #409eff;
   border: none;
   color: #fff;
   cursor: pointer;
@@ -387,16 +438,23 @@ function removePendingImage(idx: number) {
   flex-shrink: 0;
   transition: background 0.15s;
 
-  &:hover:not(:disabled) { background: #4f46e5; }
-  &:disabled { background: #c7d2fe; cursor: not-allowed; }
+  &:hover:not(:disabled) { background: #337ecc; }
+  &:disabled { background: #a0cfff; cursor: not-allowed; }
 }
 
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.stop-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ef4444;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  &:hover { background: #dc2626; }
 }
 
 .input-hint {
@@ -406,10 +464,46 @@ function removePendingImage(idx: number) {
   margin: 8px 0 0;
 }
 
-// 移动端
-@media (max-width: 768px) {
-  .chat-layout {
-    position: relative;
+// ── 移动端 ────────────────────────────────────────────────────
+@media (max-width: $breakpoint-mobile) {
+  .chat-sidebar-desktop { display: none !important; }
+  .chat-topbar--desktop { display: none !important; }
+  .chat-topbar--mobile  { display: flex !important; padding: 8px 12px; gap: 8px; }
+
+  .session-name {
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+
+  .mobile-history-btn,
+  .mobile-new-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    flex-shrink: 0;
+    &:hover { background: #f3f4f6; }
+  }
+
+  .messages-area { padding: 16px 12px; }
+  .input-area    { padding: 10px 12px 14px; }
+  .input-hint    { display: none; }
+  .user-message  { max-width: 90%; }
 }
+
+:deep(.session-drawer) {
+  .el-drawer__body { padding: 0; overflow: hidden; }
+}
+.session-drawer-sidebar { height: 100%; }
 </style>

@@ -14,10 +14,11 @@ import type { SSEEvent } from '@/types'
 export function useChat(sessionId?: string) {
   const sessionStore = useSessionStore()
   const sending = ref(false)
+  let currentController: AbortController | null = null
 
-  async function sendMessage(content: string, id?: string) {
+  async function sendMessage(content: string, id?: string): Promise<AbortController | null> {
     const targetId = id ?? sessionId
-    if (!content.trim() || sending.value || !targetId) return
+    if (!content.trim() || sending.value || !targetId) return null
     sending.value = true
 
     // 乐观更新：立即显示用户消息 + 空 assistant 占位
@@ -30,7 +31,7 @@ export function useChat(sessionId?: string) {
       const taskId = data.task_id
 
       // 订阅 SSE，监听执行过程
-      await _subscribeSSE(taskId, localId)
+      currentController = await _subscribeSSE(taskId, localId)
 
       // 更新会话排序（置顶）
       sessionStore.bumpCurrentSession()
@@ -39,19 +40,28 @@ export function useChat(sessionId?: string) {
     } finally {
       sending.value = false
     }
+
+    return currentController
   }
 
-  return { sending, sendMessage }
+  function abort() {
+    currentController?.abort()
+    currentController = null
+  }
+
+  return { sending, sendMessage, abort }
 }
 
-async function _subscribeSSE(taskId: string, localAssistantId: string) {
+async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<AbortController> {
   const sessionStore = useSessionStore()
   const token = localStorage.getItem('access_token')
-  if (!token) return
+  if (!token) {
+    return new AbortController()
+  }
 
-  return new Promise<void>((resolve) => {
-    const controller = new AbortController()
+  const controller = new AbortController()
 
+  return new Promise<AbortController>((resolve) => {
     fetch(`/api/v1/sse/tasks/${taskId}/stream`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
@@ -59,7 +69,7 @@ async function _subscribeSSE(taskId: string, localAssistantId: string) {
       .then(async (response) => {
         if (!response.ok || !response.body) {
           sessionStore.finalizeAssistantMessage(localAssistantId, '连接失败，请重试。')
-          resolve()
+          resolve(controller)
           return
         }
 
@@ -98,25 +108,23 @@ async function _subscribeSSE(taskId: string, localAssistantId: string) {
                 if (content) {
                   sessionStore.finalizeAssistantMessage(localAssistantId, content)
                 } else {
-                  // 若后端只给了 result 字段
                   const result = event.data.result as Record<string, unknown> | undefined
                   sessionStore.finalizeAssistantMessage(
                     localAssistantId,
                     typeof result === 'string' ? result : JSON.stringify(result ?? ''),
                   )
                 }
-                controller.abort()
-                resolve()
-                break
+                // 不 abort，直接 break 出循环，让流自然关闭
+                resolve(controller)
+                return  // 跳出整个循环
               }
 
               // 任务失败
               case 'task_failed': {
                 const error = (event.data.error as string) ?? '执行失败'
                 sessionStore.finalizeAssistantMessage(localAssistantId, `⚠️ ${error}`)
-                controller.abort()
-                resolve()
-                break
+                resolve(controller)
+                return  // 跳出整个循环
               }
 
               // heartbeat / 内部事件：静默忽略，不影响 UI
@@ -126,14 +134,14 @@ async function _subscribeSSE(taskId: string, localAssistantId: string) {
           }
         }
 
-        resolve()
+        resolve(controller)
       })
       .catch((err) => {
         console.error('[SSE] fetch error:', err.message)
         if (err.name !== 'AbortError') {
           sessionStore.finalizeAssistantMessage(localAssistantId, '连接中断，请重试。')
         }
-        resolve()
+        resolve(controller)
       })
   })
 }
