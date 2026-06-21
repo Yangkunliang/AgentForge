@@ -126,7 +126,16 @@ class LiteLLMProvider(LLMProvider):
         prompt: str,
         config: LLMConfig | None = None,
     ) -> AsyncGenerator[str, None]:
-        """流式完成"""
+        """流式完成
+
+        收集所有流式 chunk，将 reasoning/thinking 内容用 <thinking>...</thinking>
+        包裹后拼接到结果开头。这样前端 parseThinking() 能正确提取并渲染思考过程。
+
+        不同模型的 reasoning delta 字段名不同：
+          - OpenAI o1/o3 系列: delta["reasoning"]
+          - Claude (via OpenAI compat): delta["reasoning"] 或 delta["cache_control"]
+          - 普通模型: 只有 delta["content"]，无 reasoning
+        """
         if not self.is_available:
             yield "LiteLLM not available"
             return
@@ -142,9 +151,37 @@ class LiteLLMProvider(LLMProvider):
                 stream=True,
             )
 
+            reasoning_parts: list[str] = []
+            content_parts: list[str] = []
+
             async for chunk in response:
-                if chunk["choices"][0]["delta"]["content"]:
-                    yield chunk["choices"][0]["delta"]["content"]
+                delta = chunk["choices"][0].get("delta", {})
+
+                # 收集 reasoning（不同厂商用不同字段名）
+                reasoning = delta.get("reasoning") or ""
+                if reasoning:
+                    reasoning_parts.append(reasoning)
+
+                # 收集可见回复内容
+                content = delta.get("content") or ""
+                if content:
+                    content_parts.append(content)
+
+            # 拼接完整内容：thinking + 主体回复
+            full_reasoning = "".join(reasoning_parts)
+            full_content = "".join(content_parts)
+
+            # 如果有 reasoning，用标签包裹后拼在前面
+            if full_reasoning:
+                logger.info(
+                    "stream_complete: collected reasoning content, "
+                    "reasoning_len=%d, body_len=%d",
+                    len(full_reasoning),
+                    len(full_content),
+                )
+                yield f"<thinking>\n{full_reasoning.strip()}\n</thinking>\n\n{full_content}"
+            else:
+                yield full_content
         except Exception as e:
             logger.error(f"LiteLLM stream error: {e}")
             yield f"Error: {e}"
