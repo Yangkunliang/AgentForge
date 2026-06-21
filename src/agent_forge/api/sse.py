@@ -147,7 +147,7 @@ async def emit_task_completed(task_id: str, result: dict) -> None:
         SSEEventTypes.TASK_COMPLETED,
         {
             "task_id": task_id,
-            "result": result,
+            "content": result.get("content", ""),
         },
     )
 
