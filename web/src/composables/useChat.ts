@@ -77,7 +77,12 @@ async function _subscribeSSE(taskId: string, localAssistantId: string) {
 
           for (const chunk of chunks) {
             const event = _parseSSE(chunk)
-            if (!event) continue
+            if (!event) {
+              if (chunk.trim()) console.log('[SSE] unparsed chunk:', JSON.stringify(chunk))
+              continue
+            }
+
+            console.log('[SSE] event:', event.event, 'data:', JSON.stringify(event.data))
 
             switch (event.event) {
               // 流式文字片段（LLM 逐 token 输出）
@@ -124,6 +129,7 @@ async function _subscribeSSE(taskId: string, localAssistantId: string) {
         resolve()
       })
       .catch((err) => {
+        console.error('[SSE] fetch error:', err.message)
         if (err.name !== 'AbortError') {
           sessionStore.finalizeAssistantMessage(localAssistantId, '连接中断，请重试。')
         }
