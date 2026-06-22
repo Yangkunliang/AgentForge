@@ -3,6 +3,8 @@ export interface User {
   id: string
   username: string
   email: string
+  nickname?: string       // 可选昵称，未设置时显示 username
+  avatar_url?: string    // base64 data URL 头像
   permissions: string[]
   created_at: string
 }

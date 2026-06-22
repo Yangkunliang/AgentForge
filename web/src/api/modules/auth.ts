@@ -25,4 +25,8 @@ export const authApi = {
   me: () => {
     return request.get<{ user: import('@/types').User }>('/auth/me')
   },
+
+  updateProfile: (data: { nickname?: string | null; avatar_url?: string | null; current_password?: string; new_password?: string }) => {
+    return request.patch<{ user: import('@/types').User }>('/auth/me', data)
+  },
 }

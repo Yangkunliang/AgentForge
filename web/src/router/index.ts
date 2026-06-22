@@ -85,6 +85,11 @@ const routes: RouteRecordRaw[] = [
         name: 'LLMSettings',
         component: () => import('@/views/settings/LLMConfig.vue'),
       },
+      {
+        path: 'settings/profile',
+        name: 'Profile',
+        component: () => import('@/views/settings/Profile.vue'),
+      },
     ],
   },
 ]

@@ -26,6 +26,10 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255))
     permissions: Mapped[dict] = mapped_column(JSON, default=list)
 
+    # 个人资料
+    nickname: Mapped[str | None] = mapped_column(String(50), nullable=True, default=None)
+    avatar_url: Mapped[str | None] = mapped_column(String(524288), nullable=True, default=None)  # base64 data URL，最大 512 KB
+
     # Relationships
     tasks: Mapped[list["Task"]] = relationship(
         back_populates="user",

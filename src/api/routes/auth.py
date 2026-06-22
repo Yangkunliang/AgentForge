@@ -202,3 +202,107 @@ async def logout(request: Request) -> dict:
         path="/api/v1/auth",
     )
     return resp
+
+
+@router.get("/me", tags=["auth"])
+async def me(current_user: User = Depends(get_current_user)) -> dict:
+    """返回当前登录用户信息"""
+    return {
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "nickname": current_user.nickname,
+            "avatar_url": current_user.avatar_url,
+            "permissions": current_user.permissions,
+            "created_at": str(current_user.created_at),
+        }
+    }
+
+
+class UpdateProfileRequest(BaseModel):
+    nickname: str | None = Field(None, max_length=50)
+    avatar_url: str | None = Field(None)  # base64 data URL
+    current_password: str | None = Field(None)  # 修改密码时需提供
+    new_password: str | None = Field(None, min_length=8, max_length=128)
+
+    @field_validator("nickname")
+    @classmethod
+    def clean_nickname(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+        return v
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("需含大写字母")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("需含小写字母")
+        if not re.search(r"\d", v):
+            raise ValueError("需含数字")
+        return v
+
+    @field_validator("avatar_url")
+    @classmethod
+    def validate_avatar(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        # 必须是 data URL 或空字符串（清除头像）
+        if v == "":
+            return None
+        if not v.startswith("data:image/"):
+            raise ValueError("头像必须为 data URL 格式")
+        # base64 大小检查：约 512 KB
+        if len(v) > 700_000:
+            raise ValueError("头像文件过大，请压缩后重试")
+        return v
+
+
+@router.patch("/me", tags=["auth"])
+async def update_profile(
+    body: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+) -> dict:
+    """更新个人资料：昵称、头像、密码"""
+    # 修改密码需验证原密码
+    if body.new_password:
+        if not body.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CURRENT_PASSWORD_REQUIRED",
+            )
+        if not verify_password(body.current_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="WRONG_CURRENT_PASSWORD",
+            )
+        current_user.password_hash = hash_password(body.new_password)
+
+    if body.nickname is not None:
+        current_user.nickname = body.nickname or None
+
+    if body.avatar_url is not None:
+        current_user.avatar_url = body.avatar_url or None
+
+    db.add(current_user)
+    await db.flush()
+    await db.refresh(current_user)
+
+    return {
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "nickname": current_user.nickname,
+            "avatar_url": current_user.avatar_url,
+            "permissions": current_user.permissions,
+            "created_at": str(current_user.created_at),
+        }
+    }

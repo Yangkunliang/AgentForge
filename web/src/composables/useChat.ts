@@ -9,6 +9,7 @@
 import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
 import { useSessionStore } from '@/stores/session'
+import { useAuthStore } from '@/stores/auth'
 import type { SSEEvent } from '@/types'
 
 export function useChat(sessionId?: string) {
@@ -26,6 +27,14 @@ export function useChat(sessionId?: string) {
     const localId = assistantMsg.id
 
     try {
+      // ── 本地意图拦截（昵称 / 头像设置，直接前端处理）────────
+      const intercepted = await _tryIntercept(content, localId)
+      if (intercepted) {
+        sending.value = false
+        sessionStore.bumpCurrentSession()
+        return null
+      }
+
       // 发送到后端，获取 task_id
       const { data } = await sessionsApi.chat(targetId, content)
       const taskId = data.task_id
@@ -50,6 +59,98 @@ export function useChat(sessionId?: string) {
   }
 
   return { sending, sendMessage, abort }
+}
+
+// ── 本地意图拦截 ─────────────────────────────────────────────
+/**
+ * 识别用户想通过对话设置自己昵称的意图，直接调用 authStore.updateProfile()
+ * 并流式"打字"回复，模拟 AI 响应。
+ *
+ * 支持的指令格式（自然语言，宽松匹配）：
+ *   "把我的昵称改成 XXX"
+ *   "帮我设置昵称为 XXX"
+ *   "我的昵称叫 XXX"
+ *   "/set-nickname XXX"（快捷指令）
+ *
+ * 返回 true 表示已拦截，false 表示需要走后端
+ */
+async function _tryIntercept(content: string, localId: string): Promise<boolean> {
+  const authStore = useAuthStore()
+  const sessionStore = useSessionStore()
+
+  const text = content.trim()
+
+  // ── 1. 昵称设置 ────────────────────────────────────────────
+  const nicknamePatterns = [
+    /(?:把我的昵称|我的昵称|帮我.{0,4}昵称|设置昵称|修改昵称|昵称改)[：:为成叫是\s]*["「『]?([^\s"」』,，。！？\n]{1,20})["」』]?/,
+    /\/set-nickname\s+(.+)/i,
+    /(?:call me|my nickname is|set nickname to)\s+(.+)/i,
+  ]
+
+  for (const pattern of nicknamePatterns) {
+    const m = text.match(pattern)
+    if (m) {
+      const newNickname = m[1].trim().replace(/^["'「『]|["'」』]$/g, '')
+      if (!newNickname || newNickname.length > 50) continue
+
+      // 流式打字回复
+      const reply = `好的！我已经把你的昵称设置为「**${newNickname}**」了 🎉\n\n以后就叫你 ${newNickname} 啦，有什么需要帮忙的尽管说~`
+      await _typeReply(localId, reply, sessionStore)
+
+      // 调用 store 更新
+      try {
+        await authStore.updateProfile({ nickname: newNickname })
+      } catch {
+        // 已在 store 内 ElMessage.error，这里静默
+      }
+      return true
+    }
+  }
+
+  // ── 2. 清除昵称 ────────────────────────────────────────────
+  if (/(?:清除|删除|取消|去掉|移除).{0,6}昵称|reset nickname/i.test(text)) {
+    const reply = `已经帮你把昵称清除了，之后会用你的账号用户名「**${authStore.user?.username}**」显示。`
+    await _typeReply(localId, reply, sessionStore)
+    try { await authStore.updateProfile({ nickname: null }) } catch { /* silent */ }
+    return true
+  }
+
+  // ── 3. 查询当前昵称 ────────────────────────────────────────
+  if (/我的昵称是什么|当前昵称|查看昵称/.test(text)) {
+    const name = authStore.user?.nickname
+    const reply = name
+      ? `你当前的昵称是「**${name}**」。想改的话，说「把我的昵称改成 XX」就行。`
+      : `你还没有设置昵称，当前显示的是你的用户名「**${authStore.user?.username}**」。\n\n想设置的话，说「把我的昵称改成 XX」就行~`
+    await _typeReply(localId, reply, sessionStore)
+    return true
+  }
+
+  return false
+}
+
+/**
+ * 模拟流式打字效果写入 assistant 气泡
+ */
+async function _typeReply(
+  localId: string,
+  text: string,
+  sessionStore: ReturnType<typeof useSessionStore>,
+): Promise<void> {
+  // 标记为流式开始（显示打点动画）
+  sessionStore.appendStreamChunk(localId, '')
+
+  // 按字符分批输出，模拟打字
+  const chars = [...text]  // 支持 emoji 和中文
+  const BATCH = 3          // 每批输出字符数
+  const DELAY = 18         // ms / 批
+
+  for (let i = 0; i < chars.length; i += BATCH) {
+    await new Promise<void>(r => setTimeout(r, DELAY))
+    sessionStore.appendStreamChunk(localId, chars.slice(i, i + BATCH).join(''))
+  }
+
+  // 流式结束，最终化消息
+  sessionStore.finalizeAssistantMessage(localId, text)
 }
 
 async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<AbortController> {

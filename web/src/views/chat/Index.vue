@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useChat } from '@/composables/useChat'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
+import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 
 const route = useRoute()
@@ -15,13 +16,15 @@ const sessionStore = useSessionStore()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-// 当前用户显示名：优先 username，否则 '我'
-const userName = computed(() => authStore.user?.username || '我')
+// 当前用户显示名 + 头像（来自 store computed，自动响应昵称/头像修改）
+const userName = computed(() => authStore.displayName)
+const userAvatarUrl = computed(() => authStore.avatarUrl)
 
 const isMobile = computed(() => appStore.isMobile)
 
 const inputText = ref('')
 const messagesEl = ref<HTMLElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const sidebarVisible = ref(true)
 const autoCreating = ref(false)
 const sessionDrawerVisible = ref(false)
@@ -37,6 +40,17 @@ const topbarTitle = computed(() => {
   }
   return null
 })
+
+// 引导卡片填充话术到输入框
+async function fillPrompt(text: string) {
+  inputText.value = text
+  await nextTick()
+  if (textareaRef.value) {
+    textareaRef.value.style.height = 'auto'
+    textareaRef.value.style.height = Math.min(textareaRef.value.scrollHeight, 160) + 'px'
+    textareaRef.value.focus()
+  }
+}
 
 async function send() {
   const content = inputText.value.trim()
@@ -204,11 +218,10 @@ function removePendingImage(idx: number) {
 
       <!-- 消息区 -->
       <div ref="messagesEl" class="messages-area">
-        <div v-if="!sessionId || sessionStore.messages.length === 0" class="welcome">
-          <div class="welcome-icon">✶</div>
-          <h2>有什么可以帮你的？</h2>
-          <p>输入任何问题，多 Agent 将协同为你处理</p>
-        </div>
+        <WelcomeScreen
+          v-if="!sessionId || sessionStore.messages.length === 0"
+          @prompt="fillPrompt"
+        />
 
         <template v-for="msg in sessionStore.messages" :key="msg.id">
           <div v-if="msg.role === 'user'" class="user-message">
@@ -218,7 +231,7 @@ function removePendingImage(idx: number) {
               </div>
               <span v-if="msg.content">{{ msg.content }}</span>
             </div>
-            <UserAvatar :name="userName" shape="circle" :size="32" class="msg-avatar" />
+            <UserAvatar :name="userName" :avatar-url="userAvatarUrl" shape="circle" :size="32" class="msg-avatar" />
           </div>
           <AssistantMessage v-else :message="msg" />
         </template>
@@ -228,6 +241,7 @@ function removePendingImage(idx: number) {
       <div class="input-area">
         <div class="input-box" :class="{ 'input-box--disabled': !sessionId }">
           <textarea
+            ref="textareaRef"
             v-model="inputText"
             :placeholder="isMobile ? '输入消息...' : '输入消息，Ctrl+Enter 发送 / Enter 换行'"
             :disabled="sending || autoCreating"
@@ -345,21 +359,6 @@ function removePendingImage(idx: number) {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.welcome {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-  text-align: center;
-  padding: 60px 0;
-
-  .welcome-icon { font-size: 48px; color: #409eff; margin-bottom: 16px; }
-  h2 { font-size: 22px; font-weight: 600; color: #111827; margin: 0 0 8px; }
-  p  { font-size: 14px; margin: 0; }
 }
 
 .user-message {

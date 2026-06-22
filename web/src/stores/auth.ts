@@ -58,6 +58,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.permissions.includes('admin') ?? false)
+  // 显示名：如果设置了昵称则用昵称，否则用用户名
+  const displayName = computed(() => user.value?.nickname || user.value?.username || '我')
+  const avatarUrl = computed(() => user.value?.avatar_url || undefined)
 
   async function fetchMe() {
     if (!token.value) return
@@ -66,6 +69,25 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = data.user
     } catch {
       // token 失效则静默失败，保持登录状态
+    }
+  }
+
+  async function updateProfile(payload: {
+    nickname?: string | null
+    avatar_url?: string | null
+    current_password?: string
+    new_password?: string
+  }) {
+    loading.value = true
+    try {
+      const { data } = await authApi.updateProfile(payload)
+      user.value = data.user
+      ElMessage.success('资料已更新')
+    } catch (error) {
+      showAuthError(error, '保存失败')
+      throw error
+    } finally {
+      loading.value = false
     }
   }
 
@@ -126,10 +148,13 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     isLoggedIn,
     isAdmin,
+    displayName,
+    avatarUrl,
     login,
     register,
     logout,
     fetchMe,
+    updateProfile,
     hasPermission,
   }
 })
