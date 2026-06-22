@@ -6,6 +6,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -135,7 +136,7 @@ async def delete_agent(
 
 
 class AgentSettingsUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
+    name: str | None = Field(default=None, max_length=100)
     avatar_url: str | None = Field(default=None, max_length=500)
 
 
@@ -177,7 +178,10 @@ async def update_my_agent_settings(
     else:
         update_data = body.model_dump(exclude_unset=True)
         for field, value in update_data.items():
-            setattr(settings, field, value)
+            if field == "name":
+                setattr(settings, "agent_name", value or "CodeSoul")
+            else:
+                setattr(settings, field, value)
 
     await db.commit()
     await db.refresh(settings)
