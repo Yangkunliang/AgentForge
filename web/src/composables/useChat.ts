@@ -227,15 +227,25 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
               // 任务完成，用完整结果替换流式内容
               case 'task_completed': {
                 const content = (event.data.content as string) ?? ''
+                const result = event.data.result as Record<string, unknown> | undefined
+
+                // 优先使用 content，其次使用 result，如果都为空则保留已累积的流式内容
+                let finalContent: string | null = null
                 if (content) {
-                  sessionStore.finalizeAssistantMessage(localAssistantId, content)
-                } else {
-                  const result = event.data.result as Record<string, unknown> | undefined
-                  sessionStore.finalizeAssistantMessage(
-                    localAssistantId,
-                    typeof result === 'string' ? result : JSON.stringify(result ?? ''),
-                  )
+                  finalContent = content
+                } else if (result !== undefined && result !== null) {
+                  finalContent = typeof result === 'string' ? result : JSON.stringify(result)
                 }
+
+                // 只有当有有效内容时才替换，否则保留已累积的流式内容
+                if (finalContent !== null && finalContent !== '') {
+                  sessionStore.finalizeAssistantMessage(localAssistantId, finalContent)
+                } else {
+                  // 只标记为完成，不覆盖内容
+                  const msg = sessionStore.messages.find((m) => m.id === localAssistantId)
+                  if (msg) msg.streaming = false
+                }
+
                 resolve(controller)
                 return
               }
