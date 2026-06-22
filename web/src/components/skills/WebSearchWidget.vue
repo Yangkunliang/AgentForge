@@ -15,7 +15,7 @@ async function search() {
   searchResults.value = []
   try {
     const res = await webSearchApi.search(searchQuery.value)
-    searchResults.value = res.results
+    searchResults.value = res.data.results
   } catch (e: any) {
     error.value = e.response?.data?.detail || '搜索失败'
   } finally {

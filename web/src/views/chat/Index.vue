@@ -175,6 +175,27 @@ async function handleNewChat() {
   router.push(`/chat/${session.id}`)
 }
 
+// ── 快捷功能区域 ──────────────────────────────────────────────
+interface QuickAction {
+  id: string
+  icon: string
+  label: string
+  prompt: string
+}
+
+const quickActions: QuickAction[] = [
+  { id: 'code-review', icon: 'code-review', label: '代码审查', prompt: '帮我审查这段代码，找出潜在的问题、性能瓶颈和代码风格问题。' },
+  { id: 'debug', icon: 'debug', label: '调试分析', prompt: '帮我分析这个错误日志，找出问题根源并提供解决方案。' },
+  { id: 'refactor', icon: 'refactor', label: '代码重构', prompt: '帮我重构这段代码，使其更简洁、可维护。' },
+  { id: 'api-design', icon: 'api-design', label: 'API设计', prompt: '帮我设计一个RESTful API接口，包括请求参数、响应格式和错误处理。' },
+  { id: 'sql', icon: 'sql', label: 'SQL优化', prompt: '帮我优化这条SQL查询语句，提高执行效率。' },
+  { id: 'security', icon: 'security', label: '安全检查', prompt: '帮我检查这段代码的安全性，找出可能的安全漏洞。' },
+  { id: 'document', icon: 'document', label: '写文档', prompt: '帮我为这个功能编写技术文档，包括功能说明、API文档和使用示例。' },
+  { id: 'translate', icon: 'translate', label: '翻译', prompt: '帮我翻译这段英文技术文档为中文。' },
+]
+
+const showMoreActions = ref(false)
+
 // ── 图片上传 ──────────────────────────────────────────────────
 const pendingImages = ref<{ url: string; file: File }[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -284,6 +305,70 @@ function removePendingImage(idx: number) {
 
       <!-- 输入区 -->
       <div class="input-area">
+        <!-- 快捷功能区域 -->
+        <div class="quick-actions">
+          <button class="quick-actions__btn" @click="fillPrompt(quickActions[0].prompt)" :title="quickActions[0].label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            <span>{{ quickActions[0].label }}</span>
+          </button>
+          <button class="quick-actions__btn" @click="fillPrompt(quickActions[1].prompt)" :title="quickActions[1].label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9.06 11.9a8 8 0 1 1 6.06-6.06l3.13 3.13"/><path d="M12 12l9 9"/>
+            </svg>
+            <span>{{ quickActions[1].label }}</span>
+          </button>
+          <button class="quick-actions__btn" @click="fillPrompt(quickActions[2].prompt)" :title="quickActions[2].label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 4 10 10 4 16"/><line x1="12" y1="4" x2="20" y2="4"/><line x1="12" y1="10" x2="18" y2="10"/><line x1="12" y1="16" x2="22" y2="16"/>
+            </svg>
+            <span>{{ quickActions[2].label }}</span>
+          </button>
+          <button class="quick-actions__btn" @click="fillPrompt(quickActions[3].prompt)" :title="quickActions[3].label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <span>{{ quickActions[3].label }}</span>
+          </button>
+          
+          <!-- 更多按钮 -->
+          <div class="quick-actions__more">
+            <button class="quick-actions__btn quick-actions__btn--more" @click="showMoreActions = !showMoreActions">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <span>更多</span>
+            </button>
+            
+            <!-- 更多功能下拉菜单 -->
+            <Transition name="dropdown">
+              <div v-show="showMoreActions" class="quick-actions__dropdown">
+                <button 
+                  v-for="action in quickActions.slice(4)" 
+                  :key="action.id"
+                  class="quick-actions__dropdown-item"
+                  @click="fillPrompt(action.prompt); showMoreActions = false"
+                >
+                  <svg v-if="action.id === 'sql'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+                  </svg>
+                  <svg v-else-if="action.id === 'security'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>
+                  </svg>
+                  <svg v-else-if="action.id === 'document'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                  <svg v-else-if="action.id === 'translate'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span>{{ action.label }}</span>
+                </button>
+              </div>
+            </Transition>
+          </div>
+        </div>
+
         <!-- 待发送图片预览 -->
         <div v-if="pendingImages.length > 0" class="pending-images">
           <div v-for="(img, idx) in pendingImages" :key="idx" class="pending-image">
@@ -477,6 +562,91 @@ function removePendingImage(idx: number) {
 .input-area {
   padding: 16px 20px 20px;
   border-top: 1px solid #e5e7eb;
+}
+
+// ── 快捷功能区域 ──────────────────────────────────────────────
+.quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: #f3f4f6;
+    border: none;
+    color: #6b7280;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    &--more {
+      color: #409eff;
+      background: #f0f7ff;
+
+      &:hover {
+        background: #e6f2ff;
+      }
+    }
+  }
+
+  &__more {
+    position: relative;
+  }
+
+  &__dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 4px;
+    min-width: 140px;
+    z-index: 100;
+  }
+
+  &__dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: #374151;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+
+    &:hover {
+      background: #f3f4f6;
+    }
+  }
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 // ── 待发送图片预览 ────────────────────────────────────────────
