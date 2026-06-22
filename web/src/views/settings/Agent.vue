@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { agentsApi } from '@/api/modules/agents'
+import { uploadApi } from '@/api/modules/sessions'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 
 const agentName = ref('CodeSoul')
@@ -33,7 +34,7 @@ function onAvatarFileChange(e: Event) {
   const reader = new FileReader()
   reader.onload = (ev) => {
     const img = new Image()
-    img.onload = () => {
+    img.onload = async () => {
       const canvas = document.createElement('canvas')
       canvas.width = 200
       canvas.height = 200
@@ -42,7 +43,18 @@ function onAvatarFileChange(e: Event) {
       const sx = (img.width - size) / 2
       const sy = (img.height - size) / 2
       ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200)
-      avatarPreview.value = canvas.toDataURL('image/jpeg', 0.85)
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return
+        const uploadFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+        try {
+          const { data } = await uploadApi.image(uploadFile)
+          avatarPreview.value = data.url
+          ElMessage.success('头像上传成功')
+        } catch (err: any) {
+          ElMessage.error(err.response?.data?.detail || '头像上传失败')
+        }
+      }, 'image/jpeg', 0.85)
     }
     img.src = ev.target?.result as string
   }
