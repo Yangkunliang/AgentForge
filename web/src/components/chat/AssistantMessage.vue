@@ -9,7 +9,8 @@ import 'highlight.js/styles/github.css'
 
 const props = defineProps<{
   message: ChatMessage
-  agentName?: string   // 当前对话绑定的 Agent 名称，未传则默认 'CodeSoul'
+  agentName?: string          // 当前对话绑定的 Agent 名称，未传则默认 'CodeSoul'
+  agentAvatarUrl?: string     // AI 助手头像 URL
 }>()
 
 // AI 昵称：优先用 agentName，否则 'CodeSoul'
@@ -115,7 +116,7 @@ function handleContentClick(e: MouseEvent) {
 
 <template>
   <div class="assistant-message">
-    <UserAvatar :name="aiName" shape="squircle" :size="32" class="msg-avatar" />
+    <UserAvatar :name="aiName" :avatar-url="props.agentAvatarUrl" shape="squircle" :size="32" class="msg-avatar" />
 
     <div class="bubble">
 

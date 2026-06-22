@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useChat } from '@/composables/useChat'
 import { uploadApi } from '@/api/modules/sessions'
+import { agentsApi } from '@/api/modules/agents'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
@@ -33,6 +34,41 @@ const sessionDrawerVisible = ref(false)
 const sessionId = ref(route.params.sessionId as string | undefined)
 
 const { sending, sendMessage: _send, abort: abortStream } = useChat()
+
+// ── AI 助手信息 ──────────────────────────────────────────────
+const agentInfo = ref<{ name: string; avatarUrl: string | undefined }>({
+  name: 'CodeSoul',
+  avatarUrl: undefined,
+})
+
+async function loadAgentInfo() {
+  try {
+    const { data } = await agentsApi.list()
+    const codeSoul = data.find((a) => a.name === 'CodeSoul')
+    if (codeSoul) {
+      agentInfo.value = {
+        name: codeSoul.name,
+        avatarUrl: codeSoul.avatar_url || undefined,
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+onMounted(async () => {
+  await sessionStore.fetchSessions()
+  await loadAgentInfo()
+  if (sessionId.value) {
+    const session = sessionStore.sessions.find((s) => s.id === sessionId.value)
+    if (session) {
+      await sessionStore.selectSession(session)
+    } else {
+      sessionId.value = undefined
+      router.replace('/chat')
+    }
+  }
+})
 
 // 折叠后 topbar 显示当前会话标题
 const topbarTitle = computed(() => {
@@ -299,7 +335,7 @@ function removePendingImage(idx: number) {
             </div>
             <UserAvatar :name="userName" :avatar-url="userAvatarUrl" shape="circle" :size="32" class="msg-avatar" />
           </div>
-          <AssistantMessage v-else :message="msg" />
+          <AssistantMessage v-else :message="msg" :agent-name="agentInfo.name" :agent-avatar-url="agentInfo.avatarUrl" />
         </template>
       </div>
 

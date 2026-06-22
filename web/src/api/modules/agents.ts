@@ -8,7 +8,7 @@ export interface AgentListParams {
 
 export const agentsApi = {
   list: (params?: AgentListParams) => {
-    return request.get<{ total: number; items: Agent[] }>('/agents', { params })
+    return request.get<Agent[]>('/agents', { params })
   },
 
   get: (agentId: string) => {
@@ -16,11 +16,11 @@ export const agentsApi = {
   },
 
   create: (data: CreateAgentForm) => {
-    return request.post<{ agent_id: string; name: string }>('/agents', data)
+    return request.post<Agent>('/agents', data)
   },
 
   update: (agentId: string, data: Partial<CreateAgentForm>) => {
-    return request.put<Agent>(`/agents/${agentId}`, data)
+    return request.patch<Agent>(`/agents/${agentId}`, data)
   },
 
   delete: (agentId: string) => {

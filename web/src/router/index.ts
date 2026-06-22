@@ -90,6 +90,11 @@ const routes: RouteRecordRaw[] = [
         name: 'Profile',
         component: () => import('@/views/settings/Profile.vue'),
       },
+      {
+        path: 'settings/agent',
+        name: 'AgentSettings',
+        component: () => import('@/views/settings/Agent.vue'),
+      },
     ],
   },
 ]

@@ -64,13 +64,15 @@ export interface TaskFeedback {
 
 // Agent 相关
 export interface Agent {
-  agent_id: string
+  id: string
   name: string
   capabilities: string[]
   model: string
   status: 'active' | 'inactive'
   description?: string
+  avatar_url?: string
   created_at: string
+  updated_at: string
 }
 
 export interface CreateAgentForm {
@@ -78,6 +80,7 @@ export interface CreateAgentForm {
   capabilities: string[]
   model: string
   description?: string
+  avatar_url?: string
 }
 
 // Skill 相关

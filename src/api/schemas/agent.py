@@ -13,6 +13,7 @@ class AgentCreateRequest(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
     model: str = Field(..., min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=500)
+    avatar_url: str | None = Field(default=None, max_length=500)
 
 
 class AgentResponse(BaseModel):
@@ -22,6 +23,7 @@ class AgentResponse(BaseModel):
     model: str
     status: str
     description: str | None = None
+    avatar_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -33,3 +35,4 @@ class AgentUpdateRequest(BaseModel):
     status: str | None = Field(default=None, pattern=r"^(active|inactive)$")
     capabilities: list[str] | None = None
     description: str | None = Field(default=None, max_length=500)
+    avatar_url: str | None = Field(default=None, max_length=500)

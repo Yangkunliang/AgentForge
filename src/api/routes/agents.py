@@ -27,6 +27,7 @@ def _agent_to_dict(agent: Agent) -> dict:
         "model": agent.model,
         "status": agent.status,
         "description": agent.description,
+        "avatar_url": agent.avatar_url,
         "created_at": agent.created_at,
         "updated_at": agent.updated_at,
     }
@@ -50,6 +51,7 @@ async def create_agent(
         capabilities=body.capabilities,
         model=body.model,
         description=body.description,
+        avatar_url=body.avatar_url,
     )
     db.add(agent)
     await db.commit()

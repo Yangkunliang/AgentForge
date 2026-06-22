@@ -12,7 +12,7 @@ export const useAgentStore = defineStore('agent', () => {
     loading.value = true
     try {
       const { data } = await agentsApi.list(params)
-      agents.value = data.items
+      agents.value = data
       return data
     } finally {
       loading.value = false
@@ -54,7 +54,7 @@ export const useAgentStore = defineStore('agent', () => {
     loading.value = true
     try {
       await agentsApi.delete(agentId)
-      agents.value = agents.value.filter((a) => a.agent_id !== agentId)
+      agents.value = agents.value.filter((a) => a.id !== agentId)
     } finally {
       loading.value = false
     }

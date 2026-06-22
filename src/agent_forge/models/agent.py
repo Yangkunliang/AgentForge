@@ -32,6 +32,7 @@ class Agent(Base, TimestampMixin):
     model: Mapped[str] = mapped_column(String(100))  # LLM model name
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default=AgentStatus.ACTIVE)
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Relationships
     sub_tasks_assigned: Mapped[list["SubTask"]] = relationship(
