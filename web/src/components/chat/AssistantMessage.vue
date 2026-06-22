@@ -34,13 +34,13 @@ watch(
 // ── 工具调用记录 ──────────────────────────────────────────────
 
 const hasToolCalls = computed(() => !!(props.message.tool_calls && props.message.tool_calls.length > 0))
-const toolCallsExpanded = ref(false)
+const toolCallsExpanded = ref(true)  // 默认展开
 
-// 流式时有工具调用自动展开；完成后自动折叠
+// 流式时自动展开；完成后自动折叠
 watch(
   () => props.message.streaming,
   (streaming) => {
-    if (streaming && hasToolCalls.value) toolCallsExpanded.value = true
+    if (streaming) toolCallsExpanded.value = true
     if (!streaming) toolCallsExpanded.value = false
   },
 )

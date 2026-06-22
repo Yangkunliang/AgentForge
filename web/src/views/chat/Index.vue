@@ -5,6 +5,7 @@ import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useChat } from '@/composables/useChat'
+import { uploadApi } from '@/api/modules/sessions'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
@@ -41,6 +42,28 @@ const topbarTitle = computed(() => {
   return null
 })
 
+// 从用户消息内容中提取图片 URL（markdown 格式 ![alt](url)）
+function extractImages(content: string): Array<{ url: string; alt: string }> {
+  if (!content) return []
+  const regex = /!\[([^\]]*)\]\(([^)]+)\)/g
+  const images: Array<{ url: string; alt: string }> = []
+  let match
+  while ((match = regex.exec(content)) !== null) {
+    const url = match[2]
+    // 只提取 http/https 开头的 URL，排除 base64
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) {
+      images.push({ url, alt: match[1] || 'image' })
+    }
+  }
+  return images
+}
+
+// 移除内容中的图片 markdown 标记，只保留纯文本
+function stripImages(content: string): string {
+  if (!content) return ''
+  return content.replace(/!\[[^\]]*\]\([^)]+\)\n?/g, '').trim()
+}
+
 // 引导卡片填充话术到输入框
 async function fillPrompt(text: string) {
   inputText.value = text
@@ -54,7 +77,7 @@ async function fillPrompt(text: string) {
 
 async function send() {
   const content = inputText.value.trim()
-  if (!content || sending.value || autoCreating.value) return
+  if ((!content && pendingImages.value.length === 0) || sending.value || autoCreating.value) return
 
   if (!sessionId.value) {
     autoCreating.value = true
@@ -69,8 +92,30 @@ async function send() {
     autoCreating.value = false
   }
 
+  // 上传图片到后端，获取 URL
+  let finalContent = content
+  if (pendingImages.value.length > 0) {
+    const imageUrls: string[] = []
+    for (const img of pendingImages.value) {
+      try {
+        const { data } = await uploadApi.image(img.file)
+        imageUrls.push(data.url)
+      } catch (err) {
+        console.error('图片上传失败:', err)
+      }
+    }
+    // 将图片 URL 以 markdown 格式拼入内容
+    const imageTexts = imageUrls.map((url) => `![image](${url})`)
+    if (imageTexts.length > 0) {
+      finalContent = content
+        ? `${content}\n\n${imageTexts.join('\n')}`
+        : imageTexts.join('\n')
+    }
+  }
+
   inputText.value = ''
-  _send(content, sessionId.value)
+  pendingImages.value = []
+  _send(finalContent, sessionId.value)
 }
 
 function stopStreaming() {
@@ -226,10 +271,10 @@ function removePendingImage(idx: number) {
         <template v-for="msg in sessionStore.messages" :key="msg.id">
           <div v-if="msg.role === 'user'" class="user-message">
             <div class="bubble">
-              <div v-if="msg.images?.length" class="user-images">
-                <img v-for="img in msg.images" :key="img.url" :src="img.url" :alt="img.alt" class="user-image-thumb" />
+              <div v-if="extractImages(msg.content).length" class="user-images">
+                <img v-for="img in extractImages(msg.content)" :key="img.url" :src="img.url" :alt="img.alt" class="user-image-thumb" />
               </div>
-              <span v-if="msg.content">{{ msg.content }}</span>
+              <span v-if="stripImages(msg.content)">{{ stripImages(msg.content) }}</span>
             </div>
             <UserAvatar :name="userName" :avatar-url="userAvatarUrl" shape="circle" :size="32" class="msg-avatar" />
           </div>
@@ -406,6 +451,21 @@ function removePendingImage(idx: number) {
     font-size: 14px;
     line-height: 1.6;
     word-break: break-word;
+  }
+
+  .user-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .user-image-thumb {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: zoom-in;
   }
 
   .msg-avatar {
