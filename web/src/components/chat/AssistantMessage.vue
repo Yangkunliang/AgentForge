@@ -116,7 +116,10 @@ function handleContentClick(e: MouseEvent) {
 
 <template>
   <div class="assistant-message">
-    <UserAvatar :name="aiName" :avatar-url="props.agentAvatarUrl" shape="squircle" :size="32" class="msg-avatar" />
+    <div class="ai-identity">
+      <UserAvatar :name="aiName" :avatar-url="props.agentAvatarUrl" shape="squircle" :size="32" />
+      <span class="ai-name">{{ aiName }}</span>
+    </div>
 
     <div class="bubble">
 
@@ -227,9 +230,23 @@ function handleContentClick(e: MouseEvent) {
   align-self: flex-start;
 }
 
-.msg-avatar {
-  margin-top: 2px;
+.ai-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ai-name {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 
 .bubble {

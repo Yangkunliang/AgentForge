@@ -178,19 +178,6 @@ watch(
   },
 )
 
-onMounted(async () => {
-  await sessionStore.fetchSessions()
-  if (sessionId.value) {
-    const session = sessionStore.sessions.find((s) => s.id === sessionId.value)
-    if (session) {
-      await sessionStore.selectSession(session)
-    } else {
-      sessionId.value = undefined
-      router.replace('/chat')
-    }
-  }
-})
-
 watch(
   () => route.params.sessionId,
   async (id) => {
@@ -330,7 +317,10 @@ function removePendingImage(idx: number) {
               </div>
               <span v-if="stripImages(msg.content)">{{ stripImages(msg.content) }}</span>
             </div>
-            <UserAvatar :name="userName" :avatar-url="userAvatarUrl" shape="circle" :size="32" class="msg-avatar" />
+            <div class="user-identity" :title="userName">
+              <UserAvatar :name="userName" :avatar-url="userAvatarUrl" shape="circle" :size="32" />
+              <span class="user-name">{{ userName }}</span>
+            </div>
           </div>
           <AssistantMessage v-else :message="msg" :agent-name="agentInfo.name" :agent-avatar-url="agentInfo.avatarUrl" />
         </template>
@@ -586,8 +576,23 @@ function removePendingImage(idx: number) {
     cursor: zoom-in;
   }
 
-  .msg-avatar {
+  .user-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
     flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .user-name {
+    font-size: 11px;
+    color: #9ca3af;
+    white-space: nowrap;
+    max-width: 56px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
   }
 }
 
