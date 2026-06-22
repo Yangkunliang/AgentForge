@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.database import get_async_session
-from agent_forge.models import Agent, User
+from agent_forge.models import Agent, User, UserAgentSettings
 from api.schemas.agent import AgentCreateRequest, AgentResponse, AgentUpdateRequest
 from middleware.auth import get_current_user, require_permission
 
@@ -132,3 +132,53 @@ async def delete_agent(
 
     await db.delete(agent)
     await db.commit()
+
+
+class AgentSettingsUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    avatar_url: str | None = Field(default=None, max_length=500)
+
+
+@router.get("/settings/me")
+async def get_my_agent_settings(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """获取当前用户的 AI 助手设置（所有用户可用）"""
+    result = await db.execute(
+        select(UserAgentSettings).where(UserAgentSettings.user_id == current_user.id)
+    )
+    settings = result.scalar_one_or_none()
+    if not settings:
+        return {"agent_name": "CodeSoul", "avatar_url": None}
+    return {"agent_name": settings.agent_name, "avatar_url": settings.avatar_url}
+
+
+@router.patch("/settings/me")
+async def update_my_agent_settings(
+    body: AgentSettingsUpdateRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """更新当前用户的 AI 助手设置（所有用户可用）"""
+    result = await db.execute(
+        select(UserAgentSettings).where(UserAgentSettings.user_id == current_user.id)
+    )
+    settings = result.scalar_one_or_none()
+
+    if not settings:
+        settings = UserAgentSettings(
+            id=str(uuid.uuid4()),
+            user_id=current_user.id,
+            agent_name=body.name or "CodeSoul",
+            avatar_url=body.avatar_url,
+        )
+        db.add(settings)
+    else:
+        update_data = body.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(settings, field, value)
+
+    await db.commit()
+    await db.refresh(settings)
+    return {"agent_name": settings.agent_name, "avatar_url": settings.avatar_url}

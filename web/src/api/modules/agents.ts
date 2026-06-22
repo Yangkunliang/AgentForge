@@ -26,4 +26,13 @@ export const agentsApi = {
   delete: (agentId: string) => {
     return request.delete(`/agents/${agentId}`)
   },
+
+  // 用户级 AI 助手设置
+  getMySettings: () => {
+    return request.get<{ agent_name: string; avatar_url: string | null }>('/agents/settings/me')
+  },
+
+  updateMySettings: (data: { name?: string; avatar_url?: string | null }) => {
+    return request.patch<{ agent_name: string; avatar_url: string | null }>('/agents/settings/me', data)
+  },
 }

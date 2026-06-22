@@ -52,22 +52,10 @@ function onAvatarFileChange(e: Event) {
 async function saveSettings() {
   saving.value = true
   try {
-    const { data } = await agentsApi.list()
-    const codeSoul = data.find((a) => a.name === 'CodeSoul')
-
-    if (codeSoul) {
-      await agentsApi.update(codeSoul.id, {
-        name: agentName.value.trim() || 'CodeSoul',
-        avatar_url: avatarPreview.value || undefined,
-      })
-    } else {
-      await agentsApi.create({
-        name: agentName.value.trim() || 'CodeSoul',
-        capabilities: [],
-        model: 'openai/gpt-4o-mini',
-        avatar_url: avatarPreview.value || undefined,
-      })
-    }
+    await agentsApi.updateMySettings({
+      name: agentName.value.trim() || 'CodeSoul',
+      avatar_url: avatarPreview.value || null,
+    })
 
     ElMessage.success('AI 助手设置已更新')
   } finally {
@@ -82,12 +70,9 @@ async function removeAvatar() {
 
 async function loadAgent() {
   try {
-    const { data } = await agentsApi.list()
-    const codeSoul = data.find((a) => a.name === 'CodeSoul')
-    if (codeSoul) {
-      agentName.value = codeSoul.name
-      avatarPreview.value = codeSoul.avatar_url || null
-    }
+    const { data } = await agentsApi.getMySettings()
+    agentName.value = data.agent_name
+    avatarPreview.value = data.avatar_url
   } catch {
     // ignore
   }

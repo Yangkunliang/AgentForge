@@ -16,6 +16,7 @@ from .subtask import SubTask
 from .task import Task, TaskPriority, TaskStatus
 from .task_execution import TaskExecution
 from .user import User
+from .user_agent_settings import UserAgentSettings
 from .webhook import Webhook
 
 __all__ = [
@@ -36,5 +37,6 @@ __all__ = [
     "TaskStatus",
     "TaskExecution",
     "User",
+    "UserAgentSettings",
     "Webhook",
 ]

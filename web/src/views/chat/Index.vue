@@ -43,13 +43,10 @@ const agentInfo = ref<{ name: string; avatarUrl: string | undefined }>({
 
 async function loadAgentInfo() {
   try {
-    const { data } = await agentsApi.list()
-    const codeSoul = data.find((a) => a.name === 'CodeSoul')
-    if (codeSoul) {
-      agentInfo.value = {
-        name: codeSoul.name,
-        avatarUrl: codeSoul.avatar_url || undefined,
-      }
+    const { data } = await agentsApi.getMySettings()
+    agentInfo.value = {
+      name: data.agent_name,
+      avatarUrl: data.avatar_url || undefined,
     }
   } catch {
     // ignore

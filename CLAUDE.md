@@ -95,7 +95,7 @@ docker compose up -d              # 启动 PostgreSQL + RabbitMQ + Redis
 
 # 后端
 alembic upgrade head              # 数据库迁移
-uvicorn src.api.main:app --reload # 启动 API（localhost:8000）
+PYTHONPATH=/Users/yangkl/AgentForge/src uvicorn api.main:app --reload --port 8000  # 启动 API
 
 # 前端
 cd web
