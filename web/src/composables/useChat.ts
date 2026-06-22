@@ -264,6 +264,16 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
           }
         }
 
+        // SSE 流自然结束，兜底 finalize（防止没有 task_completed 事件时消息卡在 streaming 状态）
+        const msg = sessionStore.messages.find((m) => m.id === localAssistantId)
+        if (msg && msg.streaming) {
+          if (!msg.content) {
+            sessionStore.finalizeAssistantMessage(localAssistantId, '抱歉，未能生成回复，请重试。')
+          } else {
+            msg.streaming = false
+          }
+        }
+
         resolve(controller)
       })
       .catch((err) => {
