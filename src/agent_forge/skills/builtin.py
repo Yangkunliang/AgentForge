@@ -98,6 +98,28 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             executors={"get_weather": get_weather},
         )
 
+        # ── 3. http-request Skill ──────────────────────────────
+        from agent_forge.skills.http_request import HTTP_REQUEST_TOOL, http_request
+
+        try:
+            await SkillManager.register_skill(
+                db,
+                name="http-request",
+                version="1.0.0",
+                description="HTTP 请求工具，支持 GET/POST/PUT/PATCH/DELETE，可调用任意 REST API",
+                entry_point="agent_forge.skills.http_request:http_request",
+                manifest={"tool": HTTP_REQUEST_TOOL["function"]},
+                source_type="builtin",
+            )
+        except Exception as e:
+            logger.debug("http-request skill already registered or error: %s", e)
+
+        registry.register(
+            skill_name="http-request",
+            tool_defs=[HTTP_REQUEST_TOOL],
+            executors={"http_request": http_request},
+        )
+
         logger.info("Built-in skills registered: %s", registry.list_registered())
 
     except Exception as e:

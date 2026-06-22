@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     logger.info("AgentForge starting up...")
 
-    # 注册内置 Skills（web-search、weather）到 DB + SkillRegistry
+    # 注册内置 Skills（web-search、weather、http-request）到 DB + SkillRegistry
     try:
         from agent_forge.skills.builtin import register_builtin_skills
         await register_builtin_skills()
@@ -38,7 +38,33 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Built-in skill registration failed (non-fatal): %s", e)
 
+    # 启动 MCP Server 连接池
+    try:
+        from agent_forge.mcp.client import get_mcp_pool
+        from agent_forge.mcp.config import load_mcp_configs
+
+        mcp_pool = get_mcp_pool()
+        mcp_configs = load_mcp_configs()
+        await mcp_pool.start_all(mcp_configs)
+        if mcp_pool.active_servers:
+            logger.info("MCP servers started: %s", mcp_pool.active_servers)
+        else:
+            logger.info("No MCP servers configured")
+    except Exception as e:
+        logger.warning("MCP server initialization failed (non-fatal): %s", e)
+
     yield
+
+    # 关闭 MCP Server 连接
+    try:
+        from agent_forge.mcp.client import get_mcp_pool
+
+        mcp_pool = get_mcp_pool()
+        await mcp_pool.stop_all()
+        logger.info("MCP servers stopped")
+    except Exception as e:
+        logger.warning("MCP server shutdown error (ignored): %s", e)
+
     logger.info("AgentForge shutting down...")
 
 
