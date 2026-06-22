@@ -35,6 +35,7 @@ class SkillDispatcher:
         tool_call_id: str,
         arguments: dict[str, Any],
         on_event: Callable[[str, dict], Awaitable[None]] | None = None,
+        user_id: str | None = None,
     ) -> str:
         """
         执行一次 tool_call，返回结果的 JSON 字符串。
@@ -44,6 +45,7 @@ class SkillDispatcher:
             tool_call_id: LLM 返回的 tool_call id（用于构造 tool role 消息）
             arguments:    LLM 传入的参数 dict
             on_event:     SSE 事件回调 async (event_type, data)
+            user_id:      当前用户 ID，用于需要用户上下文的工具（如 update_profile）
 
         Returns:
             JSON string，作为 tool role message 的 content 回传给 LLM
@@ -64,8 +66,13 @@ class SkillDispatcher:
 
         start_ms = int(time.monotonic() * 1000)
         try:
+            # 将 user_id 注入到需要用户上下文的工具参数中
+            call_args = dict(arguments)
+            if user_id is not None:
+                call_args["user_id"] = user_id
+
             result: Any = await asyncio.wait_for(
-                executor(**arguments),
+                executor(**call_args),
                 timeout=SKILL_TIMEOUT_SECONDS,
             )
             elapsed_ms = int(time.monotonic() * 1000) - start_ms

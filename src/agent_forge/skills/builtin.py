@@ -120,6 +120,28 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             executors={"http_request": http_request},
         )
 
+        # ── 4. update-profile Skill ──────────────────────────────
+        from agent_forge.skills.update_profile import UPDATE_PROFILE_TOOL, update_profile
+
+        try:
+            await SkillManager.register_skill(
+                db,
+                name="update-profile",
+                version="1.0.0",
+                description="更新用户个人资料（昵称、头像）",
+                entry_point="agent_forge.skills.update_profile:update_profile",
+                manifest={"tool": UPDATE_PROFILE_TOOL["function"]},
+                source_type="builtin",
+            )
+        except Exception as e:
+            logger.debug("update-profile skill already registered or error: %s", e)
+
+        registry.register(
+            skill_name="update-profile",
+            tool_defs=[UPDATE_PROFILE_TOOL],
+            executors={"update_profile": update_profile},
+        )
+
         logger.info("Built-in skills registered: %s", registry.list_registered())
 
     except Exception as e:

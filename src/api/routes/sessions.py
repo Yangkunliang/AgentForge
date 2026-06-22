@@ -218,6 +218,7 @@ async def send_message(
             assistant_msg_id=assistant_msg.id,
             user_message=body.content,
             history_messages=history_messages,
+            user_id=current_user.id,
         )
     )
 
@@ -242,6 +243,7 @@ async def _run_task_with_skills(
     assistant_msg_id: str,
     user_message: str,
     history_messages: list[Message],
+    user_id: str | None = None,
 ) -> None:
     """
     后台执行 ReAct Skill 引擎，完成后将结果写回 assistant 消息。
@@ -305,6 +307,7 @@ async def _run_task_with_skills(
             llm=llm,
             config=llm_config,
             sse_publish=sse_publish,
+            user_id=user_id,
         )
 
         async for chunk in async_gen:
