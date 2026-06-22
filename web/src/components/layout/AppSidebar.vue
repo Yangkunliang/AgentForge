@@ -28,6 +28,7 @@ const menuItems: MenuItem[] = [
   { path: '/skills',      label: 'Skill',     title: '技能市场',           icon: 'skills' },
   { path: '/exports',     label: '导出',      title: '数据导出',           icon: 'exports', adminOnly: true },
   { path: '/settings/llm', label: 'LLM 配置', title: 'LLM 模型配置',       icon: 'settings' },
+  { path: '/settings/agent', label: 'AI 助手', title: 'AI 助手设置',       icon: 'agent-settings' },
 ]
 
 const iconMap: Record<string, string> = {
@@ -38,6 +39,7 @@ const iconMap: Record<string, string> = {
   skills:   'M12 2l4.5 4.5L12 11l-4.5-4.5L12 2zm0 12l4.5 4.5L12 23l-4.5-4.5L12 14z',
   exports:  'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+  'agent-settings': 'M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 6a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zm0 10a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z',
 }
 
 const visibleMenuItems = computed(() =>
