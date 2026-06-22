@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { parseThinking, renderMarkdown } from '@/utils/markdown'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import type { ChatMessage } from '@/types'
@@ -20,7 +19,7 @@ const aiName = computed(() => props.agentName?.trim() || 'CodeSoul')
 
 const parsed = computed(() => parseThinking(props.message.content ?? ''))
 const hasThinking = computed(() => !!parsed.value.thinking)
-const thinkingExpanded = ref(false)   // 默认折叠
+const thinkingExpanded = ref(false)
 const thinkingDone = computed(() => props.message.content.includes('</think>'))
 
 // 流式时思考过程自动展开；完成后自动折叠
@@ -31,6 +30,11 @@ watch(
     if (!streaming) thinkingExpanded.value = false
   },
 )
+
+// ── 工具调用记录 ──────────────────────────────────────────────
+
+const hasToolCalls = computed(() => !!(props.message.tool_calls && props.message.tool_calls.length > 0))
+const toolCallsExpanded = ref(false)
 
 // ── 主体 Markdown 渲染 ────────────────────────────────────────
 
@@ -132,6 +136,41 @@ function handleContentClick(e: MouseEvent) {
         </div>
       </div>
 
+      <!-- 工具调用记录折叠块 -->
+      <div v-if="hasToolCalls" class="tool-calls-block">
+        <button class="tool-calls-block__toggle" @click="toolCallsExpanded = !toolCallsExpanded">
+          <svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2"
+            :style="{ transform: toolCallsExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform .2s' }"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <span class="tool-calls-block__label">
+            工具调用 ({{ message.tool_calls?.length }})
+          </span>
+        </button>
+
+        <div v-show="toolCallsExpanded" class="tool-calls-block__content">
+          <div v-for="(tc, idx) in message.tool_calls" :key="idx" class="tool-call-item">
+            <div class="tool-call-item__header">
+              <span class="tool-call-item__name">{{ tc.tool_name }}</span>
+              <span class="tool-call-item__status" :class="`tool-call-item__status--${tc.status}`">
+                {{ tc.status === 'running' ? '执行中' : tc.status === 'completed' ? '成功' : '失败' }}
+              </span>
+            </div>
+            <div v-if="Object.keys(tc.arguments).length > 0" class="tool-call-item__args">
+              <span class="tool-call-item__label">参数:</span>
+              <pre class="tool-call-item__json">{{ JSON.stringify(tc.arguments, null, 2) }}</pre>
+            </div>
+            <div v-if="tc.result" class="tool-call-item__result">
+              <span class="tool-call-item__label">结果:</span>
+              <pre class="tool-call-item__json">{{ JSON.stringify(tc.result, null, 2) }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 主体内容 -->
       <div
         v-if="parsed.body || !message.streaming"
@@ -216,6 +255,101 @@ function handleContentClick(e: MouseEvent) {
 @keyframes dot-bounce {
   0%, 80%, 100% { transform: scale(.8); opacity: .5; }
   40%           { transform: scale(1.2); opacity: 1; }
+}
+
+// ── 工具调用记录折叠块 ────────────────────────────────────────
+.tool-calls-block {
+  margin-bottom: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
+.tool-calls-block__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+  text-align: left;
+
+  &:hover { background: rgba(55, 65, 81, .06); }
+}
+
+.tool-calls-block__label {
+  flex: 1;
+}
+
+.tool-calls-block__content {
+  padding: 10px 14px 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.tool-call-item {
+  padding: 8px;
+  border-radius: 6px;
+  background: #fff;
+  margin-bottom: 8px;
+  border: 1px solid #f3f4f6;
+
+  &:last-child { margin-bottom: 0; }
+}
+
+.tool-call-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tool-call-item__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.tool-call-item__status {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+
+  &--running { background: #dbeafe; color: #1e40af; }
+  &--completed { background: #dcfce7; color: #166534; }
+  &--failed { background: #fee2e2; color: #991b1b; }
+}
+
+.tool-call-item__label {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+  margin-right: 6px;
+}
+
+.tool-call-item__args,
+.tool-call-item__result {
+  font-size: 12px;
+  color: #4b5563;
+  margin-top: 4px;
+}
+
+.tool-call-item__json {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #374151;
+  overflow-x: auto;
+  white-space: pre;
 }
 
 // ── 思考过程折叠块 ───────────────────────────────────────────

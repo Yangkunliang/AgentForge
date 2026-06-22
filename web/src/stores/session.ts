@@ -81,6 +81,27 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  /** 追加工具调用记录 */
+  function appendToolCall(
+    localId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    status: 'running' | 'completed' | 'failed',
+    result?: Record<string, unknown>,
+  ) {
+    const msg = messages.value.find((m) => m.id === localId)
+    if (!msg) return
+    if (!msg.tool_calls) msg.tool_calls = []
+    
+    const existing = msg.tool_calls.find((tc) => tc.tool_name === toolName)
+    if (existing) {
+      existing.status = status
+      if (result) existing.result = result
+    } else {
+      msg.tool_calls.push({ tool_name: toolName, arguments: args, status, result })
+    }
+  }
+
   /** 将当前会话置顶（发送消息后调用）*/
   function bumpCurrentSession() {
     if (!currentSession.value) return
@@ -104,6 +125,7 @@ export const useSessionStore = defineStore('session', () => {
     appendUserMessage,
     appendStreamChunk,
     finalizeAssistantMessage,
+    appendToolCall,
     bumpCurrentSession,
   }
 })

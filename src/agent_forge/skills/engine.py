@@ -126,6 +126,15 @@ class SkillExecutionEngine:
                     logger.info(
                         "SkillEngine: calling '%s' args=%s", tc.function_name, tc.function_args
                     )
+                    
+                    # 发送工具调用开始事件（用于前端展示思考过程）
+                    if sse_publish:
+                        await sse_publish("tool_call_start", {
+                            "tool_name": tc.function_name,
+                            "arguments": tc.function_args,
+                            "tool_call_id": tc.id,
+                        })
+                    
                     result_str = await self._dispatcher.invoke(
                         tool_name=tc.function_name,
                         tool_call_id=tc.id,
@@ -133,6 +142,20 @@ class SkillExecutionEngine:
                         on_event=sse_publish,
                         user_id=user_id,
                     )
+                    
+                    # 发送工具调用完成事件（用于前端展示结果）
+                    if sse_publish:
+                        try:
+                            result_data = json.loads(result_str)
+                        except json.JSONDecodeError:
+                            result_data = {"result": result_str}
+                        await sse_publish("tool_call_end", {
+                            "tool_name": tc.function_name,
+                            "arguments": tc.function_args,
+                            "tool_call_id": tc.id,
+                            "result": result_data,
+                        })
+                    
                     messages.append({
                         "role": "tool",
                         "content": result_str,

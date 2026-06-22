@@ -72,6 +72,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function fetchProfile() {
+    return fetchMe()
+  }
+
   async function updateProfile(payload: {
     nickname?: string | null
     avatar_url?: string | null
@@ -154,6 +158,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     fetchMe,
+    fetchProfile,
     updateProfile,
     hasPermission,
   }

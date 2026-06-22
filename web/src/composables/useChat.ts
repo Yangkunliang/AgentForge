@@ -203,6 +203,27 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                 break
               }
 
+              // 工具调用开始
+              case 'tool_call_start': {
+                const toolName = event.data.tool_name as string
+                const args = event.data.arguments as Record<string, unknown>
+                sessionStore.appendToolCall(localAssistantId, toolName, args, 'running')
+                break
+              }
+
+              // 工具调用完成
+              case 'tool_call_end': {
+                const toolName = event.data.tool_name as string
+                const args = event.data.arguments as Record<string, unknown>
+                const result = event.data.result as Record<string, unknown>
+                sessionStore.appendToolCall(localAssistantId, toolName, args, 'completed', result)
+                // 如果是 update_profile 工具，刷新用户资料
+                if (toolName === 'update_profile') {
+                  await _refreshProfile()
+                }
+                break
+              }
+
               // 任务完成，用完整结果替换流式内容
               case 'task_completed': {
                 const content = (event.data.content as string) ?? ''
@@ -215,9 +236,8 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                     typeof result === 'string' ? result : JSON.stringify(result ?? ''),
                   )
                 }
-                // 不 abort，直接 break 出循环，让流自然关闭
                 resolve(controller)
-                return  // 跳出整个循环
+                return
               }
 
               // 任务失败
@@ -225,10 +245,9 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                 const error = (event.data.error as string) ?? '执行失败'
                 sessionStore.finalizeAssistantMessage(localAssistantId, `⚠️ ${error}`)
                 resolve(controller)
-                return  // 跳出整个循环
+                return
               }
 
-              // heartbeat / 内部事件：静默忽略，不影响 UI
               default:
                 break
             }
@@ -245,6 +264,15 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
         resolve(controller)
       })
   })
+}
+
+async function _refreshProfile(): Promise<void> {
+  const authStore = useAuthStore()
+  try {
+    await authStore.fetchProfile()
+  } catch {
+    console.log('[useChat] refresh profile failed')
+  }
 }
 
 function _parseSSE(chunk: string): SSEEvent | null {

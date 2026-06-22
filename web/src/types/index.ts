@@ -204,6 +204,8 @@ export type SSEEventType =
   | 'llm_response'
   | 'skill_called'
   | 'skill_result'
+  | 'tool_call_start'
+  | 'tool_call_end'
   | 'sub_task_completed'
   | 'task_completed'
   | 'task_failed'
@@ -222,6 +224,13 @@ export interface Session {
   updated_at: string
 }
 
+export interface ToolCall {
+  tool_name: string
+  arguments: Record<string, unknown>
+  status: 'running' | 'completed' | 'failed'
+  result?: Record<string, unknown>
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -232,6 +241,8 @@ export interface ChatMessage {
   streaming?: boolean
   // 图片附件（用户上传或 AI 输出）
   images?: ChatImage[]
+  // 工具调用记录
+  tool_calls?: ToolCall[]
 }
 
 export interface ChatImage {
