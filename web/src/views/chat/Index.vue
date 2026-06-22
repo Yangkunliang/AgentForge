@@ -3,14 +3,20 @@ import { ref, watch, nextTick, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useChat } from '@/composables/useChat'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+
+// 当前用户显示名：优先 username，否则 '我'
+const userName = computed(() => authStore.user?.username || '我')
 
 const isMobile = computed(() => appStore.isMobile)
 
@@ -212,7 +218,7 @@ function removePendingImage(idx: number) {
               </div>
               <span v-if="msg.content">{{ msg.content }}</span>
             </div>
-            <div class="avatar">我</div>
+            <UserAvatar :name="userName" shape="circle" :size="32" class="msg-avatar" />
           </div>
           <AssistantMessage v-else :message="msg" />
         </template>
@@ -374,17 +380,7 @@ function removePendingImage(idx: number) {
     word-break: break-word;
   }
 
-  .avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #e5e7eb;
-    color: #374151;
-    font-size: 12px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .msg-avatar {
     flex-shrink: 0;
   }
 }

@@ -21,4 +21,8 @@ export const authApi = {
   logout: () => {
     return request.post('/auth/logout')
   },
+
+  me: () => {
+    return request.get<{ user: import('@/types').User }>('/auth/me')
+  },
 }

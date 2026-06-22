@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { parseThinking, renderMarkdown } from '@/utils/markdown'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import type { ChatMessage } from '@/types'
 
 // highlight.js 主题（GitHub 风格，亮色）
@@ -9,7 +10,11 @@ import 'highlight.js/styles/github.css'
 
 const props = defineProps<{
   message: ChatMessage
+  agentName?: string   // 当前对话绑定的 Agent 名称，未传则默认 'CodeSoul'
 }>()
+
+// AI 昵称：优先用 agentName，否则 'CodeSoul'
+const aiName = computed(() => props.agentName?.trim() || 'CodeSoul')
 
 // ── 思考过程 ─────────────────────────────────────────────────
 
@@ -97,7 +102,7 @@ function handleContentClick(e: MouseEvent) {
 
 <template>
   <div class="assistant-message">
-    <div class="avatar">AI</div>
+    <UserAvatar :name="aiName" shape="squircle" :size="32" class="msg-avatar" />
 
     <div class="bubble">
 
@@ -173,19 +178,9 @@ function handleContentClick(e: MouseEvent) {
   align-self: flex-start;
 }
 
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #6366f1;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.msg-avatar {
   margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .bubble {

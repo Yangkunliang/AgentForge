@@ -59,6 +59,16 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.permissions.includes('admin') ?? false)
 
+  async function fetchMe() {
+    if (!token.value) return
+    try {
+      const { data } = await authApi.me()
+      user.value = data.user
+    } catch {
+      // token 失效则静默失败，保持登录状态
+    }
+  }
+
   async function login(form: LoginForm) {
     loading.value = true
     try {
@@ -119,6 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    fetchMe,
     hasPermission,
   }
 })

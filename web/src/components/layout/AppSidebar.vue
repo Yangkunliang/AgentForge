@@ -14,18 +14,19 @@ const { isAdmin } = usePermission()
 interface MenuItem {
   path: string
   label: string
+  title: string
   icon: string
   adminOnly?: boolean
 }
 
 const menuItems: MenuItem[] = [
-  { path: '/chat',         label: '会话',     icon: 'chat' },
-  { path: '/dashboard',   label: 'Dashboard', icon: 'dashboard' },
-  { path: '/tasks',       label: '任务',      icon: 'tasks' },
-  { path: '/agents',      label: 'Agent',     icon: 'agents', adminOnly: true },
-  { path: '/skills',      label: 'Skill',     icon: 'skills' },
-  { path: '/exports',     label: '导出',      icon: 'exports', adminOnly: true },
-  { path: '/settings/llm', label: 'LLM 配置', icon: 'settings' },
+  { path: '/chat',         label: '会话',     title: 'AI 对话',           icon: 'chat' },
+  { path: '/dashboard',   label: 'Dashboard', title: '数据看板',           icon: 'dashboard' },
+  { path: '/tasks',       label: '任务',      title: '任务管理',           icon: 'tasks' },
+  { path: '/agents',      label: 'Agent',     title: 'Agent 管理',         icon: 'agents', adminOnly: true },
+  { path: '/skills',      label: 'Skill',     title: '技能市场',           icon: 'skills' },
+  { path: '/exports',     label: '导出',      title: '数据导出',           icon: 'exports', adminOnly: true },
+  { path: '/settings/llm', label: 'LLM 配置', title: 'LLM 模型配置',       icon: 'settings' },
 ]
 
 const iconMap: Record<string, string> = {
@@ -33,7 +34,7 @@ const iconMap: Record<string, string> = {
   dashboard:'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
   tasks:    'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
   agents:   'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
-  skills:   'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  skills:   'M12 2l4.5 4.5L12 11l-4.5-4.5L12 2zm0 12l4.5 4.5L12 23l-4.5-4.5L12 14z',
   exports:  'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
 }
@@ -87,13 +88,13 @@ watch(() => route.path, () => {
     <!-- Nav items -->
     <div class="nav-items">
       <button
-        v-for="item in visibleMenuItems"
-        :key="item.path"
-        class="nav-item"
-        :class="{ 'nav-item--active': isActive(item.path) }"
-        :title="item.label"
-        @click="navigate(item.path)"
-      >
+          v-for="item in visibleMenuItems"
+          :key="item.path"
+          class="nav-item"
+          :class="{ 'nav-item--active': isActive(item.path) }"
+          :title="item.title"
+          @click="navigate(item.path)"
+        >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path :d="iconMap[item.icon]" />
         </svg>
