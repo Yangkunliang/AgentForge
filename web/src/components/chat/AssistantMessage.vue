@@ -36,6 +36,15 @@ watch(
 const hasToolCalls = computed(() => !!(props.message.tool_calls && props.message.tool_calls.length > 0))
 const toolCallsExpanded = ref(false)
 
+// 流式时有工具调用自动展开；完成后自动折叠
+watch(
+  () => props.message.streaming,
+  (streaming) => {
+    if (streaming && hasToolCalls.value) toolCallsExpanded.value = true
+    if (!streaming) toolCallsExpanded.value = false
+  },
+)
+
 // ── 主体 Markdown 渲染 ────────────────────────────────────────
 
 // 转义 HTML 特殊字符，防止流式期间粗精渲染 XSS
