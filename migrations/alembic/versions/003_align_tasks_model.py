@@ -1,7 +1,7 @@
 """Align tasks table with Task model
 
-Revision ID: 0003
-Revises: 0002
+Revision ID: 0004
+Revises: 0003
 Create Date: 2026-06-21
 
 This migration adds columns that the original tasks table was missing
@@ -17,8 +17,8 @@ It also adds the missing indexes.
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0003"
-down_revision = "0002"
+revision = "0004"
+down_revision = "0003"
 branch_labels = None
 depends_on = None
 
@@ -26,7 +26,7 @@ depends_on = None
 def upgrade() -> None:
     # trace_id — column exists in migration but may be missing in DB (DB shows it does exist)
     # We add indexes that the DB likely doesn't have yet
-    op.create_index("ix_tasks_trace_id", "tasks", ["trace_id"])
+    op.create_index("ix_tasks_trace_id", "tasks", ["trace_id"], if_not_exists=True)
 
     # assignee_id already exists from 000_base, but ensure the index exists
     op.create_index("ix_tasks_assignee", "tasks", ["assignee_id"], if_not_exists=True)

@@ -2,6 +2,10 @@
 
 面向终端用户，多 Agent 执行细节对用户透明。
 用户视角只有「会话」和「消息」。
+
+核心修改（2026-06-22）：
+  _run_task_with_skills 替换原 _run_task_and_update_message，
+  引入 SkillExecutionEngine ReAct 循环，解决天气等实时数据被 LLM 捏造的问题。
 """
 
 from __future__ import annotations
@@ -150,7 +154,7 @@ async def send_message(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """
-    发送用户消息，异步触发多 Agent 执行。
+    发送用户消息，异步触发 Skill 执行引擎（ReAct 循环）。
 
     返回 task_id 供前端订阅 SSE 流：
       GET /api/v1/sse/tasks/{task_id}/stream
@@ -161,7 +165,7 @@ async def send_message(
     if session.title == "新对话":
         session.title = body.content.strip()[:20]
 
-    # 2. 生成 task_id，先写 Task（Message 外键依赖它）
+    # 2. 生成 task_id
     task_id = str(uuid.uuid4())
     task = Task(
         id=task_id,
@@ -169,13 +173,13 @@ async def send_message(
         created_by=current_user.id,
         title=body.content.strip()[:100],
         description=body.content,
-        priority=1,  # TaskPriority.MEDIUM -> int 1
+        priority=1,
         trace_id=str(uuid.uuid4()),
         status=TaskStatus.PENDING,
     )
     db.add(task)
 
-    # 3. 写入用户消息（task_id=None，用户消息本身不绑定 Task）
+    # 3. 写入用户消息
     user_msg = Message(
         id=str(uuid.uuid4()),
         session_id=session_id,
@@ -185,7 +189,7 @@ async def send_message(
     )
     db.add(user_msg)
 
-    # 4. 预创建 assistant 占位消息（content 为空，SSE 完成后更新）
+    # 4. 预创建 assistant 占位消息
     assistant_msg = Message(
         id=str(uuid.uuid4()),
         session_id=session_id,
@@ -195,14 +199,26 @@ async def send_message(
     )
     db.add(assistant_msg)
 
-    # 更新 session.updated_at 使其排在列表最前
     session.updated_at = datetime.now(timezone.utc)
-
     await db.commit()
 
-    # 5. 异步启动执行（不阻塞响应），执行完成后更新 assistant 消息
+    # 5. 加载会话历史（用于多轮上下文）
+    history_result = await db.execute(
+        select(Message)
+        .where(Message.session_id == session_id)
+        .where(Message.id != assistant_msg.id)
+        .order_by(Message.created_at.asc())
+    )
+    history_messages = list(history_result.scalars().all())
+
+    # 6. 异步启动 Skill 执行引擎
     asyncio.create_task(
-        _run_task_and_update_message(task_id, assistant_msg.id, body.content)
+        _run_task_with_skills(
+            task_id=task_id,
+            assistant_msg_id=assistant_msg.id,
+            user_message=body.content,
+            history_messages=history_messages,
+        )
     )
 
     return {"message_id": user_msg.id, "task_id": task_id}
@@ -221,35 +237,79 @@ async def _get_session_or_404(db: AsyncSession, session_id: str, user_id: str) -
     return session
 
 
-async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, description: str) -> None:
+async def _run_task_with_skills(
+    task_id: str,
+    assistant_msg_id: str,
+    user_message: str,
+    history_messages: list[Message],
+) -> None:
     """
-    后台执行任务，完成后将结果写回 assistant 消息。
-    多 Agent 的协作细节（Contract Net、子任务分配）在 executor 内完成，
-    这里只关心最终结果。
+    后台执行 ReAct Skill 引擎，完成后将结果写回 assistant 消息。
+
+    流程：
+      1. 从 SkillRegistry 加载已启用的 tool 定义
+      2. SkillExecutionEngine.run() → ReAct 循环（LLM ↔ Skill）
+      3. 逐 chunk 推送 SSE llm_response 事件
+      4. 完成后更新 Task 状态和 assistant 消息内容
     """
     from agent_forge.config import settings
     from agent_forge.database import async_session_factory
     from agent_forge.api.sse import emit_task_completed, emit_task_failed, get_sse_manager
     from agent_forge.llm.provider import LLMConfig, get_llm_provider
+    from agent_forge.skills.dispatcher import SkillDispatcher
+    from agent_forge.skills.engine import SkillExecutionEngine
+    from agent_forge.skills.registry import get_skill_registry
 
     sse = get_sse_manager()
     llm = get_llm_provider()
+
+    async def sse_publish(event_type: str, data: dict) -> None:
+        """SSE 推送回调，内部 Skill 事件也推（前端可选过滤）"""
+        await sse.publish(task_id, event_type, data)
 
     try:
         # 推送开始事件
         await emit_task_started(task_id, task_id)
 
-        # 使用 LLM Provider 流式生成回复
+        # 加载 LLM 配置
         llm_config = LLMConfig(
-            model=settings.default_model or "openai/gpt-4o-mini",
+            model=settings.default_model or "openai/deepseek-v3",
             temperature=settings.default_temperature,
             max_tokens=settings.max_tokens,
         )
+
+        # 加载 tool 定义（从 Registry，不查 DB 以减少延迟）
+        registry = get_skill_registry()
+        tools = registry.get_all_tool_defs()
+        logger.info("Task %s: loaded %d tools: %s", task_id, len(tools),
+                    [t["function"]["name"] for t in tools])
+
+        # 构造历史上下文（最近 20 条，避免 token 超限）
+        conversation_history: list[dict] = []
+        for msg in history_messages[-20:]:
+            if msg.role in ("user", "assistant") and msg.content:
+                conversation_history.append({
+                    "role": msg.role,
+                    "content": msg.content,
+                })
+
+        # ReAct 引擎执行
+        dispatcher = SkillDispatcher()
+        engine = SkillExecutionEngine(dispatcher)
+
         full_content = ""
-        async for chunk in llm.stream_complete(description, llm_config):
+        async_gen = await engine.run(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            tools=tools,
+            llm=llm,
+            config=llm_config,
+            sse_publish=sse_publish,
+        )
+
+        async for chunk in async_gen:
             if chunk:
                 full_content += chunk
-                # 逐片段推送 SSE llm_response 事件
                 await sse.publish(task_id, "llm_response", {"delta": chunk})
 
         if not full_content:
@@ -257,7 +317,6 @@ async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, desc
 
         # 更新数据库
         async with async_session_factory() as db:
-            # 更新 Task 状态
             task_result = await db.execute(select(Task).where(Task.id == task_id))
             task = task_result.scalar_one_or_none()
             if task:
@@ -265,7 +324,6 @@ async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, desc
                 task.result = full_content
                 task.completed_at = datetime.now(timezone.utc)
 
-            # 更新 assistant 消息内容
             msg_result = await db.execute(select(Message).where(Message.id == assistant_msg_id))
             msg = msg_result.scalar_one_or_none()
             if msg:
@@ -273,11 +331,11 @@ async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, desc
 
             await db.commit()
 
-        # 推送完成事件（前端 useSSE 监听此事件更新气泡）
+        # 推送完成事件
         await emit_task_completed(task_id, {"content": full_content})
 
     except Exception as exc:
-        logger.exception(f"Task {task_id} failed: {exc}")
+        logger.exception("Task %s failed: %s", task_id, exc)
 
         async with async_session_factory() as db:
             task_result = await db.execute(select(Task).where(Task.id == task_id))
@@ -286,5 +344,4 @@ async def _run_task_and_update_message(task_id: str, assistant_msg_id: str, desc
                 task.status = TaskStatus.FAILED
                 await db.commit()
 
-        from agent_forge.api.sse import emit_task_failed
         await emit_task_failed(task_id, str(exc))

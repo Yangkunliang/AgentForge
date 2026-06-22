@@ -1,19 +1,35 @@
 """LLM Provider 抽象层
 
 为所有 LLM 调用注入统一的 system prompt，约束 thinking 格式与行为准则。
+支持 tool_use（function calling）循环，让 LLM 在需要时主动调用技能。
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING, Any, AsyncGenerator
 
 if TYPE_CHECKING:
     from litellm import ModelResponse
 
 logger = logging.getLogger("agent_forge.llm")
+
+
+@dataclass
+class ToolCall:
+    """LLM 返回的一个工具调用"""
+
+    id: str
+    function_name: str
+    function_args: dict[str, Any]
+
+    def __repr__(self) -> str:
+        return f"ToolCall(id={self.id}, function={self.function_name}({self.function_args!r}))"
+
 
 # ── 默认 System Prompt ──────────────────────────────────────────
 # 约束 LLM 在 reasoning/thinking 中禁止使用 markdown headers，
@@ -72,6 +88,17 @@ class LLMResponse:
     tokens_used: int
     cost_usd: float
     latency_ms: int
+    _tool_calls: list[ToolCall] | None = None  # 仅内部使用，tool_use 时非 None
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        """返回 tool_calls 列表（无则空列表）"""
+        return self._tool_calls or []
+
+    @property
+    def has_tool_calls(self) -> bool:
+        """是否有工具调用"""
+        return bool(self._tool_calls)
 
 
 class LLMProvider(ABC):
@@ -270,6 +297,166 @@ class LiteLLMProvider(LLMProvider):
         except Exception as e:
             logger.error(f"LiteLLM chat error: {e}")
             raise
+
+    async def tool_use_complete(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        config: LLMConfig | None = None,
+    ) -> LLMResponse:
+        """工具调用完成（非流式）
+
+        调用 LLM 并传入 tools 定义，返回 LLM 的响应（content + tool_calls）。
+        由调用方负责解析 tool_calls 并执行，然后将结果回传继续循环。
+        """
+        if not self.is_available:
+            return LLMResponse(
+                content="LiteLLM not available",
+                model="none",
+                tokens_used=0,
+                cost_usd=0.0,
+                latency_ms=0,
+            )
+
+        config = config or LLMConfig(model="gpt-4o")
+
+        start_time = time.time()
+
+        try:
+            response: Any = await self.litellm.acompletion(
+                model=config.model,
+                messages=messages,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                tools=tools,
+            )
+
+            latency_ms = int((time.time() - start_time) * 1000)
+            choice = response["choices"][0]["message"]
+
+            content: str | None = choice.get("content")
+            tool_calls: list[ToolCall] = []
+
+            # 解析 tool_calls（LiteLLM 返回的格式与 OpenAI 一致）
+            raw_tool_calls = choice.get("tool_calls") or []
+            for tc in raw_tool_calls:
+                tool_call = ToolCall(
+                    id=tc["id"],
+                    function_name=tc["function"]["name"],
+                    function_args=json.loads(tc["function"]["arguments"]),
+                )
+                tool_calls.append(tool_call)
+
+            return LLMResponse(
+                content=content or "",
+                model=config.model,
+                tokens_used=response.get("usage", {}).get("total_tokens", 0),
+                cost_usd=response.get("usage", {}).get("cost", 0.0),
+                latency_ms=latency_ms,
+                _tool_calls=tool_calls,  # type: ignore[arg-type]
+            )
+        except Exception as e:
+            logger.error(f"LiteLLM tool_use error: {e}")
+            raise
+
+    async def tool_use_stream(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        config: LLMConfig | None = None,
+    ) -> AsyncGenerator[str | ToolCall, None]:
+        """流式工具调用
+
+        逐 yield 返回：
+          - str: 文本内容 delta（可拼接为最终回复）
+          - ToolCall: 工具调用对象
+
+        由调用方收集所有 yield 值，分离文本和 tool_calls，
+        执行完 tool_calls 后将结果追加到 messages 继续循环。
+        """
+        if not self.is_available:
+            yield "LiteLLM not available"
+            return
+
+        config = config or LLMConfig(model="gpt-4o")
+
+        try:
+            response = await self.litellm.acompletion(
+                model=config.model,
+                messages=messages,
+                temperature=config.temperature,
+                max_tokens=config.max_tokens,
+                tools=tools,
+                stream=True,
+            )
+
+            # 累积 tool_call 的部分参数（流式 chunk 可能拆分）
+            pending_tool_calls: dict[str, ToolCall] = {}
+
+            async for chunk in response:
+                delta = chunk["choices"][0].get("delta", {})
+
+                # 收集 reasoning
+                reasoning = delta.get("reasoning") or ""
+                if reasoning:
+                    yield reasoning
+
+                # 收集文本内容
+                content = delta.get("content") or ""
+                if content:
+                    yield content
+
+                # 收集 tool_calls（流式可能拆分）
+                raw_tool_calls = delta.get("tool_calls") or []
+                for tc in raw_tool_calls:
+                    tc_index = tc.get("index", 0)
+                    tc_id = tc.get("id", "")
+
+                    # 首次见到该 tool_call，初始化
+                    if tc_id not in pending_tool_calls:
+                        pending_tool_calls[tc_id] = ToolCall(
+                            id=tc_id,
+                            function_name="",
+                            function_args={},
+                        )
+
+                    pending = pending_tool_calls[tc_id]
+
+                    # 累积 function name
+                    fn = tc.get("function", {})
+                    if fn.get("name"):
+                        pending.function_name = fn["name"]
+
+                    # 累积 function arguments（逐 chunk 拼接）
+                    if fn.get("arguments"):
+                        # 注意：LiteLLM stream 返回的 arguments 是每个 chunk 的增量
+                        # 但有些实现是全量返回，这里做去重拼接
+                        args_str = fn["arguments"]
+                        # 尝试判断是否已完整（以 } 结尾且不是重复前缀）
+                        current_args = json.dumps(pending.function_args)
+                        if args_str == current_args:
+                            # 已完整，不重复
+                            pass
+                        else:
+                            try:
+                                pending.function_args = json.loads(
+                                    current_args + args_str.lstrip(",")
+                                )
+                            except json.JSONDecodeError:
+                                pass  # 继续累积
+
+            # 提交未完成的 tool_calls
+            for tc in pending_tool_calls.values():
+                if tc.function_name and tc.function_args:
+                    yield tc
+                    logger.info(
+                        "tool_use_stream: yielded ToolCall %s(%s)",
+                        tc.function_name,
+                        tc.function_args,
+                    )
+        except Exception as e:
+            logger.error(f"LiteLLM tool_use stream error: {e}")
+            yield f"Error: {e}"
 
 
 class FallbackLLMProvider(LLMProvider):

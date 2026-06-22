@@ -26,6 +26,8 @@ class SSEEventTypes:
     SUB_TASK_COMPLETED = "sub_task_completed"
     BID_RECEIVED = "bid_received"
     AGENT_ASSIGNED = "agent_assigned"
+    SKILL_CALLED = "skill_called"
+    SKILL_RESULT = "skill_result"
     LLM_RESPONSE = "llm_response"
     ERROR = "error"
     HEARTBEAT = "heartbeat"

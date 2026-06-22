@@ -29,6 +29,15 @@ limiter = Limiter(key_func=get_remote_address)
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     logger.info("AgentForge starting up...")
+
+    # 注册内置 Skills（web-search、weather）到 DB + SkillRegistry
+    try:
+        from agent_forge.skills.builtin import register_builtin_skills
+        await register_builtin_skills()
+        logger.info("Built-in skills initialized")
+    except Exception as e:
+        logger.warning("Built-in skill registration failed (non-fatal): %s", e)
+
     yield
     logger.info("AgentForge shutting down...")
 
@@ -111,7 +120,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 from api.routes import agents, auth, dashboard, health, llm, sessions, skills, tasks, tools  # noqa: E402
 from agent_forge.api.sse import sse_router  # noqa: E402
-from agent_forge.skills import builtin  # noqa: E402
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])

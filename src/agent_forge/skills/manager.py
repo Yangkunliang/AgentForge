@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import subprocess
 import sys
 from typing import Any
 
@@ -26,18 +24,43 @@ class SkillManager:
         name: str,
         version: str,
         description: str,
-        entry_point: str,
-        manifest: dict = None,
-        dependencies: list[str] = None,
+        entry_point: str | None = None,
+        manifest: dict | None = None,
+        dependencies: list[str] | None = None,
+        source_type: str = "builtin",
+        github_url: str | None = None,
+        tags: list[str] | None = None,
+        icon_url: str | None = None,
     ) -> Skill:
+        """注册或更新 Skill。若同名 Skill 已存在则更新版本信息。"""
+        # 检查是否已存在
+        existing = await cls.get_skill(db, name)
+        if existing:
+            # 更新版本/描述（幂等注册）
+            existing.version = version
+            existing.description = description
+            if entry_point:
+                existing.entry_point = entry_point
+            if manifest:
+                existing.manifest = manifest
+            await db.commit()
+            cls._skill_cache[name] = existing.__dict__.copy()
+            return existing
+
+        import uuid
         skill = Skill(
-            id=f"skill-{name.replace('-', '')}",
+            id=f"skill-{uuid.uuid4().hex[:8]}",
             name=name,
             version=version,
             description=description,
             entry_point=entry_point,
             manifest=manifest or {},
             dependencies=dependencies or [],
+            source_type=source_type,
+            github_url=github_url,
+            tags=tags or [],
+            icon_url=icon_url,
+            enabled=True,
         )
         db.add(skill)
         await db.commit()
@@ -46,13 +69,6 @@ class SkillManager:
 
     @classmethod
     async def get_skill(cls, db: AsyncSession, name: str) -> Skill | None:
-        if name in cls._skill_cache:
-            result = await db.execute(select(Skill).where(Skill.name == name))
-            skill = result.scalar_one_or_none()
-            if skill:
-                cls._skill_cache[name] = skill.__dict__.copy()
-            return skill
-
         result = await db.execute(select(Skill).where(Skill.name == name))
         skill = result.scalar_one_or_none()
         if skill:
@@ -60,12 +76,31 @@ class SkillManager:
         return skill
 
     @classmethod
-    async def list_skills(cls, db: AsyncSession) -> list[Skill]:
-        result = await db.execute(select(Skill))
-        skills = result.scalars().all()
+    async def list_skills(cls, db: AsyncSession, enabled_only: bool = False) -> list[Skill]:
+        query = select(Skill)
+        if enabled_only:
+            query = query.where(Skill.enabled == True)  # noqa: E712
+        result = await db.execute(query)
+        skills = list(result.scalars().all())
         for skill in skills:
             cls._skill_cache[skill.name] = skill.__dict__.copy()
         return skills
+
+    @classmethod
+    async def set_enabled(cls, db: AsyncSession, name: str, enabled: bool) -> bool:
+        skill = await cls.get_skill(db, name)
+        if not skill:
+            return False
+        skill.enabled = enabled
+        await db.commit()
+        cls._skill_cache.pop(name, None)
+
+        # 同步更新 Registry
+        from agent_forge.skills.registry import get_skill_registry
+        registry = get_skill_registry()
+        if not enabled:
+            registry.unregister(name)
+        return True
 
     @classmethod
     async def unregister_skill(cls, db: AsyncSession, name: str) -> bool:
@@ -74,6 +109,9 @@ class SkillManager:
             await db.delete(skill)
             await db.commit()
             cls._skill_cache.pop(name, None)
+            # 从 Registry 中移除
+            from agent_forge.skills.registry import get_skill_registry
+            get_skill_registry().unregister(name)
             return True
         return False
 
@@ -82,31 +120,28 @@ class SkillManager:
         parts = entry_point.split(".")
         module_path = ".".join(parts[:-1])
         function_name = parts[-1]
-
         try:
             import importlib
-
             module = importlib.import_module(module_path)
             return getattr(module, function_name)
         except (ImportError, AttributeError) as e:
-            logger.error(f"Failed to load skill executor {entry_point}: {e}")
+            logger.error("Failed to load skill executor %s: %s", entry_point, e)
             return None
 
     @classmethod
-    async def install_from_pypi(cls, db: AsyncSession, package_name: str, version: str = None) -> bool:
+    async def install_from_pypi(cls, db: AsyncSession, package_name: str, version: str | None = None) -> bool:
+        import subprocess
         try:
             args = [sys.executable, "-m", "pip", "install"]
             if version:
                 args.append(f"{package_name}=={version}")
             else:
                 args.append(package_name)
-
             result = subprocess.run(args, capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"Failed to install {package_name}: {result.stderr}")
+                logger.error("Failed to install %s: %s", package_name, result.stderr)
                 return False
-
             return True
         except Exception as e:
-            logger.error(f"Installation error: {e}")
+            logger.error("Installation error: %s", e)
             return False

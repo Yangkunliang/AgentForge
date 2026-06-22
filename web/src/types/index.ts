@@ -83,8 +83,31 @@ export interface Skill {
   name: string
   version: string
   description: string
-  entry_point: string
+  entry_point: string | null
   installed_at?: string
+  enabled: boolean
+  source_type: string
+  icon_url?: string
+  tags: string[]
+  github_url?: string
+}
+
+export interface MarketplaceSkill {
+  name: string
+  description: string
+  url: string
+  author: string
+  icon?: string
+  tags: string[]
+  version: string
+  stars: number
+  source: 'github' | 'clawhub' | 'local'
+}
+
+export interface MarketplaceResponse {
+  marketplace: string
+  total: number
+  items: MarketplaceSkill[]
 }
 
 export interface SkillInstall {
