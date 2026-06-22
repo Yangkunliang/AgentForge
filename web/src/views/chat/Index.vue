@@ -239,7 +239,36 @@ function removePendingImage(idx: number) {
 
       <!-- 输入区 -->
       <div class="input-area">
+        <!-- 待发送图片预览 -->
+        <div v-if="pendingImages.length > 0" class="pending-images">
+          <div v-for="(img, idx) in pendingImages" :key="idx" class="pending-image">
+            <img :src="img.url" :alt="img.file.name" />
+            <button class="pending-image__remove" @click="removePendingImage(idx)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <div class="input-box" :class="{ 'input-box--disabled': !sessionId }">
+          <!-- 隐藏的文件输入 -->
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept="image/*"
+            multiple
+            style="display: none"
+            @change="onFileChange"
+          />
+
+          <!-- 上传按钮 -->
+          <button class="upload-btn" @click="openFilePicker" title="上传图片">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
+
           <textarea
             ref="textareaRef"
             v-model="inputText"
@@ -390,6 +419,46 @@ function removePendingImage(idx: number) {
   border-top: 1px solid #e5e7eb;
 }
 
+// ── 待发送图片预览 ────────────────────────────────────────────
+.pending-images {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+}
+
+.pending-image {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .5);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    &:hover { background: rgba(0, 0, 0, .7); }
+  }
+}
+
 .input-box {
   display: flex;
   align-items: flex-end;
@@ -435,6 +504,23 @@ function removePendingImage(idx: number) {
 
   &:hover:not(:disabled) { background: #337ecc; }
   &:disabled { background: #a0cfff; cursor: not-allowed; }
+}
+
+.upload-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover { color: #409eff; background: #f0f7ff; }
 }
 
 .stop-btn {
