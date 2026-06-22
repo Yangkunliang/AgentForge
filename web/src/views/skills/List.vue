@@ -26,7 +26,7 @@ onMounted(() => {
 
 function switchTab(tab: 'installed' | 'marketplace') {
   activeTab.value = tab
-  if (tab === 'marketplace' && skillStore.marketplaceItems.length === 0) {
+  if (tab === 'marketplace') {
     loadMarketplace()
   }
 }
@@ -343,7 +343,10 @@ function formatDate(dateStr: string | undefined): string {
           <div v-if="!skillStore.marketplaceLoading && skillStore.marketplaceItems.length === 0" class="marketplace-empty">
             <p>未找到 Skill，尝试换个关键词或来源</p>
             <p class="marketplace-tip">
-              💡 可以在 GitHub 上创建带 <code>agentforge-skill</code> topic 标签的仓库来发布自己的 Skill
+              💡 在 GitHub 上创建带 <code>agentforge-skill</code> topic 标签的仓库来发布自己的 Skill
+            </p>
+            <p class="marketplace-tip">
+              🔧 配置 <code>CLAWHUB_API_BASE</code> 环境变量来启用 ClawhHub Skill 市场
             </p>
           </div>
         </div>

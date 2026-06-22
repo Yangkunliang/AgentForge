@@ -65,7 +65,7 @@ function formatDate(dateStr: string): string {
     <div class="card">
       <el-form :inline="true" :model="filterForm" class="filter-form">
         <el-form-item label="状态">
-          <el-select v-model="filterForm.status" placeholder="全部" clearable @change="handleFilter">
+          <el-select v-model="filterForm.status" @change="handleFilter">
             <el-option label="全部" value="" />
             <el-option label="待处理" value="pending" />
             <el-option label="进行中" value="processing" />
@@ -74,7 +74,7 @@ function formatDate(dateStr: string): string {
           </el-select>
         </el-form-item>
         <el-form-item label="优先级">
-          <el-select v-model="filterForm.priority" placeholder="全部" clearable @change="handleFilter">
+          <el-select v-model="filterForm.priority" @change="handleFilter">
             <el-option label="全部" value="" />
             <el-option label="低" value="low" />
             <el-option label="中" value="medium" />

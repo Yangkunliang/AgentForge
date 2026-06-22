@@ -256,7 +256,11 @@ async def get_marketplace_skills(
 
 async def _fetch_clawhub(q: str) -> list[dict]:
     """从 clawhub.ai 获取 Skill 列表"""
-    api_base = os.getenv("CLAWHUB_API_BASE", "https://clawhub.ai")
+    api_base = os.getenv("CLAWHUB_API_BASE", "")
+    if not api_base:
+        logger.debug("ClawhHub API base not configured, skipping")
+        return []
+    
     try:
         params: dict = {}
         if q:
@@ -283,6 +287,12 @@ async def _fetch_clawhub(q: str) -> list[dict]:
                     ).model_dump()
                     for item in data.get("items", [])
                 ]
+            elif resp.status_code == 404:
+                logger.debug("ClawhHub API endpoint not found")
+            else:
+                logger.debug("ClawhHub API returned status %s", resp.status_code)
+    except httpx.ConnectError:
+        logger.debug("ClawhHub API connection failed: endpoint unreachable")
     except Exception as e:
         logger.debug("ClawhHub API unavailable: %s", e)
     return []
