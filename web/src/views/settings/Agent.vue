@@ -34,7 +34,7 @@ function onAvatarFileChange(e: Event) {
   const reader = new FileReader()
   reader.onload = (ev) => {
     const img = new Image()
-    img.onload = async () => {
+    img.onload = () => {
       const canvas = document.createElement('canvas')
       canvas.width = 200
       canvas.height = 200
@@ -43,18 +43,7 @@ function onAvatarFileChange(e: Event) {
       const sx = (img.width - size) / 2
       const sy = (img.height - size) / 2
       ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200)
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) return
-        const uploadFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
-        try {
-          const { data } = await uploadApi.image(uploadFile)
-          avatarPreview.value = data.url
-          ElMessage.success('头像上传成功')
-        } catch (err: any) {
-          ElMessage.error(err.response?.data?.detail || '头像上传失败')
-        }
-      }, 'image/jpeg', 0.85)
+      avatarPreview.value = canvas.toDataURL('image/jpeg', 0.85)
     }
     img.src = ev.target?.result as string
   }
@@ -64,11 +53,21 @@ function onAvatarFileChange(e: Event) {
 async function saveSettings() {
   saving.value = true
   try {
+    let avatarUrl = avatarPreview.value
+
+    if (avatarUrl && avatarUrl.startsWith('data:image/')) {
+      const blob = await fetch(avatarUrl).then((res) => res.blob())
+      const uploadFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+      const { data } = await uploadApi.image(uploadFile)
+      avatarUrl = data.url
+    }
+
     await agentsApi.updateMySettings({
       name: agentName.value.trim() || 'CodeSoul',
-      avatar_url: avatarPreview.value || null,
+      avatar_url: avatarUrl || null,
     })
 
+    avatarPreview.value = avatarUrl
     ElMessage.success('AI 助手设置已更新')
   } finally {
     saving.value = false
