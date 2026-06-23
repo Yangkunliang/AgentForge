@@ -21,6 +21,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { path: '/projects',     label: '项目',     title: '我的项目',           icon: 'folder' },
   { path: '/chat',         label: '会话',     title: 'AI 对话',           icon: 'chat' },
   { path: '/dashboard',   label: 'Dashboard', title: '数据看板',           icon: 'dashboard' },
   { path: '/tasks',       label: '任务',      title: '任务管理',           icon: 'tasks' },
@@ -32,6 +33,7 @@ const menuItems: MenuItem[] = [
 ]
 
 const iconMap: Record<string, string> = {
+  folder:   'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',
   chat:     'M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z',
   dashboard:'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
   tasks:    'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',

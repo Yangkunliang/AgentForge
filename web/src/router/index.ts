@@ -24,6 +24,16 @@ const routes: RouteRecordRaw[] = [
         redirect: '/chat',
       },
       {
+        path: 'projects',
+        name: 'Projects',
+        component: () => import('@/views/projects/Index.vue'),
+      },
+      {
+        path: 'projects/create',
+        name: 'ProjectCreate',
+        component: () => import('@/views/projects/Create.vue'),
+      },
+      {
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/chat/Index.vue'),

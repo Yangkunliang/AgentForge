@@ -1,5 +1,9 @@
 # AgentForge 项目文档索引
 
+## 产品设计文档 (docs/product-design/)
+- [PRD-全栈Agent交互体验-20260623.md](docs/product-design/PRD-全栈Agent交互体验-20260623.md) — 项目管理、意图路由、阶段感知对话、快捷动作体系、Agent Bridge 完整产品方案
+- [PRD-CLAW-集成能力层-20260622.md](docs/product-design/PRD-CLAW-集成能力层-20260622.md) — CLAW 集成能力层（L1 Skill / L2 MCP / L3 ClaWHub 市场）
+
 ## 产品文档 (docs/product/)
 - [PRD-v1.md](docs/product/PRD-v1.md) — 产品定位、用户故事、核心功能、技术栈
 
