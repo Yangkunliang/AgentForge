@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useSessionStore } from '@/stores/session'
-import { useAppStore } from '@/stores/app'
-import { useAuthStore } from '@/stores/auth'
-import { useAgentStore } from '@/stores/agent'
-import { useChat } from '@/composables/useChat'
 import { uploadApi } from '@/api/modules/sessions'
-import { agentsApi } from '@/api/modules/agents'
-import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
+import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import { useChat } from '@/composables/useChat'
+import { useAgentStore } from '@/stores/agent'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
