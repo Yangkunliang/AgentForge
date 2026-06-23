@@ -67,7 +67,6 @@ class UserResponse(BaseModel):
 
 @router.post(
     "/register",
-    response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["auth"],
 )
@@ -101,11 +100,17 @@ async def register(body: UserRegisterRequest, db: AsyncSession = Depends(get_asy
     await db.refresh(user)
 
     return {
-        "user_id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "permissions": user.permissions,
-        "created_at": str(user.created_at),
+        "access_token": create_access_token({"sub": user.id, "type": "access"}),
+        "expires_in": settings.access_token_expire_minutes * 60,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "nickname": user.nickname,
+            "avatar_url": user.avatar_url,
+            "permissions": user.permissions,
+            "created_at": str(user.created_at),
+        },
     }
 
 
@@ -137,6 +142,9 @@ async def login(
         "user": {
             "id": user.id,
             "username": user.username,
+            "email": user.email,
+            "nickname": user.nickname,
+            "avatar_url": user.avatar_url,
             "permissions": user.permissions,
         },
     }

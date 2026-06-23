@@ -15,9 +15,11 @@ def test_register_success(async_client):
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["username"] == "newuser"
-    assert data["email"] == "newuser@example.com"
-    assert "read" in data["permissions"]
+    assert "access_token" in data
+    assert "user" in data
+    assert data["user"]["username"] == "newuser"
+    assert data["user"]["email"] == "newuser@example.com"
+    assert "read" in data["user"]["permissions"]
 
 
 def test_register_duplicate_username(async_client, fake_user):
