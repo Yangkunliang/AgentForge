@@ -36,7 +36,8 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-003：Harness 核心 + RabbitMQ + SSE](TASK-003.md) | P2 | US-1、US-2、US-5 | TASK-001、TASK-002 | 落地多 Agent 编排、Contract Net、实时流式过程 |
 | [x] | [TASK-004：Skill 插件系统 & 辅助 API](TASK-004.md) | P2 | US-3、US-4、US-5 | TASK-001、TASK-003 | 实现 Skill 安装、Dashboard、成本、导出、Webhook |
 | [x] | [TASK-005：前端工作台 & UI/UX 体验](TASK-005.md) | P3 | US-1、US-2、US-3、US-4、US-5 | TASK-001、TASK-002、TASK-003、TASK-004 | 建立 Vue 3 前端工作台、SSE 可视化、权限页面和管理界面 |
-| [ ] | [TASK-006：面向用户的对话工作台（Chat UI）](TASK-006.md) | P2 | US-1、US-2 | TASK-001、TASK-002、TASK-003 | 用户侧对话界面：会话列表、流式气泡、SSE 接入，多 Agent 细节对用户透明 |
+| [x] | [TASK-006：面向用户的对话工作台（Chat UI）](TASK-006.md) | P2 | US-1、US-2 | TASK-001、TASK-002、TASK-003 | 用户侧对话界面：会话列表、流式气泡、SSE 接入，多 Agent 细节对用户透明 |
+| [x] | [TASK-007：全栈 Agent 交互体验 — 静态页面](TASK-007.md) | P2 | US-01～US-05（PRD-全栈Agent交互体验）| TASK-005、TASK-006 | 项目管理页 + Agent 对话页新交互层，纯静态 mock，验证体验后再接后端 |
 
 ## 执行顺序
 

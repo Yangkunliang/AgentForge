@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { uploadApi } from '@/api/modules/sessions'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
+import ConfirmCard from '@/components/chat/ConfirmCard.vue'
+import ContextChips from '@/components/chat/ContextChips.vue'
+import IntentSelector from '@/components/chat/IntentSelector.vue'
+import ProjectBar from '@/components/chat/ProjectBar.vue'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
+import StageCompleteCard from '@/components/chat/StageCompleteCard.vue'
+import StagePreview from '@/components/chat/StagePreview.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import { useChat } from '@/composables/useChat'
+import { usePipeline } from '@/composables/usePipeline'
+import type { IntentType } from '@/composables/usePipeline'
 import { useAgentStore } from '@/stores/agent'
-import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
@@ -15,15 +22,17 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
-const appStore = useAppStore()
 const authStore = useAuthStore()
 const agentStore = useAgentStore()
 
-// 当前用户显示名 + 头像（来自 store computed，自动响应昵称/头像修改）
+const { getConfig, intentLabels } = usePipeline()
+
+const currentIntent = ref<IntentType>('iteration')
+const currentConfig = computed(() => getConfig(currentIntent.value))
+const showAdvancedPanel = ref(false)
+
 const userName = computed(() => authStore.displayName)
 const userAvatarUrl = computed(() => authStore.avatarUrl)
-
-const isMobile = computed(() => appStore.isMobile)
 
 const inputText = ref('')
 const messagesEl = ref<HTMLElement | null>(null)
@@ -184,27 +193,6 @@ async function handleNewChat() {
   router.push(`/chat/${session.id}`)
 }
 
-// ── 快捷功能区域 ──────────────────────────────────────────────
-interface QuickAction {
-  id: string
-  icon: string
-  label: string
-  prompt: string
-}
-
-const quickActions: QuickAction[] = [
-  { id: 'code-review', icon: 'code-review', label: '代码审查', prompt: '帮我审查这段代码，找出潜在的问题、性能瓶颈和代码风格问题。' },
-  { id: 'debug', icon: 'debug', label: '调试分析', prompt: '帮我分析这个错误日志，找出问题根源并提供解决方案。' },
-  { id: 'refactor', icon: 'refactor', label: '代码重构', prompt: '帮我重构这段代码，使其更简洁、可维护。' },
-  { id: 'api-design', icon: 'api-design', label: 'API设计', prompt: '帮我设计一个RESTful API接口，包括请求参数、响应格式和错误处理。' },
-  { id: 'sql', icon: 'sql', label: 'SQL优化', prompt: '帮我优化这条SQL查询语句，提高执行效率。' },
-  { id: 'security', icon: 'security', label: '安全检查', prompt: '帮我检查这段代码的安全性，找出可能的安全漏洞。' },
-  { id: 'document', icon: 'document', label: '写文档', prompt: '帮我为这个功能编写技术文档，包括功能说明、API文档和使用示例。' },
-  { id: 'translate', icon: 'translate', label: '翻译', prompt: '帮我翻译这段英文技术文档为中文。' },
-]
-
-const showMoreActions = ref(false)
-
 // ── 图片上传 ──────────────────────────────────────────────────
 const pendingImages = ref<{ url: string; file: File }[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -255,7 +243,6 @@ function removePendingImage(idx: number) {
     <div class="chat-main">
       <!-- 桌面端顶栏 -->
       <div class="chat-topbar chat-topbar--desktop">
-        <!-- 展开按钮（侧边栏折叠时显示） -->
         <button
           v-if="!sidebarVisible"
           class="topbar-btn"
@@ -268,10 +255,13 @@ function removePendingImage(idx: number) {
         </button>
         <span v-if="!sidebarVisible" class="topbar-divider" />
 
-        <!-- slogan 常驻 / 折叠后补充显示当前会话标题 -->
         <div class="topbar-info">
           <span class="topbar-slogan">全栈开发者的智能工作台</span>
           <span v-if="topbarTitle" class="topbar-session-title">{{ topbarTitle }}</span>
+        </div>
+
+        <div class="topbar-right">
+          <ProjectBar />
         </div>
       </div>
 
@@ -313,75 +303,89 @@ function removePendingImage(idx: number) {
           </div>
           <AssistantMessage v-else :message="msg" :agent-name="agentInfo.name" :agent-avatar-url="agentInfo.avatarUrl" />
         </template>
+
+        <div v-if="sessionId && sessionStore.messages.length > 0" class="mock-cards">
+          <ConfirmCard
+            title="PRD 确认"
+            :check-items="[
+              '需求范围：新增用户权限管理模块',
+              '功能点：角色管理、权限分配、菜单控制',
+              '技术方案：基于 RBAC 模型设计',
+            ]"
+            next-stage="架构设计"
+          />
+          <StageCompleteCard
+            stage="需求分析"
+            artifact-name="PRD-权限管理模块.md"
+          />
+        </div>
       </div>
 
       <!-- 输入区 -->
       <div class="input-area">
-        <!-- 快捷功能区域 -->
-        <div class="quick-actions">
-          <button class="quick-actions__btn" @click="fillPrompt(quickActions[0].prompt)" :title="quickActions[0].label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <span>{{ quickActions[0].label }}</span>
-          </button>
-          <button class="quick-actions__btn" @click="fillPrompt(quickActions[1].prompt)" :title="quickActions[1].label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9.06 11.9a8 8 0 1 1 6.06-6.06l3.13 3.13"/><path d="M12 12l9 9"/>
-            </svg>
-            <span>{{ quickActions[1].label }}</span>
-          </button>
-          <button class="quick-actions__btn" @click="fillPrompt(quickActions[2].prompt)" :title="quickActions[2].label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="4 4 10 10 4 16"/><line x1="12" y1="4" x2="20" y2="4"/><line x1="12" y1="10" x2="18" y2="10"/><line x1="12" y1="16" x2="22" y2="16"/>
-            </svg>
-            <span>{{ quickActions[2].label }}</span>
-          </button>
-          <button class="quick-actions__btn" @click="fillPrompt(quickActions[3].prompt)" :title="quickActions[3].label">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-            <span>{{ quickActions[3].label }}</span>
-          </button>
-          
-          <!-- 更多按钮 -->
-          <div class="quick-actions__more">
-            <button class="quick-actions__btn quick-actions__btn--more" @click="showMoreActions = !showMoreActions">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-              <span>更多</span>
-            </button>
-            
-            <!-- 更多功能下拉菜单 -->
-            <Transition name="dropdown">
-              <div v-show="showMoreActions" class="quick-actions__dropdown">
-                <button 
-                  v-for="action in quickActions.slice(4)" 
-                  :key="action.id"
-                  class="quick-actions__dropdown-item"
-                  @click="fillPrompt(action.prompt); showMoreActions = false"
-                >
-                  <svg v-if="action.id === 'sql'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-                  </svg>
-                  <svg v-else-if="action.id === 'security'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>
-                  </svg>
-                  <svg v-else-if="action.id === 'document'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                  </svg>
-                  <svg v-else-if="action.id === 'translate'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                  <span>{{ action.label }}</span>
-                </button>
+        <!-- 遮罩层：点击关闭弹窗 -->
+        <div v-if="showAdvancedPanel" class="advanced-overlay" @click="showAdvancedPanel = false"></div>
+        <!-- 高级设置面板（悬浮在输入区上方） -->
+        <div class="advanced-panel" :class="{ 'advanced-panel--open': showAdvancedPanel }">
+          <div class="advanced-panel__inner" @click.stop>
+            <div class="advanced-panel__header">
+              <span class="advanced-panel__title">高级设置</span>
+              <button class="advanced-panel__close" @click="showAdvancedPanel = false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div class="advanced-panel__content">
+              <!-- 步骤1：需求类型 -->
+              <div class="advanced-card">
+                <div class="advanced-card__header">
+                  <span class="advanced-card__step">1</span>
+                  <span class="advanced-card__title">需求类型</span>
+                </div>
+                <IntentSelector v-model="currentIntent" />
               </div>
-            </Transition>
+
+              <!-- 步骤2：上下文文件 -->
+              <div class="advanced-card">
+                <div class="advanced-card__header">
+                  <span class="advanced-card__step">2</span>
+                  <span class="advanced-card__title">上下文文件</span>
+                </div>
+                <ContextChips />
+              </div>
+
+              <!-- 步骤3：执行流程 -->
+              <div class="advanced-card">
+                <div class="advanced-card__header">
+                  <span class="advanced-card__step">3</span>
+                  <span class="advanced-card__title">执行流程</span>
+                </div>
+                <StagePreview :intent="currentIntent" />
+              </div>
+
+              <!-- 步骤4：快捷动作 -->
+              <div class="advanced-card">
+                <div class="advanced-card__header">
+                  <span class="advanced-card__step">4</span>
+                  <span class="advanced-card__title">快捷动作</span>
+                </div>
+                <div class="quick-actions">
+                  <button
+                    v-for="action in currentConfig.quickActions"
+                    :key="action.id"
+                    class="quick-actions__btn"
+                    :class="{ 'quick-actions__btn--highlighted': action.highlighted }"
+                    @click="fillPrompt(action.prompt)"
+                    :title="action.label"
+                  >
+                    <span>{{ action.label }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <!-- 待发送图片预览 -->
         <div v-if="pendingImages.length > 0" class="pending-images">
           <div v-for="(img, idx) in pendingImages" :key="idx" class="pending-image">
             <img :src="img.url" :alt="img.file.name" />
@@ -394,7 +398,6 @@ function removePendingImage(idx: number) {
         </div>
 
         <div class="input-box" :class="{ 'input-box--disabled': !sessionId }">
-          <!-- 隐藏的文件输入 -->
           <input
             ref="fileInputRef"
             type="file"
@@ -403,23 +406,38 @@ function removePendingImage(idx: number) {
             style="display: none"
             @change="onFileChange"
           />
-
-          <!-- 上传按钮 -->
           <button class="upload-btn" @click="openFilePicker" title="上传图片">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
             </svg>
           </button>
 
+          <!-- 紧凑的需求类型选择器 -->
+          <button class="intent-pill" @click="showAdvancedPanel = true">
+            <span class="intent-pill__icon">{{ intentLabels[currentIntent].icon }}</span>
+            <span class="intent-pill__label">{{ intentLabels[currentIntent].label }}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="intent-pill__arrow">
+              <polyline points="6 15 12 9 18 15" />
+            </svg>
+          </button>
+
           <textarea
             ref="textareaRef"
             v-model="inputText"
-            :placeholder="isMobile ? '输入消息...' : '输入消息，Ctrl+Enter 发送 / Enter 换行'"
+            :placeholder="currentConfig.placeholder"
             :disabled="sending || autoCreating"
             rows="1"
             @keydown="onKeydown"
             @input="(e) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 160) + 'px' }"
           />
+
+          <button class="advanced-btn" @click="showAdvancedPanel = true" title="高级设置">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+
           <button v-if="!sending" class="send-btn" :disabled="!inputText.trim() || autoCreating" @click="send">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z" /></svg>
           </button>
@@ -492,6 +510,7 @@ function removePendingImage(idx: number) {
   flex-direction: column;
   justify-content: center;
   overflow: hidden;
+  flex: 1;
 }
 
 .topbar-slogan {
@@ -508,6 +527,10 @@ function removePendingImage(idx: number) {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 1px;
+}
+
+.topbar-right {
+  flex-shrink: 0;
 }
 
 // ── 侧边栏过渡动画 ────────────────────────────────────────────
@@ -587,6 +610,7 @@ function removePendingImage(idx: number) {
 
 // ── 输入区 ────────────────────────────────────────────────────
 .input-area {
+  position: relative;
   padding: 16px 20px 20px;
   border-top: 1px solid #e5e7eb;
 }
@@ -595,35 +619,35 @@ function removePendingImage(idx: number) {
 .quick-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-bottom: 12px;
+  gap: 6px;
   flex-wrap: wrap;
 
   &__btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
-    border-radius: 20px;
-    background: #f3f4f6;
-    border: none;
-    color: #6b7280;
-    font-size: 13px;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
 
     &:hover {
-      background: #e5e7eb;
-      color: #374151;
+      background: #fff;
+      border-color: #cbd5e1;
+      color: #1e293b;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
 
-    &--more {
-      color: #409eff;
-      background: #f0f7ff;
-
-      &:hover {
-        background: #e6f2ff;
-      }
+    &--highlighted {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+      box-shadow: 0 1px 2px rgba(59, 130, 246, 0.1);
     }
   }
 
@@ -676,6 +700,196 @@ function removePendingImage(idx: number) {
   transform: translateY(8px);
 }
 
+.advanced-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: transparent;
+}
+
+// ── 高级设置面板（悬浮在输入区上方）───────────────────────────
+.advanced-panel {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  pointer-events: none;
+
+  &--open {
+    max-height: 500px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  &__inner {
+    background: #fff;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f1f5f9;
+    border-bottom: none;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  &__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  &__close {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #f1f5f9;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      background: #e2e8f0;
+      color: #334155;
+    }
+  }
+
+  &__content {
+    padding: 12px 16px;
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.advanced-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: #cbd5e1;
+    background: #fff;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  &__step {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  }
+
+  &__title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+  }
+}
+
+// ── 紧凑需求类型选择器（输入框内）───────────────────────────────
+.intent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.1);
+
+  &:hover {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-color: #93c5fd;
+    transform: translateY(-1px);
+  }
+
+  &__icon {
+    font-size: 13px;
+  }
+
+  &__label {
+    white-space: nowrap;
+  }
+
+  &__arrow {
+    transition: transform 0.2s;
+
+    &--up {
+      transform: rotate(180deg);
+    }
+  }
+}
+
+.advanced-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #409eff;
+    border-color: #bfdbfe;
+  }
+}
+
+// ── Mock 卡片 ────────────────────────────────────────────────
+.mock-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+}
+
 // ── 待发送图片预览 ────────────────────────────────────────────
 .pending-images {
   display: flex;
@@ -718,15 +932,19 @@ function removePendingImage(idx: number) {
 
 .input-box {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 10px 12px;
-  transition: border-color 0.15s;
+  border-radius: 16px;
+  padding: 8px 14px;
+  transition: all 0.2s;
 
-  &:focus-within { border-color: #409eff; background: #fff; }
+  &:focus-within {
+    border-color: #3b82f6;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
   &--disabled { opacity: 0.6; }
 
   textarea {
@@ -735,21 +953,21 @@ function removePendingImage(idx: number) {
     background: transparent;
     resize: none;
     font-size: 14px;
-    line-height: 1.5;
-    color: #111827;
+    line-height: 1.6;
+    color: #1e293b;
     outline: none;
     min-height: 24px;
     max-height: 160px;
     overflow-y: auto;
-    &::placeholder { color: #9ca3af; }
+    &::placeholder { color: #94a3b8; }
   }
 }
 
 .send-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #409eff;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   border: none;
   color: #fff;
   cursor: pointer;
@@ -757,34 +975,47 @@ function removePendingImage(idx: number) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.15s;
+  transition: all 0.15s;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.25);
 
-  &:hover:not(:disabled) { background: #337ecc; }
-  &:disabled { background: #a0cfff; cursor: not-allowed; }
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.35);
+    transform: translateY(-1px);
+  }
+  &:active:not(:disabled) { transform: translateY(0); }
+  &:disabled {
+    background: #cbd5e1;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
 }
 
 .upload-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: #94a3b8;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: color 0.15s, background 0.15s;
+  transition: all 0.15s;
 
-  &:hover { color: #409eff; background: #f0f7ff; }
+  &:hover {
+    color: #3b82f6;
+    background: #eff6ff;
+  }
 }
 
 .stop-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #ef4444;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   border: none;
   color: #fff;
   cursor: pointer;
@@ -792,7 +1023,12 @@ function removePendingImage(idx: number) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  &:hover { background: #dc2626; }
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+
+  &:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
+  }
 }
 
 .input-hint {
@@ -838,6 +1074,13 @@ function removePendingImage(idx: number) {
   .input-area    { padding: 10px 12px 14px; }
   .input-hint    { display: none; }
   .user-message  { max-width: 90%; }
+
+  .interaction-layer {
+    .interaction-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
 }
 
 :deep(.session-drawer) {
