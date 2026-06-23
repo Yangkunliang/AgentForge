@@ -3,7 +3,10 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { agentsApi } from '@/api/modules/agents'
 import { uploadApi } from '@/api/modules/sessions'
+import { useAgentStore } from '@/stores/agent'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+
+const agentStore = useAgentStore()
 
 const agentName = ref('CodeSoul')
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -68,6 +71,10 @@ async function saveSettings() {
     })
 
     avatarPreview.value = avatarUrl
+    agentStore.updateMyAgentSettings({
+      agent_name: agentName.value.trim() || 'CodeSoul',
+      avatar_url: avatarUrl || null,
+    })
     ElMessage.success('AI 助手设置已更新')
   } finally {
     saving.value = false
@@ -84,6 +91,10 @@ async function loadAgent() {
     const { data } = await agentsApi.getMySettings()
     agentName.value = data.agent_name
     avatarPreview.value = data.avatar_url
+    agentStore.updateMyAgentSettings({
+      agent_name: data.agent_name,
+      avatar_url: data.avatar_url || null,
+    })
   } catch {
     // ignore
   }

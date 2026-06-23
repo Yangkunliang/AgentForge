@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useAgentStore } from '@/stores/agent'
 import { useChat } from '@/composables/useChat'
 import { uploadApi } from '@/api/modules/sessions'
 import { agentsApi } from '@/api/modules/agents'
@@ -17,6 +18,7 @@ const router = useRouter()
 const sessionStore = useSessionStore()
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const agentStore = useAgentStore()
 
 // 当前用户显示名 + 头像（来自 store computed，自动响应昵称/头像修改）
 const userName = computed(() => authStore.displayName)
@@ -35,27 +37,15 @@ const sessionId = ref(route.params.sessionId as string | undefined)
 
 const { sending, sendMessage: _send, abort: abortStream } = useChat()
 
-// ── AI 助手信息 ──────────────────────────────────────────────
-const agentInfo = ref<{ name: string; avatarUrl: string | undefined }>({
-  name: 'CodeSoul',
-  avatarUrl: undefined,
-})
-
-async function loadAgentInfo() {
-  try {
-    const { data } = await agentsApi.getMySettings()
-    agentInfo.value = {
-      name: data.agent_name,
-      avatarUrl: data.avatar_url || undefined,
-    }
-  } catch {
-    // ignore
-  }
-}
+// AI 助手信息（来自 store）
+const agentInfo = computed(() => ({
+  name: agentStore.myAgentSettings.agent_name,
+  avatarUrl: agentStore.myAgentSettings.avatar_url || undefined,
+}))
 
 onMounted(async () => {
   await sessionStore.fetchSessions()
-  await loadAgentInfo()
+  await agentStore.fetchMyAgentSettings()
   if (sessionId.value) {
     const session = sessionStore.sessions.find((s) => s.id === sessionId.value)
     if (session) {

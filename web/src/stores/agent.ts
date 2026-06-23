@@ -8,6 +8,11 @@ export const useAgentStore = defineStore('agent', () => {
   const currentAgent = ref<Agent | null>(null)
   const loading = ref(false)
 
+  const myAgentSettings = ref<{ agent_name: string; avatar_url: string | null }>({
+    agent_name: 'CodeSoul',
+    avatar_url: null,
+  })
+
   async function fetchAgents(params?: AgentListParams) {
     loading.value = true
     try {
@@ -64,15 +69,35 @@ export const useAgentStore = defineStore('agent', () => {
     currentAgent.value = null
   }
 
+  async function fetchMyAgentSettings() {
+    try {
+      const { data } = await agentsApi.getMySettings()
+      myAgentSettings.value = {
+        agent_name: data.agent_name,
+        avatar_url: data.avatar_url || null,
+      }
+      return data
+    } catch {
+      // ignore
+    }
+  }
+
+  function updateMyAgentSettings(settings: { agent_name: string; avatar_url: string | null }) {
+    myAgentSettings.value = settings
+  }
+
   return {
     agents,
     currentAgent,
     loading,
+    myAgentSettings,
     fetchAgents,
     fetchAgent,
     createAgent,
     updateAgent,
     deleteAgent,
     clearCurrentAgent,
+    fetchMyAgentSettings,
+    updateMyAgentSettings,
   }
 })
