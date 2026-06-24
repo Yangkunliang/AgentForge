@@ -64,8 +64,9 @@ function toggleChip(index: number) {
   &:hover { background: #e5e7eb; }
 
   &.active {
-    background: #4c1d95;
-    color: #fff;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
   }
 }
 

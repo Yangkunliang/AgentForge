@@ -126,13 +126,15 @@ function handleManageProjects() {
 .project-dropdown {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
+  left: auto;
   background: #fff;
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   min-width: 240px;
   z-index: 200;
   overflow: hidden;
+  border: 1px solid #f3f4f6;
 }
 
 .dropdown-header {

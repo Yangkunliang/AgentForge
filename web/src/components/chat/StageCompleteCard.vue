@@ -30,6 +30,9 @@ defineProps<{
   border: 1px solid #bbf7d0;
   border-radius: 10px;
   padding: 14px 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .card-header {

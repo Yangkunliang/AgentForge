@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { IntentType } from '@/composables/usePipeline'
 import { usePipeline } from '@/composables/usePipeline'
+import { computed } from 'vue'
 
 const props = defineProps<{
   intent: IntentType
@@ -8,7 +9,7 @@ const props = defineProps<{
 
 const { getConfig } = usePipeline()
 
-const config = getConfig(props.intent)
+const config = computed(() => getConfig(props.intent))
 </script>
 
 <template>

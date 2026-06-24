@@ -146,7 +146,8 @@ alembic upgrade head
 ### 3.5 启动后端
 
 ```bash
-uvicorn api.main:app --reload --port 8000
+# uvicorn api.main:app --reload --port 8000
+PYTHONPATH=/Users/yangkl/AgentForge/src uvicorn api.main:app --reload --port 8000
 # API 文档：http://localhost:8000/docs
 # OpenAPI JSON：http://localhost:8000/openapi.json
 ```

@@ -337,39 +337,34 @@ function removePendingImage(idx: number) {
               </button>
             </div>
             <div class="advanced-panel__content">
-              <!-- 步骤1：需求类型 -->
-              <div class="advanced-card">
-                <div class="advanced-card__header">
-                  <span class="advanced-card__step">1</span>
-                  <span class="advanced-card__title">需求类型</span>
-                </div>
+
+              <!-- 需求类型 -->
+              <div class="ap-section">
+                <span class="ap-section__label">需求类型</span>
                 <IntentSelector v-model="currentIntent" />
               </div>
 
-              <!-- 步骤2：上下文文件 -->
-              <div class="advanced-card">
-                <div class="advanced-card__header">
-                  <span class="advanced-card__step">2</span>
-                  <span class="advanced-card__title">上下文文件</span>
-                </div>
+              <div class="ap-divider" />
+
+              <!-- 上下文文件 -->
+              <div class="ap-section">
+                <span class="ap-section__label">上下文</span>
                 <ContextChips />
               </div>
 
-              <!-- 步骤3：执行流程 -->
-              <div class="advanced-card">
-                <div class="advanced-card__header">
-                  <span class="advanced-card__step">3</span>
-                  <span class="advanced-card__title">执行流程</span>
-                </div>
+              <div class="ap-divider" />
+
+              <!-- 执行流程 -->
+              <div class="ap-section">
+                <span class="ap-section__label">执行阶段</span>
                 <StagePreview :intent="currentIntent" />
               </div>
 
-              <!-- 步骤4：快捷动作 -->
-              <div class="advanced-card">
-                <div class="advanced-card__header">
-                  <span class="advanced-card__step">4</span>
-                  <span class="advanced-card__title">快捷动作</span>
-                </div>
+              <div class="ap-divider" />
+
+              <!-- 快捷动作 -->
+              <div class="ap-section">
+                <span class="ap-section__label">快捷动作</span>
                 <div class="quick-actions">
                   <button
                     v-for="action in currentConfig.quickActions"
@@ -383,6 +378,7 @@ function removePendingImage(idx: number) {
                   </button>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
@@ -770,54 +766,38 @@ function removePendingImage(idx: number) {
   }
 
   &__content {
-    padding: 12px 16px;
-    max-height: 400px;
+    padding: 0;
+    max-height: 360px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
   }
 }
 
-.advanced-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 12px;
-  transition: all 0.15s;
+// 面板分组（替代原 advanced-card）
+.ap-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 16px;
 
-  &:hover {
-    border-color: #cbd5e1;
-    background: #fff;
-  }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  &__step {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    color: #fff;
+  &__label {
     font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-weight: 500;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    padding-top: 5px;
+    width: 52px;
     flex-shrink: 0;
-    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
   }
+}
 
-  &__title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #334155;
-  }
+.ap-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0 16px;
 }
 
 // ── 紧凑需求类型选择器（输入框内）───────────────────────────────
@@ -825,22 +805,20 @@ function removePendingImage(idx: number) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
+  padding: 5px 10px;
+  background: #eff6ff;
+  border: 0.5px solid #bfdbfe;
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: 600;
-  color: #2563eb;
+  font-weight: 500;
+  color: #185FA5;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.15s;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.1);
+  transition: background 0.15s, border-color 0.15s;
 
   &:hover {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    background: #dbeafe;
     border-color: #93c5fd;
-    transform: translateY(-1px);
   }
 
   &__icon {
@@ -967,7 +945,7 @@ function removePendingImage(idx: number) {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: #409eff;
   border: none;
   color: #fff;
   cursor: pointer;
@@ -975,18 +953,15 @@ function removePendingImage(idx: number) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.25);
+  transition: background 0.15s, transform 0.1s;
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.35);
+    background: #337ecc;
     transform: translateY(-1px);
   }
   &:active:not(:disabled) { transform: translateY(0); }
   &:disabled {
     background: #cbd5e1;
-    box-shadow: none;
     cursor: not-allowed;
   }
 }
@@ -1015,7 +990,7 @@ function removePendingImage(idx: number) {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: #ef4444;
   border: none;
   color: #fff;
   cursor: pointer;
@@ -1023,12 +998,9 @@ function removePendingImage(idx: number) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+  transition: background 0.15s;
 
-  &:hover {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4);
-  }
+  &:hover { background: #dc2626; }
 }
 
 .input-hint {

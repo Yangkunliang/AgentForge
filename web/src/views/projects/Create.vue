@@ -311,6 +311,10 @@ function finish() {
   font-size: 13px;
   color: #6b7280;
   white-space: nowrap;
+
+  @media (max-width: 480px) {
+    display: none;
+  }
 }
 
 .step-connector {
