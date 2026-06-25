@@ -10,7 +10,7 @@
 
 > 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态：Phase 0 — 仅设计文档。** 本仓库目前只包含产品和技术设计文档，尚无实现代码（不存在 `src/`、`tests/`、`pyproject.toml`）。后续会话将根据这些文档进行实现。
+**当前状态：Phase 1 — 记忆系统已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。详见 `docs/tech-design/DATABASE.md` 第 5 节记忆系统表设计。
 
 ---
 
@@ -61,7 +61,7 @@
 | 目录 | 内容 |
 |------|------|
 | `docs/product/` | 产品需求（`PRD-v1.md`） |
-| `docs/design/` | 架构、API 规范、数据库、安全、LLM 配置、数据导出、前端架构、RabbitMQ、部署 |
+| `docs/tech-design/` | 技术设计文档（数据库、安全、LLM 配置、部署、RabbitMQ、前端架构、记忆系统） |
 | `docs/tasks/` | 任务清单（`CHECKLIST.md`） |
 | `docs/iteration/` | 迭代记录 |
 
@@ -78,7 +78,7 @@
 3. **Registry（注册中心）** — AgentRegistry + SkillRegistry + `skills/` 目录热加载
 4. **Governance（容错治理）** — 重试（tenacity 指数退避，最多 3 次）、熔断器（pybreaker）、优雅降级
 5. **Executor（执行编排）** — 任务分解（LLM）→ Agent 协商（Contract Net 协议）→ Skill 调用 → 结果合并
-6. **Memory（记忆状态）** — 短期记忆（对话历史）、长期记忆（任务结果持久化）、审计日志（全链路 trace_id）
+6. **Memory（记忆状态）** — 4 层记忆架构（Working/Episodic/Semantic/User），详见 `src/agent_forge/memory/` 和 `docs/tech-design/DATABASE.md` 第 5 节
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
@@ -88,7 +88,7 @@
 |------|------|
 | 后端 | Python + FastAPI (async) |
 | LLM 网关 | LiteLLM（统一多厂商 API + Cost 追踪） |
-| 数据库 | PostgreSQL 15（SQLAlchemy 2.0 async + Alembic 迁移） |
+| 数据库 | PostgreSQL 15 + pgvector（SQLAlchemy 2.0 async + Alembic 迁移） |
 | 消息队列 | RabbitMQ（持久化 + ACK + 死信队列，详见 `docs/design/RABBITMQ.md`） |
 | 前端 | Vue 3 + Vite + Element Plus + Pinia（详见 `docs/design/FRONTEND-ARCHITECTURE.md`） |
 | 认证 | JWT（access_token 1h）+ refresh_token（HttpOnly Cookie 7d）+ API Key |
@@ -106,7 +106,8 @@ AgentForge/
 │   │   ├── bus/         # 消息总线（pubsub, direct, init）
 │   │   ├── agents/      # Agent 实现（基类 + 内置：coder, reviewer, researcher）
 │   │   ├── skills/      # 插件系统（manager, loader, validator）
-│   │   ├── models/      # SQLAlchemy 数据模型
+│   │   ├── memory/      # 记忆系统（4层：Working/Episodic/Semantic/User）
+│   ├── models/      # SQLAlchemy 数据模型
 │   │   ├── llm/         # LLM Provider 抽象（litellm_adapter, router, cost）
 │   │   └── exporter/    # 数据导出（JSONL, 脱敏）
 │   ├── api/             # FastAPI 路由（main.py + tasks, agents, skills, exports, dashboard, auth）
@@ -173,7 +174,10 @@ bug 修复、小功能增强、样式调整等非架构变更不触发。
 
 ## 使用本仓库
 
-- 目前无实现代码，重点在设计文档（`docs/design/` 下 9 个文档已完备）
-- 实现任务清单：`docs/tasks/CHECKLIST.md`
-- 本地开发启动顺序：`docs/design/DEPLOYMENT.md` 第 3 节
+- 核心实现：`src/agent_forge/`（记忆、引擎、消息总线、LLM 抽象）
+- 前端：`web/src/`
+- 数据库迁移：`migrations/alembic/versions/`
+- 测试：`tests/`
+- 技术设计文档：`docs/tech-design/`
+- 本地开发启动顺序：`docs/tech-design/DEPLOYMENT.md` 第 3 节
 - 安全模型：双认证（JWT + API Key）、Prompt 注入防护、Skill 沙箱、全链路 trace_id 审计

@@ -11,6 +11,7 @@
 - [ARCHITECTURE.md](docs/design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
 - [API-SPEC.md](docs/design/API-SPEC.md) — 完整 API 规范（认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
 - [DATABASE.md](docs/design/DATABASE.md) — 数据库实体（9张表）、索引、关系图
+- [DATABASE.md](docs/tech-design/DATABASE.md) — 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
 - [SECURITY.md](docs/tech-design/SECURITY.md) — 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测 + tool_call 分级）、Skill 沙箱分级、审计日志
 - [SANDBOX-RESEARCH.md](docs/tech-design/SANDBOX-RESEARCH.md) — 沙箱机制技术调研报告（方案一 Docker vs 方案二 CubeSandbox，含对比表格与选型依据）
 - [INTEGRATION-CUBESANDBOX.md](docs/tech-design/INTEGRATION-CUBESANDBOX.md) — CubeSandbox 集成详细设计（抽象层、E2B SDK / REST API 两种对接路径、API 设计、分级策略、实施计划）
