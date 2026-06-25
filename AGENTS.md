@@ -131,7 +131,32 @@ docs/iterations/YYYY-MM-DD-topic/
 
 ---
 
-## 7. 验证要求
+## 7. Git 凭证
+
+**本地已配置 `store` credential helper**，`~/.git-credentials` 存有 GitHub PAT。
+
+```bash
+# 凭证文件
+cat ~/.git-credentials
+# https://<USER>:<PAT>@github.com
+```
+
+**Push 失败时的兜底方案**（当 `store` helper 未自动匹配 remote URL 时）：
+
+```bash
+git push https://<PAT>@github.com/<owner>/<repo>.git <branch>
+```
+
+> PAT 以 `gho_` 开头（Fine-grained）或 `ghp_` 开头（classic），scope 需包含 `repo`。
+> 如凭证文件中无 GitHub 条目，先引导用户从 https://github.com/settings/tokens 创建并保存：
+> ```bash
+> echo "https://<PAT>@github.com" >> ~/.git-credentials
+> git config --global credential.helper store
+> ```
+
+---
+
+## 8. 验证要求
 
 文档类变更至少检查：
 
@@ -142,7 +167,7 @@ docs/iterations/YYYY-MM-DD-topic/
 
 ---
 
-## 8. 架构变更自动同步
+## 9. 架构变更自动同步
 
 当对话中产生**架构级别**变更时，Agent 应主动同步更新架构文档，无需用户额外指示。
 
