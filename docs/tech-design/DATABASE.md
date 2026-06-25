@@ -147,7 +147,75 @@ CREATE INDEX idx_conversation_from ON Conversation(from_agent);
 CREATE INDEX idx_apikey_user_id ON APIKey(user_id);
 ```
 
-## 4. 数据库选型
+## 5. 记忆系统表
+
+### 5.1 语义记忆 (SemanticEntry)
+
+跨会话语义记忆，支持向量相似度检索。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| task_id | UUID | 外键 → Task(id) ON DELETE SET NULL |
+| title | String | 标题（最多 500 字符） |
+| content | Text | 记忆内容 |
+| category | String | 类别（decision/code/design/result/context/preference） |
+| metadata | JSONB | 附加元数据 |
+| embedding | vector(1536) | 向量嵌入（pgvector） |
+| version | Int | 版本号（更新时递增） |
+| deleted | Boolean | 软删除标记 |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+```sql
+-- 向量索引（HNSW 加速相似度搜索）
+CREATE INDEX ON semantic_entries USING hnsw (embedding vector_cosine_ops)
+    WHERE deleted = FALSE;
+
+-- 全文索引
+CREATE INDEX ON semantic_entries USING gin(to_tsvector('english', content || ' ' || title));
+
+-- 复合索引
+CREATE INDEX ix_semantic_user_category ON semantic_entries(user_id, category)
+    WHERE deleted = FALSE;
+```
+
+### 5.2 用户记忆 (UserMemory)
+
+用户级偏好与项目上下文，category 唯一约束。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| category | String | 类别（project_context/preference/style_guide/tech_stack） |
+| content | Text | 记忆内容 |
+| metadata | JSONB | 附加元数据 |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+### 5.3 对话记忆 (ChatMessages)
+
+用户对话历史（Episodic Memory），复用 `chat_messages` 表。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | String | 主键 |
+| session_id | String | 外键 → Session(id) ON DELETE CASCADE |
+| role | String | 角色（user/assistant） |
+| content | Text | 消息内容（全文搜索索引） |
+| task_id | String | 外键 → Task(id) ON DELETE SET NULL |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+```sql
+-- 全文搜索索引
+CREATE INDEX ix_chat_messages_content_fts
+    ON chat_messages USING gin(to_tsvector('english', content));
+```
+
+## 6. 数据库选型
 
 | 项目 | 选型 | 说明 |
 |------|------|------|

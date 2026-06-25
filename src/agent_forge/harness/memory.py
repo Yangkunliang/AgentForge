@@ -1,4 +1,16 @@
-"""Harness Layer 6: Memory - 短期记忆、长期记忆、审计日志"""
+"""Harness Layer 6: Memory - 短期记忆、长期记忆、审计日志
+
+.. deprecated::
+    此模块已被新的记忆系统替代。新的记忆系统位于
+    ``src/agent_forge/memory/`` 目录，提供 4 层记忆架构
+    （Working/Episodic/Semantic/User），支持语义搜索、
+    向量 embedding、用户级记忆等能力。
+
+    迁移指引：
+    - 使用 ``from agent_forge.memory import MemoryManager``
+    - 使用 ``from agent_forge.memory.embedder import embed, chunk_text``
+    - 使用 ``from agent_forge.memory.retriever import MemoryRetriever``
+"""
 
 from __future__ import annotations
 

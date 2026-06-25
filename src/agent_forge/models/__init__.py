@@ -10,6 +10,7 @@ from .conversation import Conversation
 from .session import Session, Message
 from .export_task import ExportTask
 from .memory_entry import MemoryEntry
+from .semantic_entry import SemanticEntry
 from .skill import Skill
 from .skill_install import SkillInstall
 from .subtask import SubTask
@@ -17,6 +18,7 @@ from .task import Task, TaskPriority, TaskStatus
 from .task_execution import TaskExecution
 from .user import User
 from .user_agent_settings import UserAgentSettings
+from .user_memory import UserMemory
 from .webhook import Webhook
 
 __all__ = [
@@ -25,10 +27,10 @@ __all__ = [
     "APIKey",
     "AuditLog",
     "Conversation",
-    "Session",
     "Message",
-    "ExportTask",
     "MemoryEntry",
+    "SemanticEntry",
+    "Session",
     "Skill",
     "SkillInstall",
     "SubTask",
@@ -38,5 +40,6 @@ __all__ = [
     "TaskExecution",
     "User",
     "UserAgentSettings",
+    "UserMemory",
     "Webhook",
 ]
