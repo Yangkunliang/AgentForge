@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     postgres_password: str = "agent"
     postgres_db: str = "agentforge"
 
+    # Database Connection Pool
+    # pool_size: 连接池保持的空闲连接数，建议设置为 CPU 核心数的 1-2 倍
+    # max_overflow: 超出 pool_size 后允许的最大额外连接数
+    # pool_timeout: 获取连接的等待超时时间（秒）
+    # pool_recycle: 连接回收间隔（秒），建议小于数据库的 idle_in_transaction_session_timeout
+    #               PostgreSQL 默认 10 分钟，这里设置 30 分钟较为安全
+    # pool_pre_ping: 获取连接前是否检查可用性，生产环境建议开启
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_timeout: int = 30
+    db_pool_recycle: int = 1800
+    db_pool_pre_ping: bool = True
+
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
@@ -51,6 +64,12 @@ class Settings(BaseSettings):
     vision_model: str = Field(default="", validation_alias="VL_MODEL")
     image_gen_model: str = Field(default="", validation_alias="T2I_MODEL")
     model_routes: str = Field(default="{}", validation_alias="MODEL_ROUTES")  # JSON: {"claude": "anthropic/claude-3-5-sonnet", ...}
+
+    # Embedding
+    embedding_model: str = Field(default="openai/text-embedding-3-small", validation_alias="EMBEDDING_MODEL")
+    embedding_dimension: int = Field(default=1536, validation_alias="EMBEDDING_DIM")
+    embedding_chunk_size: int = Field(default=512, validation_alias="EMBEDDING_CHUNK_SIZE")
+    embedding_chunk_overlap: int = Field(default=50, validation_alias="EMBEDDING_CHUNK_OVERLAP")
 
     @property
     def model_routes_map(self) -> dict[str, str]:
