@@ -63,7 +63,7 @@
 | `docs/product/` | 产品需求（`PRD-v1.md`） |
 | `docs/tech-design/` | 技术设计文档（数据库、安全、LLM 配置、部署、RabbitMQ、前端架构、记忆系统、沙箱） |
 | `docs/tasks/` | 任务清单（`CHECKLIST.md`） |
-| `docs/iteration/` | 迭代记录 |
+| `docs/iterations/` | 迭代记录 |
 
 根目录 `MEMORY.md` 也索引了所有文档。
 

@@ -23,10 +23,9 @@
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单，按 P1→P2→P3→P4 优先级排列，共 28 项
 
-## 迭代记录 (docs/iteration/)
-- [ITER-001.md](docs/iteration/ITER-001.md) — 架构设计迭代记录
-
-## 迭代产物 (docs/iterations/)
+## 迭代记录 (docs/iterations/)
+- [2026-06-17-architecture-design/](docs/iterations/2026-06-17-architecture-design/) — 架构设计迭代记录
+  - [ITER-architecture-design-20260617.md](docs/iterations/2026-06-17-architecture-design/ITER-architecture-design-20260617.md) — Harness 六层架构、Skill 格式、技术栈决策
 - [2025-06-20-task-agent-management-api/](docs/iterations/2025-06-20-task-agent-management-api/) — TASK-002 任务管理与 Agent 管理 API
   - [PRODUCT-REQUIREMENTS.md](docs/iterations/2025-06-20-task-agent-management-api/PRODUCT-REQUIREMENTS.md) — 产品需求文档
   - [TASK-CHECKLIST.md](docs/iterations/2025-06-20-task-agent-management-api/TASK-CHECKLIST.md) — 任务清单和问题解决记录
@@ -35,6 +34,9 @@
   - [PRODUCT-REQUIREMENTS.md](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/PRODUCT-REQUIREMENTS.md) — 产品需求文档
   - [TASK-CHECKLIST.md](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/TASK-CHECKLIST.md) — 任务清单
   - [TECHNICAL-DESIGN.md](docs/iterations/2025-06-20-harness-core-rabbitmq-sse/TECHNICAL-DESIGN.md) — 技术设计文档
+- [2025-06-20-frontend-workbench/](docs/iterations/2025-06-20-frontend-workbench/) — 前端工作台迭代
+- [2025-06-20-skill-dashboard-cost-exports/](docs/iterations/2025-06-20-skill-dashboard-cost-exports/) — Skill 面板与成本导出
+- [2026-06-22-skill-engine/](docs/iterations/2026-06-22-skill-engine/) — Skill 引擎迭代
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
