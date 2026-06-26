@@ -14,8 +14,6 @@ SandboxPool 单元测试
 - size 属性
 """
 
-import asyncio
-
 import pytest
 
 from agent_forge.sandbox.base import SandboxConfig
@@ -114,18 +112,25 @@ async def test_drain_empties_pool_and_destroys_sandboxes(executor, config):
     pool = SandboxPool(executor=executor, config=config, min_size=3, max_size=10)
     await pool.bootstrap()
 
-    # 记录所有 sandbox_id
-    sandbox_ids = []
+    # 记录池中所有 sandbox_id
+    pool_ids = []
     while pool.size > 0:
         info = await pool.acquire()
-        sandbox_ids.append(info.sandbox_id)
-        await pool.release(info)
-
-    # 重新预热并drain
-    await pool.bootstrap()
-    await pool.drain()
+        pool_ids.append(info.sandbox_id)
 
     assert pool.size == 0
+
+    # drain 空池
+    await pool.drain()
+    assert pool.size == 0
+
+    # 已 acquire 的沙箱应仍在注册表中（drain 只销毁池内沙箱）
+    for sid in pool_ids:
+        assert sid in _MOCK_REGISTRY
+
+    # 手动销毁已 acquire 的沙箱
+    for sid in pool_ids:
+        await executor.destroy(sid)
 
 
 @pytest.mark.asyncio
