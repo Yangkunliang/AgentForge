@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger("agent_forge.api.sse")
 
@@ -31,6 +31,15 @@ class SSEEventTypes:
     LLM_RESPONSE = "llm_response"
     ERROR = "error"
     HEARTBEAT = "heartbeat"
+
+    # 沙箱生命周期事件
+    SANDBOX_CREATED = "sandbox_created"
+    SANDBOX_CONNECTED = "sandbox_connected"
+    SANDBOX_CODE_EXECUTING = "sandbox_code_executing"
+    SANDBOX_CODE_COMPLETED = "sandbox_code_completed"
+    SANDBOX_PAUSED = "sandbox_paused"
+    SANDBOX_DESTROYED = "sandbox_destroyed"
+    SANDBOX_TIMEOUT = "sandbox_timeout"
 
 
 class SSEManager:
@@ -83,7 +92,7 @@ class SSEManager:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=30)
                     yield event
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # 发送心跳
                     yield f"event: {SSEEventTypes.HEARTBEAT}\ndata: {{}}\n\n"
         except GeneratorExit:
@@ -187,4 +196,77 @@ async def emit_bid_received(task_id: str, agent_id: str, confidence: float) -> N
             "agent_id": agent_id,
             "confidence": confidence,
         },
+    )
+
+
+# ── 沙箱生命周期事件发射器 ───────────────────────────────────────
+
+async def emit_sandbox_created(
+    task_id: str, sandbox_id: str, template_id: str = ""
+) -> None:
+    """沙箱已创建"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_CREATED,
+        {"sandbox_id": sandbox_id, "template_id": template_id},
+    )
+
+
+async def emit_sandbox_connected(
+    task_id: str, sandbox_id: str, host: str = "", port: int = 0
+) -> None:
+    """沙箱已连接"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_CONNECTED,
+        {"sandbox_id": sandbox_id, "host": host, "port": port},
+    )
+
+
+async def emit_sandbox_code_executing(
+    task_id: str, sandbox_id: str, code_preview: str = ""
+) -> None:
+    """沙箱开始执行代码"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_CODE_EXECUTING,
+        {"sandbox_id": sandbox_id, "code_preview": code_preview[:200]},
+    )
+
+
+async def emit_sandbox_code_completed(
+    task_id: str, sandbox_id: str, exit_code: int = 0, duration_ms: int = 0
+) -> None:
+    """沙箱代码执行完成"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_CODE_COMPLETED,
+        {"sandbox_id": sandbox_id, "exit_code": exit_code, "duration_ms": duration_ms},
+    )
+
+
+async def emit_sandbox_paused(task_id: str, sandbox_id: str) -> None:
+    """沙箱已暂停"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_PAUSED,
+        {"sandbox_id": sandbox_id},
+    )
+
+
+async def emit_sandbox_destroyed(task_id: str, sandbox_id: str) -> None:
+    """沙箱已销毁"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_DESTROYED,
+        {"sandbox_id": sandbox_id},
+    )
+
+
+async def emit_sandbox_timeout(task_id: str, sandbox_id: str, reason: str = "") -> None:
+    """沙箱超时"""
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.SANDBOX_TIMEOUT,
+        {"sandbox_id": sandbox_id, "reason": reason},
     )

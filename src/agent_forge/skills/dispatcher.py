@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import time
@@ -66,10 +67,12 @@ class SkillDispatcher:
 
         start_ms = int(time.monotonic() * 1000)
         try:
-            # 将 user_id 注入到需要用户上下文的工具参数中
+            # 将 user_id 注入到需要用户上下文的工具参数中（仅函数签名接受时才注入）
             call_args = dict(arguments)
             if user_id is not None:
-                call_args["user_id"] = user_id
+                sig = inspect.signature(executor)
+                if "user_id" in sig.parameters:
+                    call_args["user_id"] = user_id
 
             result: Any = await asyncio.wait_for(
                 executor(**call_args),

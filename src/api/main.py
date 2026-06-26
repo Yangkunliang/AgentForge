@@ -53,7 +53,30 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("MCP server initialization failed (non-fatal): %s", e)
 
+    # 启动沙箱 TTL 回收器
+    reclaimer = None
+    try:
+        from agent_forge.config import sandbox_settings
+        from agent_forge.sandbox.reclaimer import SandboxReclaimer
+
+        reclaimer = SandboxReclaimer(
+            interval=sandbox_settings.cube_sandbox_reclaim_interval,
+            pause_ttl=sandbox_settings.cube_sandbox_pause_ttl,
+        )
+        await reclaimer.start()
+        logger.info("SandboxReclaimer started (interval=%ds)", sandbox_settings.cube_sandbox_reclaim_interval)
+    except Exception as e:
+        logger.warning("SandboxReclaimer startup failed (non-fatal): %s", e)
+
     yield
+
+    # 关闭沙箱 TTL 回收器
+    if reclaimer is not None:
+        try:
+            await reclaimer.stop()
+            logger.info("SandboxReclaimer stopped")
+        except Exception as e:
+            logger.warning("SandboxReclaimer shutdown error (ignored): %s", e)
 
     # 关闭 MCP Server 连接
     try:
@@ -144,7 +167,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # ── 路由挂载 ──────────────────────────────────────────────────
 
-from api.routes import agents, auth, dashboard, health, llm, memory, sessions, skills, tasks, tools, uploads  # noqa: E402
+from api.routes import agents, auth, dashboard, health, llm, memory, sandboxes, sessions, skills, tasks, tools, uploads  # noqa: E402
 from agent_forge.api.sse import sse_router  # noqa: E402
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
@@ -163,3 +186,4 @@ app.include_router(  # noqa: F821
 )
 app.include_router(uploads.router, prefix="/api/v1", tags=["uploads"])
 app.include_router(memory.router, prefix="/api/v1", tags=["memory"])
+app.include_router(sandboxes.router, prefix="/api/v1", tags=["sandboxes"])

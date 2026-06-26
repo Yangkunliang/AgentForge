@@ -142,6 +142,28 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             executors={"update_profile": update_profile},
         )
 
+        # ── 5. code-executor Skill ──────────────────────────────
+        from agent_forge.skills.code_executor import CODE_EXECUTOR_TOOL, code_executor
+
+        try:
+            await SkillManager.register_skill(
+                db,
+                name="code-executor",
+                version="1.0.0",
+                description="在隔离沙箱中执行 Python 代码",
+                entry_point="agent_forge.skills.code_executor:code_executor",
+                manifest={"tool": CODE_EXECUTOR_TOOL["function"]},
+                source_type="builtin",
+            )
+        except Exception as e:
+            logger.debug("code-executor skill already registered or error: %s", e)
+
+        registry.register(
+            skill_name="code-executor",
+            tool_defs=[CODE_EXECUTOR_TOOL],
+            executors={"code_executor": code_executor},
+        )
+
         logger.info("Built-in skills registered: %s", registry.list_registered())
 
     except Exception as e:

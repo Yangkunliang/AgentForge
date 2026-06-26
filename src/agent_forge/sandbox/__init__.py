@@ -43,6 +43,7 @@ from agent_forge.sandbox.base import (
 from agent_forge.sandbox.manager import SandboxManager
 from agent_forge.sandbox.mock import MockSandboxExecutor
 from agent_forge.sandbox.pool import SandboxPool
+from agent_forge.sandbox.factory import SandboxProviderFactory
 
 __all__ = [
     # 数据类 & 协议
@@ -62,6 +63,8 @@ __all__ = [
     # 核心组件
     "SandboxManager",
     "SandboxPool",
+    # 工厂
+    "SandboxProviderFactory",
     # 执行器（开箱即用）
     "MockSandboxExecutor",
 ]

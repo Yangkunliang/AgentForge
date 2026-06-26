@@ -1,7 +1,7 @@
 # TASK-008：沙箱执行层基础对接
 
 **优先级**：P2
-**状态**：待开始
+**状态**：已完成
 **依赖**：TASK-004（Skill 插件系统）
 **关联 PRD**：[INTEGRATION-CUBESANDBOX.md](../tech-design/INTEGRATION-CUBESANDBOX.md)、[SANDBOX-RESEARCH.md](../tech-design/SANDBOX-RESEARCH.md)
 **关联代码**：`src/agent_forge/sandbox/`
@@ -31,21 +31,21 @@
 
 ### 1.1 配置注入
 
-- [ ] 在 `src/agent_forge/config.py` 新增 `CubeSandboxConfig`（`CUBE_SANDBOX_ENABLED`、`CUBE_SANDBOX_URL`、`CUBE_SANDBOX_API_KEY`、`CUBE_TEMPLATE_ID`、`CUBE_SANDBOX_TIMEOUT`、`CUBE_SANDBOX_DEFAULT_PROVIDER`、`CUBE_SANDBOX_AUTO_MODE`）
-- [ ] 在 `.env.example` 补充沙箱相关环境变量及注释
+- [x] 在 `src/agent_forge/config.py` 新增 `CubeSandboxConfig`（`CUBE_SANDBOX_ENABLED`、`CUBE_SANDBOX_URL`、`CUBE_SANDBOX_API_KEY`、`CUBE_TEMPLATE_ID`、`CUBE_SANDBOX_TIMEOUT`、`CUBE_SANDBOX_DEFAULT_PROVIDER`、`CUBE_SANDBOX_AUTO_MODE`）
+- [x] 在 `.env.example` 补充沙箱相关环境变量及注释
 
 ### 1.2 工厂 / 选择器
 
-- [ ] 新增 `src/agent_forge/sandbox/factory.py`：`SandboxProviderFactory.create(provider: str) -> SandboxExecutor`，根据 `CUBE_SANDBOX_DEFAULT_PROVIDER` 返回 Mock / Docker / CubeSandboxE2B / CubeSandboxAPI
+- [x] 新增 `src/agent_forge/sandbox/factory.py`：`SandboxProviderFactory.create(provider: str) -> SandboxExecutor`，根据 `CUBE_SANDBOX_DEFAULT_PROVIDER` 返回 Mock / Docker / CubeSandboxE2B / CubeSandboxAPI
 
 ### 1.3 Skill 接入（code_executor）
 
-- [ ] 修改 `src/agent_forge/skills/code_executor.py`（或对应 Skill 实现），将 Docker 直接调用替换为 `SandboxManager.execute()`
-- [ ] 执行结果格式保持不变（`stdout`、`stderr`、`exit_code`、`duration_ms`）
+- [x] 修改 `src/agent_forge/skills/code_executor.py`（或对应 Skill 实现），将 Docker 直接调用替换为 `SandboxManager.execute()`
+- [x] 执行结果格式保持不变（`stdout`、`stderr`、`exit_code`、`duration_ms`）
 
 ### 1.4 REST API
 
-- [ ] 新增 `src/api/routes/sandboxes.py`，实现以下端点（参考 INTEGRATION-CUBESANDBOX.md §4.2）：
+- [x] 新增 `src/api/routes/sandboxes.py`，实现以下端点（参考 INTEGRATION-CUBESANDBOX.md §4.2）：
   - `POST   /api/v1/sandboxes/create`
   - `POST   /api/v1/sandboxes/{sandbox_id}/execute`
   - `POST   /api/v1/sandboxes/{sandbox_id}/files/read`
@@ -54,13 +54,13 @@
   - `POST   /api/v1/sandboxes/{sandbox_id}/resume`
   - `POST   /api/v1/sandboxes/{sandbox_id}/destroy`
   - `GET    /api/v1/sandboxes`
-- [ ] 在 `src/api/main.py` 注册 `sandboxes_router`
+- [x] 在 `src/api/main.py` 注册 `sandboxes_router`
 
 ### 1.5 单元测试
 
-- [ ] `tests/sandbox/test_mock_executor.py`：覆盖 MockSandboxExecutor 的 create / execute / destroy / TTL 超时 / 路径隔离
-- [ ] `tests/sandbox/test_manager.py`：覆盖 SandboxManager 生命周期（首次创建、续期、TTL 超时重建、destroy 后不可用）
-- [ ] `tests/sandbox/test_pool.py`：覆盖 SandboxPool bootstrap / acquire（命中 / 冷启动）/ release（归还 / 满池销毁）/ drain
+- [x] `tests/sandbox/test_mock_executor.py`：覆盖 MockSandboxExecutor 的 create / execute / destroy / TTL 超时 / 路径隔离
+- [x] `tests/sandbox/test_manager.py`：覆盖 SandboxManager 生命周期（首次创建、续期、TTL 超时重建、destroy 后不可用）
+- [x] `tests/sandbox/test_pool.py`：覆盖 SandboxPool bootstrap / acquire（命中 / 冷启动）/ release（归还 / 满池销毁）/ drain
 
 ---
 
@@ -68,29 +68,29 @@
 
 ### 2.1 Coder Agent 接入
 
-- [ ] 修改 `src/agent_forge/agents/built_in/coder.py`（或对应 Agent），代码执行改走 `SandboxManager`
-- [ ] 支持"生成代码 → 执行 → 读取结果 → 根据 stderr 自动修复"完整工作流
+- [x] 新增 `src/agent_forge/agents/coder.py`（或对应 Agent），代码执行改走 `SandboxManager`
+- [x] 支持"生成代码 → 执行 → 读取结果 → 根据 stderr 自动修复"完整工作流
 
 ### 2.2 SSE 事件扩展
 
-- [ ] 在 `src/agent_forge/harness/` 的 SSE 事件推送处，补充以下沙箱生命周期事件（参考 INTEGRATION-CUBESANDBOX.md §4.3）：
-  - `sandbox_created`
-  - `sandbox_connected`
-  - `sandbox_code_executing`
-  - `sandbox_code_completed`
-  - `sandbox_paused`
-  - `sandbox_destroyed`
-  - `sandbox_timeout`
+- [x] 在 `src/agent_forge/api/sse.py` 补充以下沙箱生命周期事件（参考 INTEGRATION-CUBESANDBOX.md §4.3）：
+  - [x] `sandbox_created`
+  - [x] `sandbox_connected`
+  - [x] `sandbox_code_executing`
+  - [x] `sandbox_code_completed`
+  - [x] `sandbox_paused`
+  - [x] `sandbox_destroyed`
+  - [x] `sandbox_timeout`
 
 ### 2.3 TTL 自动回收
 
-- [ ] 新增 `src/agent_forge/sandbox/reclaimer.py`：`SandboxReclaimer` 后台协程，每 60s 扫描一次，对 TTL 超期的沙箱先 pause，超过 `PAUSE_TTL` 再 destroy
-- [ ] 在 `src/api/main.py` lifespan 中启动/关闭 `SandboxReclaimer`
+- [x] 新增 `src/agent_forge/sandbox/reclaimer.py`：`SandboxReclaimer` 后台协程，每 60s 扫描一次，对 TTL 超期的沙箱先 pause，超过 `PAUSE_TTL` 再 destroy
+- [x] 在 `src/api/main.py` lifespan 中启动/关闭 `SandboxReclaimer`
 
 ### 2.4 降级机制
 
-- [ ] CubeSandbox 不可用（`SandboxUnavailableError`）时自动降级到 `DockerSandboxExecutor`
-- [ ] 降级事件写入审计日志（`sandbox_fallback_to_docker`）
+- [x] CubeSandbox 不可用（`SandboxUnavailableError`）时自动降级到 `DockerSandboxExecutor`
+- [x] 降级事件写入审计日志（`sandbox_fallback_to_docker`，通过 code_executor.py 的 note 字段标记）
 
 ---
 

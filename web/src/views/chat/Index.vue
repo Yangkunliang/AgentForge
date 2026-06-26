@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { uploadApi } from '@/api/modules/sessions'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
-import ConfirmCard from '@/components/chat/ConfirmCard.vue'
 import ContextChips from '@/components/chat/ContextChips.vue'
 import IntentSelector from '@/components/chat/IntentSelector.vue'
 import ProjectBar from '@/components/chat/ProjectBar.vue'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
-import StageCompleteCard from '@/components/chat/StageCompleteCard.vue'
 import StagePreview from '@/components/chat/StagePreview.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
@@ -303,22 +301,6 @@ function removePendingImage(idx: number) {
           </div>
           <AssistantMessage v-else :message="msg" :agent-name="agentInfo.name" :agent-avatar-url="agentInfo.avatarUrl" />
         </template>
-
-        <div v-if="sessionId && sessionStore.messages.length > 0" class="mock-cards">
-          <ConfirmCard
-            title="PRD 确认"
-            :check-items="[
-              '需求范围：新增用户权限管理模块',
-              '功能点：角色管理、权限分配、菜单控制',
-              '技术方案：基于 RBAC 模型设计',
-            ]"
-            next-stage="架构设计"
-          />
-          <StageCompleteCard
-            stage="需求分析"
-            artifact-name="PRD-权限管理模块.md"
-          />
-        </div>
       </div>
 
       <!-- 输入区 -->
@@ -857,15 +839,6 @@ function removePendingImage(idx: number) {
     color: #409eff;
     border-color: #bfdbfe;
   }
-}
-
-// ── Mock 卡片 ────────────────────────────────────────────────
-.mock-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-top: 12px;
-  border-top: 1px dashed #e5e7eb;
 }
 
 // ── 待发送图片预览 ────────────────────────────────────────────

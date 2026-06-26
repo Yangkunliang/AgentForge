@@ -101,3 +101,59 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class CubeSandboxConfig(BaseSettings):
+    """沙箱执行层配置。
+
+    通过环境变量注入，所有字段均有合理默认值，本地开发无需配置即可使用 mock。
+    """
+
+    # 是否启用沙箱（False 时 code_executor Skill 直接返回错误）
+    cube_sandbox_enabled: bool = Field(default=True, validation_alias="CUBE_SANDBOX_ENABLED")
+
+    # 默认 provider：mock | docker | cubesandbox_e2b | cubesandbox_api
+    # macOS 开发环境强制设为 mock，CI/生产设为 docker 或 cubesandbox_*
+    cube_sandbox_default_provider: str = Field(
+        default="mock", validation_alias="CUBE_SANDBOX_DEFAULT_PROVIDER"
+    )
+
+    # CubeSandbox 服务地址（仅 cubesandbox_* provider 需要）
+    cube_sandbox_url: str = Field(
+        default="http://127.0.0.1:3000", validation_alias="CUBE_SANDBOX_URL"
+    )
+
+    # CubeSandbox API Key
+    cube_sandbox_api_key: str = Field(default="", validation_alias="CUBE_SANDBOX_API_KEY")
+
+    # 默认模板 ID（CubeSandbox 模板，包含预装的运行时环境）
+    cube_template_id: str = Field(default="", validation_alias="CUBE_TEMPLATE_ID")
+
+    # 沙箱 TTL（秒）：空闲超过此时间自动暂停/销毁
+    cube_sandbox_timeout: int = Field(default=300, validation_alias="CUBE_SANDBOX_TIMEOUT")
+
+    # 自动路由模式：True 时根据代码来源自动选择 Docker / CubeSandbox
+    # False 时统一使用 cube_sandbox_default_provider
+    cube_sandbox_auto_mode: bool = Field(
+        default=False, validation_alias="CUBE_SANDBOX_AUTO_MODE"
+    )
+
+    # TTL 回收器扫描间隔（秒）
+    cube_sandbox_reclaim_interval: int = Field(
+        default=60, validation_alias="CUBE_SANDBOX_RECLAIM_INTERVAL"
+    )
+
+    # TTL 回收器：pause 后多少秒再 destroy
+    cube_sandbox_pause_ttl: int = Field(
+        default=120, validation_alias="CUBE_SANDBOX_PAUSE_TTL"
+    )
+
+    model_config = {
+        "env_file": str(_find_env()),
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore",
+    }
+
+
+sandbox_settings = CubeSandboxConfig()
