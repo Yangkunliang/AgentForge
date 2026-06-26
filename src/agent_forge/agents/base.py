@@ -110,8 +110,15 @@ Agent 能力：{', '.join(self.capabilities)}
         pass
 
 
-class CodeAgent(BaseAgent):
-    """代码 Agent"""
+class CodeWriterAgent(BaseAgent):
+    """代码生成 Agent（仅生成代码文本，不执行代码）。
+
+    ⚠️  此 Agent 只负责用 LLM 生成代码内容，返回给调用方或用户。
+        如需在沙箱中执行代码，请使用 agents/coder.py 中的 CoderAgent，
+        或通过 skills/code_executor.py 中的 code_executor Skill。
+
+        严禁在此 Agent 内直接执行代码——任何代码执行必须经过 SandboxManager。
+    """
 
     def __init__(self, config: AgentConfig, llm_provider: LLMProvider):
         super().__init__(config, llm_provider)
@@ -119,10 +126,8 @@ class CodeAgent(BaseAgent):
             config.capabilities.append("code")
 
     async def execute(self, task: dict) -> dict:
-        """执行代码任务"""
-        description = task.get("description", "")
-
-        prompt = f"""作为代码 Agent，执行以下任务：
+        """生成代码（不执行）。如需执行，使用 CoderAgent 或 code_executor Skill。"""
+        prompt = f"""作为代码生成 Agent，根据以下任务生成代码：
 
 {task}
 
@@ -143,8 +148,12 @@ class CodeAgent(BaseAgent):
                 "cost_usd": response.cost_usd,
             }
         except Exception as e:
-            logger.error(f"Code agent execution error: {e}")
+            logger.error(f"CodeWriterAgent execution error: {e}")
             return {"status": "error", "error": str(e)}
+
+
+# 向后兼容别名，避免现有代码 import 失败
+CodeAgent = CodeWriterAgent
 
 
 class AnalysisAgent(BaseAgent):
@@ -157,8 +166,6 @@ class AnalysisAgent(BaseAgent):
 
     async def execute(self, task: dict) -> dict:
         """执行分析任务"""
-        description = task.get("description", "")
-
         prompt = f"""作为分析 Agent，执行以下分析任务：
 
 {task}
@@ -194,8 +201,6 @@ class SearchAgent(BaseAgent):
 
     async def execute(self, task: dict) -> dict:
         """执行搜索任务"""
-        description = task.get("description", "")
-
         prompt = f"""作为搜索 Agent，执行以下搜索任务：
 
 {task}
@@ -230,7 +235,7 @@ def create_agent(agent_type: str, agent_id: str, name: str, llm_provider: LLMPro
     )
 
     agents = {
-        "code": CodeAgent,
+        "code": CodeWriterAgent,
         "analysis": AnalysisAgent,
         "search": SearchAgent,
     }
