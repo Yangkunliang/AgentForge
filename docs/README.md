@@ -14,8 +14,7 @@ docs/
 ├── architecture/   # 当前系统架构蓝图
 ├── product-design/   # 产品文档
 ├── tech-design/   # 技术设计文档
-├── iteration/     # 迭代记录
-└── iterations/    # 新迭代产物目录
+├── iterations/    # 迭代记录
 ```
 
 ## 长期规范 (standards/)
