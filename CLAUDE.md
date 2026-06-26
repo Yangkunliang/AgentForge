@@ -61,7 +61,7 @@
 | 目录 | 内容 |
 |------|------|
 | `docs/product/` | 产品需求（`PRD-v1.md`） |
-| `docs/tech-design/` | 技术设计文档（数据库、安全、LLM 配置、部署、RabbitMQ、前端架构、记忆系统） |
+| `docs/tech-design/` | 技术设计文档（数据库、安全、LLM 配置、部署、RabbitMQ、前端架构、记忆系统、沙箱） |
 | `docs/tasks/` | 任务清单（`CHECKLIST.md`） |
 | `docs/iteration/` | 迭代记录 |
 
@@ -89,8 +89,8 @@
 | 后端 | Python + FastAPI (async) |
 | LLM 网关 | LiteLLM（统一多厂商 API + Cost 追踪） |
 | 数据库 | PostgreSQL 15 + pgvector（SQLAlchemy 2.0 async + Alembic 迁移） |
-| 消息队列 | RabbitMQ（持久化 + ACK + 死信队列，详见 `docs/design/RABBITMQ.md`） |
-| 前端 | Vue 3 + Vite + Element Plus + Pinia（详见 `docs/design/FRONTEND-ARCHITECTURE.md`） |
+| 消息队列 | RabbitMQ（持久化 + ACK + 死信队列，详见 `docs/tech-design/RABBITMQ.md`） |
+| 前端 | Vue 3 + Vite + Element Plus + Pinia（详见 `docs/tech-design/FRONTEND-ARCHITECTURE.md`） |
 | 认证 | JWT（access_token 1h）+ refresh_token（HttpOnly Cookie 7d）+ API Key |
 | 重试 | tenacity（指数退避） |
 | 熔断器 | pybreaker |
@@ -102,15 +102,20 @@
 AgentForge/
 ├── src/
 │   ├── agent_forge/
-│   │   ├── harness/     # 六层 harness（validator, router, registry, governance, executor, memory）
-│   │   ├── bus/         # 消息总线（pubsub, direct, init）
-│   │   ├── agents/      # Agent 实现（基类 + 内置：coder, reviewer, researcher）
-│   │   ├── skills/      # 插件系统（manager, loader, validator）
-│   │   ├── memory/      # 记忆系统（4层：Working/Episodic/Semantic/User）
-│   ├── models/      # SQLAlchemy 数据模型
+│   │   ├── harness/     # 六层 harness（validator, router, registry, governance, executor）
+│   │   ├── bus/         # 消息总线（publisher, consumer, init）
+│   │   ├── agents/      # Agent 实现（基类 base.py + coder.py）
+│   │   ├── skills/      # 插件系统（manager, loader, registry, dispatcher, engine, builtin, code_executor 等）
+│   │   ├── memory/      # 4 层记忆（Working/Episodic/Semantic/User）
 │   │   ├── llm/         # LLM Provider 抽象（litellm_adapter, router, cost）
-│   │   └── exporter/    # 数据导出（JSONL, 脱敏）
-│   ├── api/             # FastAPI 路由（main.py + tasks, agents, skills, exports, dashboard, auth）
+│   │   ├── exporter/    # 数据导出（JSONL, 脱敏）
+│   │   ├── sandbox/     # 沙箱执行层（SandboxProviderFactory, SandboxPool, SandboxReclaimer）
+│   │   ├── api/         # 内部 API 层
+│   │   ├── auth/        # 认证相关
+│   │   ├── models/      # SQLAlchemy 数据模型
+│   │   ├── mcp/         # MCP 集成
+│   │   └── webhooks/    # Webhook 集成
+│   ├── api/             # FastAPI 路由（main.py + agents, auth, dashboard, health, llm, memory, sandboxes, sessions, skills, tasks, tools, uploads）
 │   └── middleware/      # auth.py, rate_limit.py
 └── web/                 # Vue 3 前端
     └── src/

@@ -109,7 +109,7 @@
 - `src/agent_forge/harness/executor.py`
 - `src/agent_forge/harness/memory.py`
 - `src/agent_forge/llm/litellm_adapter.py` + `router.py`
-- `src/agent_forge/agents/base.py` + `coder.py` + `reviewer.py` + `researcher.py`
+- `src/agent_forge/agents/base.py` + `coder.py`
 
 ## 参考文档
 

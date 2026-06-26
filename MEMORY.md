@@ -7,19 +7,18 @@
 ## 产品文档 (docs/product/)
 - [PRD-v1.md](docs/product/PRD-v1.md) — 产品定位、用户故事、核心功能、技术栈
 
-## 技术设计文档 (docs/design/ & docs/tech-design/)
-- [ARCHITECTURE.md](docs/design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
-- [API-SPEC.md](docs/design/API-SPEC.md) — 完整 API 规范（认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
-- [DATABASE.md](docs/design/DATABASE.md) — 数据库实体（9张表）、索引、关系图
-- [DATABASE.md](docs/tech-design/DATABASE.md) — 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
+## 技术设计文档 (docs/tech-design/)
+- [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
+- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
+- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体（9张表）、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
 - [SECURITY.md](docs/tech-design/SECURITY.md) — 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测 + tool_call 分级）、Skill 沙箱分级、审计日志
 - [SANDBOX-RESEARCH.md](docs/tech-design/SANDBOX-RESEARCH.md) — 沙箱机制技术调研报告（方案一 Docker vs 方案二 CubeSandbox，含对比表格与选型依据）
 - [INTEGRATION-CUBESANDBOX.md](docs/tech-design/INTEGRATION-CUBESANDBOX.md) — CubeSandbox 集成详细设计（抽象层、E2B SDK / REST API 两种对接路径、API 设计、分级策略、实施计划）
-- [LLM-CONFIG.md](docs/design/LLM-CONFIG.md) — LiteLLM 配置、模型路由、Fallback、Cost 追踪
-- [DATA-EXPORT.md](docs/design/DATA-EXPORT.md) — 训练数据导出、PII 脱敏策略
-- [FRONTEND-ARCHITECTURE.md](docs/design/FRONTEND-ARCHITECTURE.md) — Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步）
-- [RABBITMQ.md](docs/design/RABBITMQ.md) — 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理
-- [DEPLOYMENT.md](docs/design/DEPLOYMENT.md) — 本地开发环境、生产部署、Nginx 配置、数据库迁移
+- [LLM-CONFIG.md](docs/tech-design/LLM-CONFIG.md) — LiteLLM 配置、模型路由、Fallback、Cost 追踪
+- [DATA-EXPORT.md](docs/tech-design/DATA-EXPORT.md) — 训练数据导出、PII 脱敏策略
+- [FRONTEND-ARCHITECTURE.md](docs/tech-design/FRONTEND-ARCHITECTURE.md) — Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步）
+- [RABBITMQ.md](docs/tech-design/RABBITMQ.md) — 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理
+- [DEPLOYMENT.md](docs/tech-design/DEPLOYMENT.md) — 本地开发环境、生产部署、Nginx 配置、数据库迁移
 
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单，按 P1→P2→P3→P4 优先级排列，共 28 项

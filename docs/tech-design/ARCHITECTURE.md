@@ -105,40 +105,56 @@
 
 ```
 src/
-├── agentforge/
+├── agent_forge/
 │   ├── harness/           # Harness 六层实现
 │   │   ├── validator.py   # 第1层 输入校验
 │   │   ├── router.py      # 第2层 路由分发
 │   │   ├── registry.py    # 第3层 注册中心
 │   │   ├── governance.py  # 第4层 容错治理
-│   │   ├── executor.py    # 第5层 执行编排
-│   │   └── memory.py      # 第6层 记忆状态
+│   │   └── executor.py    # 第5层 执行编排
 │   ├── bus/               # 消息总线
-│   │   ├── pubsub.py      # Pub/Sub 广播
-│   │   └── direct.py      # 点对点通信
+│   │   ├── publisher.py   # Pub/Sub 广播 + SSE 流式输出
+│   │   └── consumer.py    # 点对点通信（Request/Response）
 │   ├── agents/            # Agent 实现
-│   │   ├── base.py        # Agent 基类
-│   │   └── built_in/      # 内置 Agent
-│   │       ├── coder.py
-│   │       ├── reviewer.py
-│   │       └── researcher.py
+│   │   ├── base.py        # Agent 基类 + CodeAgent + AnalysisAgent + SearchAgent
+│   │   └── coder.py       # 沙箱新增 CoderAgent
 │   ├── skills/            # Skill 插件系统
 │   │   ├── manager.py     # Skill 管理器
 │   │   ├── loader.py      # 加载器
-│   │   └── validator.py   # 验证器
-│   ├── models/            # 数据模型
-│   └── llm/               # LLM Provider 抽象
-│       ├── provider.py    # 统一接口
-│       ├── litellm_adapter.py  # LiteLLM 适配
-│       └── config.py      # 配置
-│   └── exporter/          # 数据导出
+│   │   ├── registry.py    # 注册中心
+│   │   ├── dispatcher.py  # 调度器
+│   │   ├── engine.py      # 执行引擎
+│   │   ├── builtin.py     # 内置 Skill 注册
+│   │   ├── code_executor.py   # 代码执行 Skill
+│   │   ├── installer.py       # 安装 Skill
+│   │   ├── manifest.py        # 清单管理
+│   │   ├── http_request.py    # HTTP 请求 Skill
+│   │   ├── web_search.py      # 网页搜索 Skill
+│   │   ├── weather.py         # 天气 Skill
+│   │   └── update_profile.py  # 个人信息 Skill
+│   ├── memory/            # 4 层记忆系统
+│   ├── llm/               # LLM Provider 抽象
+│   │   ├── litellm_adapter.py  # LiteLLM 适配
+│   │   ├── router.py       # 模型路由
+│   │   └── cost.py         # Cost 追踪
+│   ├── exporter/          # 数据导出
+│   ├── sandbox/           # 沙箱执行层（SandboxProviderFactory, SandboxPool, SandboxReclaimer）
+│   ├── models/            # SQLAlchemy 数据模型
 ├── api/                   # FastAPI 路由
 │   ├── main.py
 │   └── routes/
-│       ├── tasks.py
-│       ├── agents.py
-│       ├── skills.py
-│       └── exports.py
+│       ├── agents.py      # Agent 管理
+│       ├── auth.py        # 认证
+│       ├── dashboard.py   # 仪表盘
+│       ├── health.py      # 健康检查
+│       ├── llm.py         # LLM 配置
+│       ├── memory.py      # 记忆 CRUD
+│       ├── sandboxes.py   # 沙箱管理
+│       ├── sessions.py    # 会话管理
+│       ├── skills.py      # Skill 管理
+│       ├── tasks.py       # 任务管理
+│       ├── tools.py       # 工具
+│       └── uploads.py     # 文件上传
 └── middleware/            # 中间件
     ├── auth.py
     └── rate_limit.py
@@ -255,7 +271,50 @@ async def execute(code: str) -> dict:
 3. `pyproject.toml` 声明依赖和 entry_point
 4. 安装时同时注册 skill.md 到 SkillRegistry 和 executor 到调用器
 
-## 8. 技术栈
+### 7.6 内置 Skill 列表
+
+| Skill | 文件 | 说明 |
+|-------|------|------|
+| code_executor | `skills/code_executor.py` | 沙箱代码执行（Docker/CubeSandbox） |
+| builtin | `skills/builtin.py` | 内置 Skill 注册表 |
+| http_request | `skills/http_request.py` | HTTP 请求 |
+| web_search | `skills/web_search.py` | 网页搜索 |
+| weather | `skills/weather.py` | 天气查询 |
+| installer | `skills/installer.py` | Skill 安装 |
+| update_profile | `skills/update_profile.py` | 个人信息更新 |
+
+## 8. 沙箱执行层
+
+### 8.1 架构
+
+```
+SandboxProviderFactory ──┬── DockerSandboxExecutor
+                         ├── CubeSandboxE2BExecutor
+                         ├── CubeSandboxAPIExecutor
+                         └── MockSandboxExecutor
+```
+
+### 8.2 核心组件
+
+- **SandboxProviderFactory**：工厂模式，根据配置动态创建不同 Provider
+- **SandboxManager**：沙箱管理器，维护当前活跃沙箱
+- **SandboxPool**：预置热沙箱池，降低冷启动延迟
+- **SandboxReclaimer**：周期性回收过期/闲置沙箱
+
+### 8.3 Sandbox API 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/sandboxes` | 创建沙箱 |
+| POST | `/api/v1/sandboxes/{id}/execute` | 执行代码 |
+| POST | `/api/v1/sandboxes/{id}/files/read` | 读取文件 |
+| POST | `/api/v1/sandboxes/{id}/files/write` | 写入文件 |
+| POST | `/api/v1/sandboxes/{id}/pause` | 暂停沙箱 |
+| POST | `/api/v1/sandboxes/{id}/resume` | 恢复沙箱 |
+| POST | `/api/v1/sandboxes/{id}/destroy` | 销毁沙箱 |
+| GET | `/api/v1/sandboxes` | 列出活跃沙箱 |
+
+## 9. 技术栈
 
 | 组件 | 技术 | 说明 |
 |------|------|------|

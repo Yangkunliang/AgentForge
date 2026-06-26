@@ -303,7 +303,7 @@ async def consume_dlq():
 后端启动时自动执行 Exchange/Queue 声明（幂等，多次执行安全）：
 
 ```python
-# agentforge/bus/init.py
+# agent_forge/bus/init.py
 async def init_rabbitmq():
     conn = await aio_pika.connect_robust(RABBITMQ_URL)
     ch   = await conn.channel()

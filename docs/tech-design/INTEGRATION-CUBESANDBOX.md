@@ -243,7 +243,7 @@ CubeSandbox 完全兼容 E2B SDK，直接使用 `e2b-code-interpreter` 或 `e2b`
 # requirements.txt
 e2b-code-interpreter>=1.0.0
 
-# agentforge/sandbox/cubesandbox_e2b.py
+# agent_forge/sandbox/cubesandbox_e2b.py
 import os
 import asyncio
 from dataclasses import dataclass
@@ -319,7 +319,7 @@ class CubeSandboxE2BExecutor:
 当需要更精细控制（如自定义快照、集群调度）时，直接调用 CubeSandbox REST API：
 
 ```python
-# agentforge/sandbox/cubesandbox_api.py
+# agent_forge/sandbox/cubesandbox_api.py
 import httpx
 from typing import Optional
 
@@ -746,7 +746,7 @@ CUBE_SANDBOX_AUTO_MODE=true
 ### 5.2 Config 模型
 
 ```python
-# src/agentforge/config.py
+# src/agent_forge/config.py
 
 class CubeSandboxConfig(BaseModel):
     enabled: bool = False
@@ -786,7 +786,7 @@ class Settings(BaseSettings):
 Coder Agent 在生成代码后，需要执行测试时走沙箱：
 
 ```python
-# src/agentforge/agents/built_in/coder.py
+# src/agent_forge/agents/coder.py
 
 class CoderAgent(Agent):
     async def execute(self, sub_task: SubTask) -> AgentResult:
@@ -821,7 +821,7 @@ class CoderAgent(Agent):
 ### 6.2 Skill Executor 集成
 
 ```python
-# src/agentforge/skills/code_executor/executor.py
+# src/agent_forge/skills/code_executor.py
 
 async def execute(code: str, config: SkillConfig) -> dict:
     """code_executor Skill 的入口"""
@@ -925,7 +925,7 @@ class SandboxReclaimer:
                     await self._remove_sandbox(sb["sandbox_id"])
 ```
 
-### 7.2 资源池化（可选优化）
+### 7.2 资源池化（已实现）
 
 为极致降低冷启动延迟，可维护一个"热沙箱池"：
 
