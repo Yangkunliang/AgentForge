@@ -16,11 +16,8 @@ constraint_naming_convention = {
     "pk": "pk_%(table_name)s",
 }
 
-metadata = MetaData(naming_convention=constraint_naming_convention)
-
-
 class Base(DeclarativeBase):
-    pass
+    metadata = MetaData(naming_convention=constraint_naming_convention)
 
 
 def _now() -> datetime:

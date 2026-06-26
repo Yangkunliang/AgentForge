@@ -26,9 +26,7 @@ class SemanticCreateRequest(BaseModel):
     category: str = Field(default="general", description="类别")
     task_id: str | None = Field(default=None, description="关联任务 ID")
     metadata: dict[str, Any] = Field(default_factory=dict, description="元数据")
-    generate_embedding: bool = Field(
-        default=True, description="是否生成 embedding"
-    )
+    generate_embedding: bool = Field(default=True, description="是否生成 embedding")
 
 
 class SemanticUpdateRequest(BaseModel):
@@ -119,7 +117,7 @@ async def create_semantic_memory(
         title=result.title,
         content=result.content,
         category=result.category,
-        metadata=result.metadata if isinstance(result.metadata, dict) else {},
+        metadata=result.extra_data if isinstance(result.extra_data, dict) else {},
         version=result.version,
         deleted=result.deleted,
         created_at=result.created_at.isoformat() if result.created_at else "",
@@ -147,7 +145,7 @@ async def get_semantic_memory(
         title=entry.title,
         content=entry.content,
         category=entry.category,
-        metadata=entry.metadata if isinstance(entry.metadata, dict) else {},
+        metadata=entry.extra_data if isinstance(entry.extra_data, dict) else {},
         version=entry.version,
         deleted=entry.deleted,
         created_at=entry.created_at.isoformat() if entry.created_at else "",
@@ -182,7 +180,7 @@ async def update_semantic_memory(
         title=entry.title,
         content=entry.content,
         category=entry.category,
-        metadata=entry.metadata if isinstance(entry.metadata, dict) else {},
+        metadata=entry.extra_data if isinstance(entry.extra_data, dict) else {},
         version=entry.version,
         deleted=entry.deleted,
         created_at=entry.created_at.isoformat() if entry.created_at else "",
@@ -230,7 +228,7 @@ async def list_semantic_memories(
             title=e.title,
             content=e.content,
             category=e.category,
-            metadata=e.metadata if isinstance(e.metadata, dict) else {},
+            metadata=e.extra_data if isinstance(e.extra_data, dict) else {},
             version=e.version,
             deleted=e.deleted,
             created_at=e.created_at.isoformat() if e.created_at else "",
@@ -287,7 +285,7 @@ async def get_user_memories(
             "user_id": m.user_id,
             "category": m.category,
             "content": m.content,
-            "metadata": m.metadata if isinstance(m.metadata, dict) else {},
+            "metadata": m.extra_data if isinstance(m.extra_data, dict) else {},
             "created_at": m.created_at.isoformat() if m.created_at else "",
             "updated_at": m.updated_at.isoformat() if m.updated_at else "",
         }
@@ -313,7 +311,7 @@ async def upsert_user_memory(
         "user_id": entry.user_id,
         "category": entry.category,
         "content": entry.content,
-        "metadata": entry.metadata if isinstance(entry.metadata, dict) else {},
+        "metadata": entry.extra_data if isinstance(entry.extra_data, dict) else {},
         "created_at": entry.created_at.isoformat() if entry.created_at else "",
         "updated_at": entry.updated_at.isoformat() if entry.updated_at else "",
     }

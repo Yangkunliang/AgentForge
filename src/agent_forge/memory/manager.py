@@ -71,7 +71,7 @@ class MemoryManager:
             title=title or content[:200],
             content=content,
             category=category,
-            metadata=metadata or {},
+            extra_data=metadata or {},
             version=1,
         )
         self.db.add(entry)
@@ -130,7 +130,7 @@ class MemoryManager:
         if category is not None:
             entry.category = category
         if metadata is not None:
-            entry.metadata = metadata
+            entry.extra_data = metadata
 
         entry.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
@@ -237,13 +237,13 @@ class MemoryManager:
                 user_id=user_id,
                 category=category,
                 content=content,
-                metadata=metadata or {},
+                extra_data=metadata or {},
             )
             self.db.add(entry)
         else:
             entry.content = content
             if metadata:
-                entry.metadata = metadata
+                entry.extra_data = metadata
             entry.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()

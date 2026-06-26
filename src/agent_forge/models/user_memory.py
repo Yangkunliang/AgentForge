@@ -32,7 +32,7 @@ class UserMemory(Base):
 
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    extra_data: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
 
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,

@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, Index
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import NullType
 
 from .base import Base
 
-if TYPE_CHECKING:
-    from pgvector.sqlalchemy import Vector
+# pgvector 可选依赖：本地开发若未安装则降级为 NullType（不影响启动）
+try:
+    from pgvector.sqlalchemy import Vector as _Vector
+    _VECTOR_TYPE = _Vector(1536)
+except ImportError:
+    _VECTOR_TYPE = NullType()
 
 
 class SemanticEntry(Base):
@@ -43,13 +47,12 @@ class SemanticEntry(Base):
         # decision, code, design, result, context, preference
     )
 
-    metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    extra_data: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)
 
     # 向量存储：通过 pgvector extension 的 vector(N) 类型
     # embedding 列在 migration 中定义为 vector(1536)
-    embedding: Mapped[list[float] | None] = mapped_column(
-        nullable=True,
-    )
+    # 使用旧式 Column() 避免 Mapped[] 注解对 list[float] 类型推断失败
+    embedding = Column(_VECTOR_TYPE, nullable=True)
 
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
