@@ -60,7 +60,7 @@
 
 | 目录 | 内容 |
 |------|------|
-| `docs/product/` | 产品需求（`PRD-v1.md`） |
+| `docs/product-design/` | 产品需求文档 |
 | `docs/tech-design/` | 技术设计文档（数据库、安全、LLM 配置、部署、RabbitMQ、前端架构、记忆系统、沙箱） |
 | `docs/tasks/` | 任务清单（`CHECKLIST.md`） |
 | `docs/iterations/` | 迭代记录 |
