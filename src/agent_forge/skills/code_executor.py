@@ -15,15 +15,19 @@ Provider 路由
     - 开发模式（CUBE_SANDBOX_DEFAULT_PROVIDER=mock）：允许降级到 MockSandboxExecutor
     - 非开发模式：拒绝执行，返回错误（严禁在宿主机执行用户代码）
 
-用法
-----
-    result = await code_executor(code="print('hello')")
-    # {"success": True, "stdout": "hello\\n", "stderr": "", "exit_code": 0}
+SSE 事件发射（TASK-009）
+------------------------
+接受可选的 on_event 回调，由 SkillDispatcher 动态注入。
+在关键执行节点发射事件供前端可视化：
+  sandbox_executing — 代码开始执行（含代码内容，供前端展示代码块）
+  sandbox_completed — 执行完成（含 exit_code 和耗时）
+  sandbox_timeout   — 执行超时
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from agent_forge.config import sandbox_settings
@@ -68,12 +72,10 @@ CODE_EXECUTOR_TOOL: dict = {
 
 # ── 懒加载 SandboxManager ────────────────────────────────────────
 
-# 全局单例，避免每次调用重新创建 executor
 _global_manager: SandboxManager | None = None
 
 
 def _get_manager() -> SandboxManager:
-    """懒加载 SandboxManager 单例"""
     global _global_manager
     if _global_manager is None:
         executor = SandboxProviderFactory.create(
@@ -89,13 +91,24 @@ def _get_manager() -> SandboxManager:
 
 
 def _is_dev_mode() -> bool:
-    """当前是否为开发/测试模式（primary provider 配置为 mock）。
-
-    mock provider 是唯一允许在宿主机执行代码的模式。
-    任何其他 provider（docker / cubesandbox_*）均视为非开发模式，
-    降级到 Mock 时直接拒绝，不允许在宿主机执行用户代码。
-    """
+    """当前是否为开发模式（primary provider 配置为 mock）。"""
     return sandbox_settings.cube_sandbox_default_provider == "mock"
+
+
+# ── 事件发射辅助 ────────────────────────────────────────────────
+
+async def _emit(
+    on_event: Callable[[str, dict], Awaitable[None]] | None,
+    event_type: str,
+    data: dict,
+) -> None:
+    """安全地发射 SSE 事件，忽略回调不存在或回调异常的情况。"""
+    if on_event is None:
+        return
+    try:
+        await on_event(event_type, data)
+    except Exception as e:
+        logger.warning("code_executor: on_event callback error (%s): %s", event_type, e)
 
 
 # ── Skill 入口 ─────────────────────────────────────────────────
@@ -103,18 +116,34 @@ def _is_dev_mode() -> bool:
 async def code_executor(
     code: str,
     timeout: int = 30,
+    on_event: Callable[[str, dict], Awaitable[None]] | None = None,
 ) -> dict[str, Any]:
     """在沙箱中执行 Python 代码。
 
+    on_event 由 SkillDispatcher 动态注入（检测到函数签名含 on_event 参数时注入）。
+    在关键节点发射事件：
+      sandbox_executing  — 执行前，携带完整代码供前端展示代码块
+      sandbox_completed  — 执行成功，携带 exit_code 和 duration_ms
+      sandbox_timeout    — 执行超时
+
     降级策略：
-    - CubeSandbox 不可用 → 降级到 DockerSandboxExecutor
-    - Docker 不可用 → 仅开发模式允许降级到 MockSandboxExecutor；
-      生产模式下直接返回错误，严禁在宿主机执行用户代码。
+      非开发模式：CubeSandbox → Docker → 拒绝执行（不允许在宿主机执行用户代码）
+      开发模式：   CubeSandbox → Docker → MockSandbox
     """
     manager = _get_manager()
 
+    # 执行前发射事件：前端用此展示代码块 + loading 动画
+    await _emit(on_event, "sandbox_executing", {"code": code})
+
     try:
         result = await manager.execute(code, timeout=timeout)
+
+        # 执行成功：发射完成事件（结果由 tool_call_end 携带，这里只推耗时）
+        await _emit(on_event, "sandbox_completed", {
+            "exit_code": result.exit_code,
+            "duration_ms": result.duration_ms,
+        })
+
         return {
             "success": True,
             "stdout": result.stdout,
@@ -124,24 +153,26 @@ async def code_executor(
         }
 
     except SandboxUnavailableError as e:
-        logger.warning(
-            "code_executor: primary executor unavailable, "
-            "attempting fallback: %s",
-            e,
-        )
+        logger.warning("code_executor: primary unavailable, attempting fallback: %s", e)
 
-        # ── 降级第一层：Docker（仅非 mock primary 时才有意义）──────────────
+        # ── 降级第一层：Docker（非 dev 模式才有意义）──────────────
         if not _is_dev_mode():
             try:
                 from agent_forge.sandbox.docker import DockerSandboxExecutor
 
-                docker_executor = DockerSandboxExecutor()
                 fallback_manager = SandboxManager(
-                    docker_executor,
+                    DockerSandboxExecutor(),
                     ttl_seconds=sandbox_settings.cube_sandbox_timeout,
                 )
                 result = await fallback_manager.execute(code, timeout=timeout)
                 logger.warning("code_executor: degraded to DockerSandbox")
+
+                await _emit(on_event, "sandbox_completed", {
+                    "exit_code": result.exit_code,
+                    "duration_ms": result.duration_ms,
+                    "note": "degraded:docker",
+                })
+
                 return {
                     "success": True,
                     "stdout": result.stdout,
@@ -151,37 +182,38 @@ async def code_executor(
                     "note": "degraded: cube_sandbox -> docker",
                 }
             except Exception as fallback_e:
-                # 生产环境 Docker 也失败 → 拒绝执行，安全优先
+                # 生产环境 Docker 也失败 → 拒绝执行
                 logger.error(
                     "code_executor: docker fallback failed in non-dev mode, "
-                    "refusing mock fallback for security: %s",
+                    "refusing mock for security: %s",
                     fallback_e,
                 )
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": (
-                        "代码执行服务暂时不可用（沙箱和 Docker 均无法连接），"
-                        "请稍后重试。"
-                    ),
+                    "stderr": "代码执行服务暂时不可用（沙箱和 Docker 均无法连接），请稍后重试。",
                     "exit_code": -1,
                     "duration_ms": 0,
                     "error": "sandbox_unavailable",
                 }
 
-        # ── 降级第二层：Mock（仅开发模式，宿主机直接执行）─────────────────
+        # ── 降级第二层：Mock（仅开发模式）────────────────────────
         try:
             from agent_forge.sandbox.mock import MockSandboxExecutor
 
-            mock_executor = MockSandboxExecutor()
             mock_manager = SandboxManager(
-                mock_executor,
+                MockSandboxExecutor(),
                 ttl_seconds=sandbox_settings.cube_sandbox_timeout,
             )
             result = await mock_manager.execute(code, timeout=timeout)
-            logger.warning(
-                "code_executor: degraded to MockSandbox (dev mode, NO isolation)"
-            )
+            logger.warning("code_executor: degraded to MockSandbox (dev, NO isolation)")
+
+            await _emit(on_event, "sandbox_completed", {
+                "exit_code": result.exit_code,
+                "duration_ms": result.duration_ms,
+                "note": "degraded:mock",
+            })
+
             return {
                 "success": True,
                 "stdout": result.stdout,
@@ -191,7 +223,7 @@ async def code_executor(
                 "note": "degraded: mock (unsafe, dev only)",
             }
         except Exception as mock_e:
-            logger.error("code_executor: mock fallback also failed: %s", mock_e)
+            logger.error("code_executor: mock fallback failed: %s", mock_e)
             return {
                 "success": False,
                 "stdout": "",
@@ -202,6 +234,7 @@ async def code_executor(
             }
 
     except SandboxTimeoutError as e:
+        await _emit(on_event, "sandbox_timeout", {"timeout_seconds": timeout})
         return {
             "success": False,
             "stdout": "",

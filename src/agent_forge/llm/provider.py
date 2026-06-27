@@ -2,6 +2,19 @@
 
 为所有 LLM 调用注入统一的 system prompt，约束 thinking 格式与行为准则。
 支持 tool_use（function calling）循环，让 LLM 在需要时主动调用技能。
+
+Thinking 事件拆分（TASK-009）
+------------------------------
+stream_complete() 现在接受可选的 thinking 回调参数：
+  on_thinking_start: Callable[[], Awaitable[None]]
+  on_thinking_delta: Callable[[str], Awaitable[None]]
+  on_thinking_end:   Callable[[int], Awaitable[None]]  # duration_ms
+
+当检测到 <thinking> / </thinking> 标签边界时，自动切换推送目标：
+  - thinking 内容 → on_thinking_delta（不走 on_chunk）
+  - 正文内容 → yield（调用方消费，同时推送 llm_response）
+
+两类内容严格互斥，同一时刻只推一种事件。
 """
 
 from __future__ import annotations
@@ -10,8 +23,9 @@ import json
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from litellm import ModelResponse
@@ -32,8 +46,6 @@ class ToolCall:
 
 
 # ── 默认 System Prompt ──────────────────────────────────────────
-# 约束 LLM 在 reasoning/thinking 中禁止使用 markdown headers，
-# 确保前端 <thinking> 折叠块渲染不会产生刺眼的 "screaming headers"。
 
 DEFAULT_SYSTEM_PROMPT: str = (
     "你是一个多智能体协同框架的 AI 助手。请遵循以下回答规范：\n"
@@ -47,22 +59,11 @@ DEFAULT_SYSTEM_PROMPT: str = (
     "## 正文回复\n"
     "- 在 <thinking> 标签之外输出面向用户的正式回复。\n"
     "- 可以使用完整的 markdown 格式（标题、列表、表格等）。\n"
-    "\n"
-    "## 可用工具\n"
-    "- web_search: 网络搜索工具。当需要查找最新信息、验证事实、检索特定内容时调用。\n"
-    "  参数：\n"
-    "    - query: 搜索关键词（必填）\n"
-    "    - max_results: 返回结果数量（默认 5）\n"
-    "  调用方式：使用 HTTP GET 或 POST 到 /api/v1/tools/web-search，传入 query 参数。\n"
-    "  返回结果包含 title、snippet、url 三个字段。\n"
 )
 
 
 def _build_messages(prompt: str, system_prompt: str) -> list[dict]:
-    """构造 messages 列表：始终在头部注入 system message。
-
-    对于不支持 system role 的旧版模型，自动前置到 prompt 开头。
-    """
+    """构造 messages 列表：始终在头部注入 system message。"""
     return [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": prompt},
@@ -88,16 +89,14 @@ class LLMResponse:
     tokens_used: int
     cost_usd: float
     latency_ms: int
-    _tool_calls: list[ToolCall] | None = None  # 仅内部使用，tool_use 时非 None
+    _tool_calls: list[ToolCall] | None = None
 
     @property
     def tool_calls(self) -> list[ToolCall]:
-        """返回 tool_calls 列表（无则空列表）"""
         return self._tool_calls or []
 
     @property
     def has_tool_calls(self) -> bool:
-        """是否有工具调用"""
         return bool(self._tool_calls)
 
 
@@ -106,7 +105,6 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
-        """同步完成"""
         pass
 
     @abstractmethod
@@ -114,8 +112,15 @@ class LLMProvider(ABC):
         self,
         prompt: str,
         config: LLMConfig | None = None,
+        on_thinking_start: Callable[[], Awaitable[None]] | None = None,
+        on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
+        on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """流式完成"""
+        """流式完成。
+        
+        yield 的内容仅为正文（非 thinking）文字 chunk。
+        thinking 内容通过回调推送，与 yield 内容严格互斥。
+        """
         pass
 
     @abstractmethod
@@ -124,7 +129,6 @@ class LLMProvider(ABC):
         messages: list[dict],
         config: LLMConfig | None = None,
     ) -> LLMResponse:
-        """聊天完成"""
         pass
 
 
@@ -137,7 +141,6 @@ class LiteLLMProvider(LLMProvider):
             from agent_forge.config import settings
             self.litellm = litellm
             self._available = True
-            # 如果配置了自定义 base_url，全局注入（适用于 OpenAI-compatible 接口，如百炼）
             if settings.llm_base_url:
                 litellm.api_base = settings.llm_base_url
             if settings.api_key:
@@ -152,21 +155,12 @@ class LiteLLMProvider(LLMProvider):
         return self._available
 
     async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
-        """同步完成"""
         if not self.is_available:
-            return LLMResponse(
-                content="LiteLLM not available",
-                model="none",
-                tokens_used=0,
-                cost_usd=0.0,
-                latency_ms=0,
-            )
+            return LLMResponse(content="LiteLLM not available", model="none",
+                               tokens_used=0, cost_usd=0.0, latency_ms=0)
 
         config = config or LLMConfig(model="gpt-4o")
-
-        import time
         start_time = time.time()
-
         messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
 
         try:
@@ -176,9 +170,7 @@ class LiteLLMProvider(LLMProvider):
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
             )
-
             latency_ms = int((time.time() - start_time) * 1000)
-
             return LLMResponse(
                 content=response["choices"][0]["message"]["content"],
                 model=config.model,
@@ -194,23 +186,23 @@ class LiteLLMProvider(LLMProvider):
         self,
         prompt: str,
         config: LLMConfig | None = None,
+        on_thinking_start: Callable[[], Awaitable[None]] | None = None,
+        on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
+        on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """流式完成
+        """流式完成，支持 thinking 事件拆分。
 
-        收集所有流式 chunk，将 reasoning/thinking 内容用 <thinking>...</thinking>
-        包裹后拼接到结果开头。这样前端 parseThinking() 能正确提取并渲染思考过程。
+        处理两类 thinking 来源：
+          1. 模型原生 reasoning 字段（OpenAI o1/o3、部分 Claude）→ delta.reasoning
+          2. 模型在 content 中内嵌 <thinking>...</thinking> 标签（DeepSeek-R1 等）
 
-        不同模型的 reasoning delta 字段名不同：
-          - OpenAI o1/o3 系列: delta["reasoning"]
-          - Claude (via OpenAI compat): delta["reasoning"] 或 delta["cache_control"]
-          - 普通模型: 只有 delta["content"]，无 reasoning
+        yield 只输出正文内容；thinking 内容通过回调推送。
         """
         if not self.is_available:
             yield "LiteLLM not available"
             return
 
         config = config or LLMConfig(model="gpt-4o")
-
         messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
 
         try:
@@ -222,37 +214,14 @@ class LiteLLMProvider(LLMProvider):
                 stream=True,
             )
 
-            reasoning_parts: list[str] = []
-            content_parts: list[str] = []
+            async for chunk in _stream_with_thinking(
+                response,
+                on_thinking_start=on_thinking_start,
+                on_thinking_delta=on_thinking_delta,
+                on_thinking_end=on_thinking_end,
+            ):
+                yield chunk
 
-            async for chunk in response:
-                delta = chunk["choices"][0].get("delta", {})
-
-                # 收集 reasoning（不同厂商用不同字段名）
-                reasoning = delta.get("reasoning") or ""
-                if reasoning:
-                    reasoning_parts.append(reasoning)
-
-                # 收集可见回复内容
-                content = delta.get("content") or ""
-                if content:
-                    content_parts.append(content)
-
-            # 拼接完整内容：thinking + 主体回复
-            full_reasoning = "".join(reasoning_parts)
-            full_content = "".join(content_parts)
-
-            # 如果有 reasoning，用标签包裹后拼在前面
-            if full_reasoning:
-                logger.info(
-                    "stream_complete: collected reasoning content, "
-                    "reasoning_len=%d, body_len=%d",
-                    len(full_reasoning),
-                    len(full_content),
-                )
-                yield f"<thinking>\n{full_reasoning.strip()}\n</thinking>\n\n{full_content}"
-            else:
-                yield full_content
         except Exception as e:
             logger.error(f"LiteLLM stream error: {e}")
             yield f"Error: {e}"
@@ -262,19 +231,11 @@ class LiteLLMProvider(LLMProvider):
         messages: list[dict],
         config: LLMConfig | None = None,
     ) -> LLMResponse:
-        """聊天完成"""
         if not self.is_available:
-            return LLMResponse(
-                content="LiteLLM not available",
-                model="none",
-                tokens_used=0,
-                cost_usd=0.0,
-                latency_ms=0,
-            )
+            return LLMResponse(content="LiteLLM not available", model="none",
+                               tokens_used=0, cost_usd=0.0, latency_ms=0)
 
         config = config or LLMConfig(model="gpt-4o")
-
-        import time
         start_time = time.time()
 
         try:
@@ -284,9 +245,7 @@ class LiteLLMProvider(LLMProvider):
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
             )
-
             latency_ms = int((time.time() - start_time) * 1000)
-
             return LLMResponse(
                 content=response["choices"][0]["message"]["content"],
                 model=config.model,
@@ -304,22 +263,12 @@ class LiteLLMProvider(LLMProvider):
         tools: list[dict],
         config: LLMConfig | None = None,
     ) -> LLMResponse:
-        """工具调用完成（非流式）
-
-        调用 LLM 并传入 tools 定义，返回 LLM 的响应（content + tool_calls）。
-        由调用方负责解析 tool_calls 并执行，然后将结果回传继续循环。
-        """
+        """工具调用完成（非流式）"""
         if not self.is_available:
-            return LLMResponse(
-                content="LiteLLM not available",
-                model="none",
-                tokens_used=0,
-                cost_usd=0.0,
-                latency_ms=0,
-            )
+            return LLMResponse(content="LiteLLM not available", model="none",
+                               tokens_used=0, cost_usd=0.0, latency_ms=0)
 
         config = config or LLMConfig(model="gpt-4o")
-
         start_time = time.time()
 
         try:
@@ -333,19 +282,16 @@ class LiteLLMProvider(LLMProvider):
 
             latency_ms = int((time.time() - start_time) * 1000)
             choice = response["choices"][0]["message"]
-
             content: str | None = choice.get("content")
             tool_calls: list[ToolCall] = []
 
-            # 解析 tool_calls（LiteLLM 返回的格式与 OpenAI 一致）
             raw_tool_calls = choice.get("tool_calls") or []
             for tc in raw_tool_calls:
-                tool_call = ToolCall(
+                tool_calls.append(ToolCall(
                     id=tc["id"],
                     function_name=tc["function"]["name"],
                     function_args=json.loads(tc["function"]["arguments"]),
-                )
-                tool_calls.append(tool_call)
+                ))
 
             return LLMResponse(
                 content=content or "",
@@ -365,15 +311,7 @@ class LiteLLMProvider(LLMProvider):
         tools: list[dict],
         config: LLMConfig | None = None,
     ) -> AsyncGenerator[str | ToolCall, None]:
-        """流式工具调用
-
-        逐 yield 返回：
-          - str: 文本内容 delta（可拼接为最终回复）
-          - ToolCall: 工具调用对象
-
-        由调用方收集所有 yield 值，分离文本和 tool_calls，
-        执行完 tool_calls 后将结果追加到 messages 继续循环。
-        """
+        """流式工具调用"""
         if not self.is_available:
             yield "LiteLLM not available"
             return
@@ -390,95 +328,198 @@ class LiteLLMProvider(LLMProvider):
                 stream=True,
             )
 
-            # 累积 tool_call 的部分参数（流式 chunk 可能拆分）
             pending_tool_calls: dict[str, ToolCall] = {}
 
             async for chunk in response:
                 delta = chunk["choices"][0].get("delta", {})
 
-                # 收集 reasoning
                 reasoning = delta.get("reasoning") or ""
                 if reasoning:
                     yield reasoning
 
-                # 收集文本内容
                 content = delta.get("content") or ""
                 if content:
                     yield content
 
-                # 收集 tool_calls（流式可能拆分）
                 raw_tool_calls = delta.get("tool_calls") or []
                 for tc in raw_tool_calls:
-                    tc_index = tc.get("index", 0)
                     tc_id = tc.get("id", "")
-
-                    # 首次见到该 tool_call，初始化
                     if tc_id not in pending_tool_calls:
                         pending_tool_calls[tc_id] = ToolCall(
-                            id=tc_id,
-                            function_name="",
-                            function_args={},
-                        )
+                            id=tc_id, function_name="", function_args={})
 
                     pending = pending_tool_calls[tc_id]
-
-                    # 累积 function name
                     fn = tc.get("function", {})
                     if fn.get("name"):
                         pending.function_name = fn["name"]
-
-                    # 累积 function arguments（逐 chunk 拼接）
                     if fn.get("arguments"):
-                        # 注意：LiteLLM stream 返回的 arguments 是每个 chunk 的增量
-                        # 但有些实现是全量返回，这里做去重拼接
                         args_str = fn["arguments"]
-                        # 尝试判断是否已完整（以 } 结尾且不是重复前缀）
                         current_args = json.dumps(pending.function_args)
-                        if args_str == current_args:
-                            # 已完整，不重复
-                            pass
-                        else:
+                        if args_str != current_args:
                             try:
                                 pending.function_args = json.loads(
-                                    current_args + args_str.lstrip(",")
-                                )
+                                    current_args + args_str.lstrip(","))
                             except json.JSONDecodeError:
-                                pass  # 继续累积
+                                pass
 
-            # 提交未完成的 tool_calls
             for tc in pending_tool_calls.values():
                 if tc.function_name and tc.function_args:
                     yield tc
-                    logger.info(
-                        "tool_use_stream: yielded ToolCall %s(%s)",
-                        tc.function_name,
-                        tc.function_args,
-                    )
         except Exception as e:
             logger.error(f"LiteLLM tool_use stream error: {e}")
             yield f"Error: {e}"
 
 
+# ── Thinking 流式解析器 ───────────────────────────────────────
+
+async def _stream_with_thinking(
+    litellm_response: Any,
+    on_thinking_start: Callable[[], Awaitable[None]] | None,
+    on_thinking_delta: Callable[[str], Awaitable[None]] | None,
+    on_thinking_end: Callable[[int], Awaitable[None]] | None,
+) -> AsyncGenerator[str, None]:
+    """从 LiteLLM 流式响应中拆分 thinking 和正文内容。
+
+    处理策略：
+      - delta.reasoning 非空 → 原生 reasoning 字段（o1/Claude）
+      - delta.content 含 <thinking> 标签 → 内嵌标签模式（DeepSeek-R1）
+      - 其余 delta.content → 正文，直接 yield
+
+    thinking 内容通过回调推送，yield 只输出正文。
+    """
+    in_thinking = False
+    thinking_start_time: float = 0.0
+    # 跨 chunk 的标签缓冲区（处理标签被拆分到两个 chunk 的情况）
+    tag_buffer = ""
+
+    OPEN_TAG  = "<thinking>"
+    CLOSE_TAG = "</thinking>"
+
+    async def _fire_thinking_start() -> None:
+        nonlocal in_thinking, thinking_start_time
+        if not in_thinking:
+            in_thinking = True
+            thinking_start_time = time.time()
+            if on_thinking_start:
+                await on_thinking_start()
+
+    async def _fire_thinking_end() -> None:
+        nonlocal in_thinking, thinking_start_time
+        if in_thinking:
+            in_thinking = False
+            duration_ms = int((time.time() - thinking_start_time) * 1000)
+            if on_thinking_end:
+                await on_thinking_end(duration_ms)
+
+    async for chunk in litellm_response:
+        delta = chunk["choices"][0].get("delta", {})
+
+        # ── 来源 1：原生 reasoning 字段（o1/o3/Claude compat）────
+        reasoning = delta.get("reasoning") or ""
+        if reasoning:
+            await _fire_thinking_start()
+            if on_thinking_delta:
+                await on_thinking_delta(reasoning)
+            continue  # reasoning 和 content 互斥，跳过 content 处理
+
+        # ── 来源 2：content 字段，需解析内嵌 <thinking> 标签 ────
+        content = delta.get("content") or ""
+        if not content:
+            continue
+
+        # 将 tag_buffer 中残留内容和新 chunk 合并处理
+        text = tag_buffer + content
+        tag_buffer = ""
+
+        while text:
+            if in_thinking:
+                # 在 thinking 块内，寻找结束标签
+                close_idx = text.find(CLOSE_TAG)
+                if close_idx == -1:
+                    # 检查末尾是否是结束标签的前缀（防止标签被拆断）
+                    suffix_len = _suffix_match(text, CLOSE_TAG)
+                    if suffix_len:
+                        # 末尾可能是不完整的结束标签，放入 buffer 等下一 chunk
+                        if on_thinking_delta and text[:-suffix_len]:
+                            await on_thinking_delta(text[:-suffix_len])
+                        tag_buffer = text[-suffix_len:]
+                    else:
+                        if on_thinking_delta:
+                            await on_thinking_delta(text)
+                    break
+                else:
+                    # 找到结束标签
+                    thinking_part = text[:close_idx]
+                    if on_thinking_delta and thinking_part:
+                        await on_thinking_delta(thinking_part)
+                    await _fire_thinking_end()
+                    text = text[close_idx + len(CLOSE_TAG):]
+                    # 跳过标签后紧跟的换行
+                    text = text.lstrip("\n")
+            else:
+                # 在正文区，寻找开始标签
+                open_idx = text.find(OPEN_TAG)
+                if open_idx == -1:
+                    # 检查末尾是否是开始标签的前缀
+                    suffix_len = _suffix_match(text, OPEN_TAG)
+                    if suffix_len:
+                        body_part = text[:-suffix_len]
+                        if body_part:
+                            yield body_part
+                        tag_buffer = text[-suffix_len:]
+                    else:
+                        yield text
+                    break
+                else:
+                    # 找到开始标签
+                    body_part = text[:open_idx]
+                    if body_part:
+                        yield body_part
+                    await _fire_thinking_start()
+                    text = text[open_idx + len(OPEN_TAG):]
+
+    # 流结束时，若仍在 thinking 中（模型未输出结束标签），强制结束
+    if in_thinking:
+        if tag_buffer and on_thinking_delta:
+            await on_thinking_delta(tag_buffer)
+        await _fire_thinking_end()
+    elif tag_buffer:
+        # tag_buffer 中是不完整的开始标签，当作正文输出
+        yield tag_buffer
+
+
+def _suffix_match(text: str, tag: str) -> int:
+    """返回 text 末尾与 tag 前缀匹配的最大长度（1 ~ len(tag)-1）。
+    
+    用于处理标签被拆断到两个 chunk 的情况。
+    返回 0 表示无匹配。
+    """
+    for length in range(min(len(tag) - 1, len(text)), 0, -1):
+        if text.endswith(tag[:length]):
+            return length
+    return 0
+
+
+# ── Fallback Provider ──────────────────────────────────────────
+
 class FallbackLLMProvider(LLMProvider):
     """降级 LLM Provider（无 API 时使用）"""
 
     async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
-        """返回降级响应"""
         logger.warning("Using fallback LLM provider")
         return LLMResponse(
             content=f"[Fallback] Processed: {prompt[:100]}...",
-            model="fallback",
-            tokens_used=0,
-            cost_usd=0.0,
-            latency_ms=100,
+            model="fallback", tokens_used=0, cost_usd=0.0, latency_ms=100,
         )
 
     async def stream_complete(
         self,
         prompt: str,
         config: LLMConfig | None = None,
+        on_thinking_start: Callable[[], Awaitable[None]] | None = None,
+        on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
+        on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """流式降级响应"""
         logger.warning("Using fallback LLM provider (streaming)")
         content = f"[Fallback] Processed: {prompt[:100]}..."
         for char in content:
@@ -490,23 +531,19 @@ class FallbackLLMProvider(LLMProvider):
         messages: list[dict],
         config: LLMConfig | None = None,
     ) -> LLMResponse:
-        """聊天降级响应"""
         last_message = messages[-1]["content"] if messages else ""
         return LLMResponse(
             content=f"[Fallback] Processed: {last_message[:100]}...",
-            model="fallback",
-            tokens_used=0,
-            cost_usd=0.0,
-            latency_ms=100,
+            model="fallback", tokens_used=0, cost_usd=0.0, latency_ms=100,
         )
 
 
-# 全局 LLM Provider
+# ── 全局 Provider ──────────────────────────────────────────────
+
 _global_llm_provider: LLMProvider | None = None
 
 
 def get_llm_provider() -> LLMProvider:
-    """获取全局 LLM Provider"""
     global _global_llm_provider
     if _global_llm_provider is None:
         provider = LiteLLMProvider()
@@ -517,5 +554,4 @@ def get_llm_provider() -> LLMProvider:
     return _global_llm_provider
 
 
-# 兼容导入
 import asyncio

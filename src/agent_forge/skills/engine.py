@@ -8,18 +8,21 @@
   4. LLM 不再调用工具 → 退出循环，流式输出最终文本
   5. 最终文本逐 chunk yield 给调用方用于 SSE 流式推送
 
-循环上限：MAX_ROUNDS（默认 5），防止无限循环。
+thinking 事件（TASK-009）
+--------------------------
+流式最终回复阶段，stream_complete() 接入 thinking 回调：
+  - LLM 输出 <thinking>...</thinking> 时触发 thinking_start/delta/end 事件
+  - yield 只携带正文文字 chunk（不含 thinking 内容）
+  - thinking 与 llm_response 事件严格互斥
 
-DeepSeek-V3（百炼）注意事项：
-  - 完全兼容 OpenAI Function Calling 格式
-  - tool_use 阶段使用非流式（stream=False）
-  - 最终文本回复使用流式（stream=True）
+循环上限：MAX_ROUNDS（默认 5），防止无限循环。
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -66,12 +69,7 @@ class SkillExecutionEngine:
         sse_publish: Callable[[str, dict], Awaitable[None]],
         user_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        """
-        执行 ReAct 循环，返回 async generator，调用方 async for chunk in engine.run(...) 消费。
-
-        注意：此方法本身是 async def 但返回 generator object（非 async generator 语法），
-        通过内部 _react_loop 实现，避免 Python async generator 不能 return value 的限制。
-        """
+        """执行 ReAct 循环，返回 async generator。"""
         return self._react_loop(
             user_message, conversation_history, tools, llm, config, sse_publish, user_id
         )
@@ -86,13 +84,29 @@ class SkillExecutionEngine:
         sse_publish: Callable[[str, dict], Awaitable[None]],
         user_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        """真正的 async generator，实现 ReAct 循环逻辑"""
+        """ReAct 循环主体（async generator）。
 
+        yield 只输出正文文字 chunk（供调用方作为 llm_response 事件推送）。
+        thinking 内容通过 sse_publish 以独立事件推送，不经过 yield。
+        """
         messages: list[dict] = [
             {"role": "system", "content": SYSTEM_PROMPT_WITH_TOOLS},
             *conversation_history,
             {"role": "user", "content": user_message},
         ]
+
+        # ── thinking 回调：将 provider 的 thinking 事件转为 SSE ──────────
+        async def _on_thinking_start() -> None:
+            if sse_publish:
+                await sse_publish("thinking_start", {})
+
+        async def _on_thinking_delta(delta: str) -> None:
+            if sse_publish:
+                await sse_publish("thinking_delta", {"delta": delta})
+
+        async def _on_thinking_end(duration_ms: int) -> None:
+            if sse_publish:
+                await sse_publish("thinking_end", {"duration_ms": duration_ms})
 
         for round_num in range(1, MAX_ROUNDS + 1):
             logger.info(
@@ -106,7 +120,7 @@ class SkillExecutionEngine:
                 response = await llm.chat_complete(messages, config)
 
             if response.has_tool_calls:
-                # 追加 assistant tool_call 消息
+                # ── 有工具调用：追加 assistant 消息，逐一执行 ──────────
                 assistant_msg: dict = {
                     "role": "assistant",
                     "content": response.content or None,
@@ -124,13 +138,12 @@ class SkillExecutionEngine:
                 }
                 messages.append(assistant_msg)
 
-                # 执行每个工具
                 for tc in response.tool_calls:
                     logger.info(
-                        "SkillEngine: calling '%s' args=%s", tc.function_name, tc.function_args
+                        "SkillEngine: calling '%s' args=%s",
+                        tc.function_name, tc.function_args,
                     )
 
-                    # 发送工具调用开始事件（用于前端展示思考过程）
                     if sse_publish:
                         await sse_publish("tool_call_start", {
                             "tool_name": tc.function_name,
@@ -146,7 +159,6 @@ class SkillExecutionEngine:
                         user_id=user_id,
                     )
 
-                    # 发送工具调用完成事件（用于前端展示结果）
                     if sse_publish:
                         try:
                             result_data = json.loads(result_str)
@@ -165,18 +177,24 @@ class SkillExecutionEngine:
                         "tool_call_id": tc.id,
                     })
 
-                # 继续下一轮
-                continue
+                continue  # 进入下一轮
 
             else:
-                # 无 tool_calls：最终回复，流式输出
+                # ── 无工具调用：最终回复，流式输出 ────────────────────
                 final_text = response.content or ""
 
                 if tools and messages[-1].get("role") == "tool":
-                    # 有工具结果，用流式重新生成更自然的回复
+                    # 有工具执行结果 → 用流式重新生成自然语言回复
+                    # 同时接入 thinking 回调，LLM 的思考过程以独立事件推送
                     stream_prompt = _build_final_prompt(messages)
                     try:
-                        async for chunk in llm.stream_complete(stream_prompt, config):
+                        async for chunk in llm.stream_complete(
+                            stream_prompt,
+                            config,
+                            on_thinking_start=_on_thinking_start,
+                            on_thinking_delta=_on_thinking_delta,
+                            on_thinking_end=_on_thinking_end,
+                        ):
                             if chunk:
                                 yield chunk
                         return
@@ -185,13 +203,15 @@ class SkillExecutionEngine:
                         yield final_text or "处理完毕，请查看结果。"
                         return
 
+                # 无工具结果（纯对话）→ 直接输出 LLM 非流式回复
+                # 这里 final_text 可能含 <thinking> 标签，做简单剥离后输出
                 if not final_text:
                     final_text = "抱歉，未能生成回复，请重试。"
 
-                yield final_text
+                yield _strip_thinking_tags(final_text)
                 return
 
-        # 超过最大轮次兜底
+        # ── 超过最大轮次兜底 ─────────────────────────────────────────
         logger.warning("SkillEngine: exceeded MAX_ROUNDS=%d", MAX_ROUNDS)
         try:
             messages.append({
@@ -206,7 +226,7 @@ class SkillExecutionEngine:
 
 
 def _build_final_prompt(messages: list[dict]) -> str:
-    """从 tool 结果构造流式最终回复的 prompt"""
+    """从 tool 结果构造流式最终回复的 prompt。"""
     tool_results: list[str] = []
     user_question = ""
 
@@ -223,3 +243,13 @@ def _build_final_prompt(messages: list[dict]) -> str:
         f"请用自然语言、清晰友好地整理并回答用户的问题。"
         f"可以使用 markdown 格式，但不要直接复制粘贴 JSON 原文。"
     )
+
+
+def _strip_thinking_tags(text: str) -> str:
+    """剥离非流式回复中残留的 <thinking>...</thinking> 标签内容。
+
+    流式路径已由 provider 的 _stream_with_thinking 拆分；
+    非流式路径（纯对话、兜底）在此兜底处理，避免 <thinking> 原文透出给用户。
+    """
+    import re
+    return re.sub(r"<thinking>.*?</thinking>\s*", "", text, flags=re.DOTALL).strip()

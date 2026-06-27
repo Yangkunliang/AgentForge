@@ -26,6 +26,7 @@ PRODUCT-REQUIREMENTS / PRD
 | US-3 | 快速导入新的 Skill 插件 | [TASK-004](TASK-004.md)、[TASK-005](TASK-005.md) |
 | US-4 | 导出训练数据，优化模型和 Agent 路由 | [TASK-004](TASK-004.md)、[TASK-005](TASK-005.md) |
 | US-5 | 查看安全 API 调用记录，用于审计和合规 | [TASK-001](TASK-001.md)、[TASK-003](TASK-003.md)、[TASK-004](TASK-004.md)、[TASK-005](TASK-005.md) |
+| US-6 | 实时感知 AI 执行过程（thinking、工具调用、代码执行） | [TASK-009](TASK-009.md) |
 
 ## 任务列表
 
@@ -39,6 +40,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-006：面向用户的对话工作台（Chat UI）](TASK-006.md) | P2 | US-1、US-2 | TASK-001、TASK-002、TASK-003 | 用户侧对话界面：会话列表、流式气泡、SSE 接入，多 Agent 细节对用户透明 |
 | [x] | [TASK-007：全栈 Agent 交互体验 — 静态页面](TASK-007.md) | P2 | US-01～US-05（PRD-全栈Agent交互体验）| TASK-005、TASK-006 | 项目管理页 + Agent 对话页新交互层，纯静态 mock，验证体验后再接后端 |
 | [x] | [TASK-008：沙箱执行层基础对接](TASK-008.md) | P2 | US-3、US-5 | TASK-004 | 完成 sandbox 包配置注入、REST API、Coder Agent 集成、TTL 回收机制（Phase 1+2） |
+| [ ] | [TASK-009：SSE 执行过程可视化](TASK-009.md) | P2 | US-6 | TASK-006、TASK-008 | thinking/工具调用/代码执行过程实时透出，专属 UI 卡片，后端事件补齐 + 前端组件全新设计 |
 
 ## 执行顺序
 
@@ -48,7 +50,10 @@ TASK-001
     -> TASK-003
       -> TASK-004
         -> TASK-005
+        -> TASK-008
+          -> TASK-009
       -> TASK-006  （可与 TASK-004 并行，依赖 TASK-003 SSE 稳定后启动）
+        -> TASK-009
 ```
 
 前端任务 `TASK-005` 可以在 API 合同稳定后提前进行 UI 设计，但正式联调依赖后端核心 API 和 SSE 事件格式稳定。

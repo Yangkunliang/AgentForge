@@ -5,6 +5,14 @@
  * - 用户只看到"AI 思考中..." → 文字逐步出现 → 完成
  * - task_started / bid_received / agent_assigned 等内部事件静默忽略
  * - 只有 llm_response（流式片段）和 task_completed（最终结果）影响 UI
+ *
+ * TASK-009 SSE 事件映射
+ * ─────────────────────
+ * thinking_start/delta/end    → sessionStore.start/append/endThinkingStep
+ * sandbox_executing           → sessionStore.startCodeExecution
+ * sandbox_completed/timeout   → sessionStore.complete/failCodeExecution
+ * tool_call_start/end         → code_executor → CodeExecutionStep
+ *                             → 其他工具 → ToolCallStep
  */
 import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
@@ -196,30 +204,85 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
             console.log('[SSE] event:', event.event, 'data:', JSON.stringify(event.data))
 
             switch (event.event) {
-              // 流式文字片段（LLM 逐 token 输出）
+              // ── Thinking ───────────────────────────────────────────
+              case 'thinking_start': {
+                sessionStore.startThinkingStep(localAssistantId)
+                break
+              }
+
+              case 'thinking_delta': {
+                const delta = (event.data.delta as string) ?? ''
+                sessionStore.appendThinkingDelta(localAssistantId, delta)
+                break
+              }
+
+              case 'thinking_end': {
+                const duration_ms = (event.data.duration_ms as number) ?? 0
+                sessionStore.endThinkingStep(localAssistantId, duration_ms)
+                break
+              }
+
+              // ── 沙箱代码执行 ───────────────────────────────────────
+              case 'sandbox_executing': {
+                const code = (event.data.code as string) ?? ''
+                sessionStore.startCodeExecution(localAssistantId, code)
+                break
+              }
+
+              case 'sandbox_completed': {
+                // sandbox_completed 只携带 exit_code + duration_ms，
+                // 完整 stdout/stderr 由 task_completed 携带的 content 覆盖
+                const exit_code = (event.data.exit_code as number) ?? 0
+                const duration_ms = (event.data.duration_ms as number) ?? 0
+                sessionStore.completeCodeExecution(
+                  localAssistantId, '', '', exit_code, duration_ms,
+                )
+                break
+              }
+
+              case 'sandbox_timeout': {
+                sessionStore.failCodeExecution(localAssistantId, 'timeout')
+                break
+              }
+
+              // ── 流式文字片段（LLM 逐 token 输出）───────────────────
               case 'llm_response': {
                 const delta = (event.data.delta as string) ?? ''
                 sessionStore.appendStreamChunk(localAssistantId, delta)
                 break
               }
 
-              // 工具调用开始
+              // ── 工具调用 ───────────────────────────────────────────
               case 'tool_call_start': {
                 const toolName = event.data.tool_name as string
                 const args = event.data.arguments as Record<string, unknown>
-                sessionStore.appendToolCall(localAssistantId, toolName, args, 'running')
+                sessionStore.startToolCallStep(localAssistantId, toolName, args)
                 break
               }
 
-              // 工具调用完成
               case 'tool_call_end': {
                 const toolName = event.data.tool_name as string
                 const args = event.data.arguments as Record<string, unknown>
                 const result = event.data.result as Record<string, unknown>
-                sessionStore.appendToolCall(localAssistantId, toolName, args, 'completed', result)
-                // 如果是 update_profile 工具，刷新用户资料
-                if (toolName === 'update_profile') {
-                  await _refreshProfile()
+
+                // code_executor 的 tool_call_end 只携带耗时信息，
+                // 完整 stdout/stderr 已在 sandbox_completed 中填充
+                if (toolName === 'code_executor') {
+                  const duration_ms = (event.data.duration_ms as number) ?? 0
+                  const stdout = (result?.stdout as string) ?? ''
+                  const stderr = (result?.stderr as string) ?? ''
+                  const exit_code = (result?.exit_code as number) ?? 0
+                  sessionStore.completeCodeExecution(
+                    localAssistantId, stdout, stderr, exit_code, duration_ms,
+                  )
+                } else {
+                  sessionStore.completeToolCallStep(
+                    localAssistantId, toolName, result ?? {},
+                  )
+                  // 如果是 update_profile 工具，刷新用户资料
+                  if (toolName === 'update_profile') {
+                    await _refreshProfile()
+                  }
                 }
                 break
               }

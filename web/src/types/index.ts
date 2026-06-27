@@ -184,7 +184,43 @@ export interface Webhook {
   description?: string
 }
 
-// 工具调用
+// ── Execution Steps（TASK-009 SSE 执行过程可视化）─────────────
+
+export type ExecutionStep = ThinkingStep | ToolCallStep | CodeExecutionStep
+
+export interface ThinkingStep {
+  type: 'thinking'
+  content: string
+  streaming: boolean
+  duration_ms?: number
+}
+
+export interface ToolCallStep {
+  type: 'tool_call'
+  tool_name: string
+  arguments: Record<string, unknown>
+  status: 'running' | 'completed' | 'failed' | 'timeout'
+  result?: Record<string, unknown>
+  duration_ms?: number
+}
+
+export interface CodeExecutionStep {
+  type: 'code_execution'
+  code: string
+  status: 'running' | 'completed' | 'failed' | 'timeout'
+  stdout: string
+  stderr: string
+  exit_code?: number
+  duration_ms?: number
+}
+
+export interface ToolCall {
+  tool_name: string
+  arguments: Record<string, unknown>
+  status: 'running' | 'completed' | 'failed'
+  result?: Record<string, unknown>
+}
+
 export interface WebSearchResult {
   title: string
   snippet: string
@@ -212,6 +248,12 @@ export type SSEEventType =
   | 'sub_task_completed'
   | 'task_completed'
   | 'task_failed'
+  | 'thinking_start'
+  | 'thinking_delta'
+  | 'thinking_end'
+  | 'sandbox_executing'
+  | 'sandbox_completed'
+  | 'sandbox_timeout'
   | 'heartbeat'
 
 export interface SSEEvent {
@@ -227,7 +269,8 @@ export interface Session {
   updated_at: string
 }
 
-export interface ToolCall {
+// ToolCall 已迁移为 ExecutionStep，此旧接口仅兼容历史消息
+export interface LegacyToolCall {
   tool_name: string
   arguments: Record<string, unknown>
   status: 'running' | 'completed' | 'failed'
@@ -244,8 +287,10 @@ export interface ChatMessage {
   streaming?: boolean
   // 图片附件（用户上传或 AI 输出）
   images?: ChatImage[]
-  // 工具调用记录
-  tool_calls?: ToolCall[]
+  // 新格式：执行步骤（TASK-009）
+  execution_steps?: ExecutionStep[]
+  // 旧格式：工具调用记录（deprecated，仅兼容历史消息）
+  tool_calls?: LegacyToolCall[]
 }
 
 export interface ChatImage {
