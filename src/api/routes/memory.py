@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 from agent_forge.database import async_session_factory
 from agent_forge.memory import MemoryManager
 from agent_forge.memory.embedder import chunk_text, embed
+from agent_forge.models import User
+from middleware.auth import get_current_user
 
 logger = logging.getLogger("agent_forge.api.memory")
 
@@ -21,7 +23,7 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 
 class SemanticCreateRequest(BaseModel):
-    content: str = Field(..., min_length=1, description="记忆内容")
+    content: str = Field(..., min_length=1, max_length=50000, description="记忆内容")
     title: str = Field(default="", max_length=500, description="标题")
     category: str = Field(default="general", description="类别")
     task_id: str | None = Field(default=None, description="关联任务 ID")
@@ -92,10 +94,11 @@ async def get_memory_manager() -> MemoryManager:
 @router.post("/semantic", response_model=SemanticEntryResponse)
 async def create_semantic_memory(
     req: SemanticCreateRequest,
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> SemanticEntryResponse:
     """创建语义记忆"""
+    user_id = current_user.id
     entry_id = await mgr.create_semantic_entry(
         user_id=user_id,
         content=req.content,
@@ -128,10 +131,11 @@ async def create_semantic_memory(
 @router.get("/semantic/{entry_id}", response_model=SemanticEntryResponse)
 async def get_semantic_memory(
     entry_id: str,
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> SemanticEntryResponse:
     """获取单条语义记忆"""
+    user_id = current_user.id
     entry = await mgr.get_semantic_entry(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -157,10 +161,11 @@ async def get_semantic_memory(
 async def update_semantic_memory(
     entry_id: str,
     req: SemanticUpdateRequest,
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> SemanticEntryResponse:
     """更新语义记忆"""
+    user_id = current_user.id
     entry = await mgr.update_semantic_entry(
         entry_id=entry_id,
         content=req.content,
@@ -191,10 +196,11 @@ async def update_semantic_memory(
 @router.delete("/semantic/{entry_id}")
 async def delete_semantic_memory(
     entry_id: str,
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> dict[str, str]:
     """软删除语义记忆"""
+    user_id = current_user.id
     entry = await mgr.get_semantic_entry(entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -207,13 +213,14 @@ async def delete_semantic_memory(
 
 @router.get("/semantic", response_model=list[SemanticEntryResponse])
 async def list_semantic_memories(
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     category: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> list[SemanticEntryResponse]:
     """列出用户的语义记忆"""
+    user_id = current_user.id
     entries = await mgr.list_semantic_entries(
         user_id=user_id,
         category=category,
@@ -244,10 +251,11 @@ async def list_semantic_memories(
 @router.post("/search", response_model=list[SearchResultResponse])
 async def search_memories(
     req: SearchRequest,
-    user_id: str,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> list[SearchResultResponse]:
     """混合搜索：向量 + 全文"""
+    user_id = current_user.id
     results = await mgr.search(
         query=req.query,
         user_id=user_id,
@@ -272,12 +280,17 @@ async def search_memories(
 # ── User Memory ──────────────────────────────────────────
 
 
-@router.get("/user/{user_id}/memories")
+@router.get("/user/{user_id_path}/memories")
 async def get_user_memories(
-    user_id: str,
+    user_id_path: str,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> list[dict[str, Any]]:
     """获取用户记忆列表"""
+    user_id = user_id_path
+    # Verify the requested user matches the authenticated user (defense in depth)
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
     memories = await mgr.get_user_memories(user_id)
     return [
         {
@@ -293,13 +306,18 @@ async def get_user_memories(
     ]
 
 
-@router.put("/user/{user_id}/memories")
+@router.put("/user/{user_id_path}/memories")
 async def upsert_user_memory(
-    user_id: str,
+    user_id_path: str,
     req: UserMemoryCreateRequest,
+    current_user: User = Depends(get_current_user),
     mgr: MemoryManager = Depends(get_memory_manager),
 ) -> dict[str, Any]:
     """更新或创建用户记忆"""
+    user_id = user_id_path
+    # Verify the requested user matches the authenticated user (defense in depth)
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
     entry = await mgr.update_user_memory(
         user_id=user_id,
         category=req.category,

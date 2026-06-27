@@ -7,7 +7,7 @@ import os
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.database import get_async_session
@@ -25,6 +25,18 @@ logger = logging.getLogger("agent_forge")
 class InstallSkillRequest(BaseModel):
     source: str
     version: str | None = None
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, v: str) -> str:
+        """白名单验证：只允许 GitHub HTTPS URL 或 PyPI 合规包名"""
+        if re.match(r"^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", v):
+            return v
+        if re.match(r"^git\+https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", v):
+            return v
+        if re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$", v):
+            return v
+        raise ValueError("Invalid source. Only GitHub HTTPS URLs or PyPI package names allowed.")
 
 
 class SkillResponse(BaseModel):

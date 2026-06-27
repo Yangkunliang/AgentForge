@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,11 +41,11 @@ class MessageResponse(BaseModel):
 
 
 class RenameSessionRequest(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=100)
 
 
 class ChatRequest(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=50000, description="用户消息（最多 50000 字符）")
 
 
 class ChatResponse(BaseModel):

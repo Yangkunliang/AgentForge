@@ -23,6 +23,12 @@ from agent_forge.models import User  # noqa: E402
 from agent_forge.auth.jwt import get_current_user  # noqa: E402
 
 import uuid
+from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Rate limiter for auth routes (stricter limits to prevent brute-force)
+_auth_limiter = Limiter(key_func=get_remote_address, default_limits=[])
 import re
 
 router = APIRouter()
@@ -70,7 +76,8 @@ class UserResponse(BaseModel):
     status_code=status.HTTP_201_CREATED,
     tags=["auth"],
 )
-async def register(body: UserRegisterRequest, db: AsyncSession = Depends(get_async_session)) -> dict:
+@_auth_limiter.limit("5/minute")
+async def register(request: Request, body: UserRegisterRequest, db: AsyncSession = Depends(get_async_session)) -> dict:
     """用户注册：bcrypt 密码哈希，默认权限 ["read"]"""
     # 检查用户名是否已存在
     result = await db.execute(select(User).where(User.username == body.username))
@@ -115,10 +122,8 @@ async def register(body: UserRegisterRequest, db: AsyncSession = Depends(get_asy
 
 
 @router.post("/login", tags=["auth"])
-async def login(
-    body: UserLoginRequest,
-    db: AsyncSession = Depends(get_async_session),
-) -> dict:
+@_auth_limiter.limit("10/minute")
+async def login(request: Request, body: UserLoginRequest, db: AsyncSession = Depends(get_async_session)) -> dict:
     """用户登录：验证密码，返回 access_token，写入 refresh_token Cookie"""
     # 通过用户名或邮箱查找用户
     result = await db.execute(

@@ -29,12 +29,13 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 
 const status = computed(() => STATUS_MAP[props.step.status] ?? STATUS_MAP.running)
 
-function unescapeHtml(str: string): string {
+function escapeHtml(str: string): string {
   return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
 }
 
 // 超时状态不显示代码区
@@ -69,7 +70,7 @@ const showCodeBlock = computed(() => props.step.status !== 'timeout')
       <pre
         class="code-execution-card__code-text"
         :style="codeCollapsed ? { maxHeight: MAX_COLLAPSE_LINES * 1.6 + 'em' } : {}"
-      ><code v-html="unescapeHtml(step.code)" /></pre>
+      ><code v-html="escapeHtml(step.code)" /></pre>
     </div>
 
     <!-- 超时提示 -->

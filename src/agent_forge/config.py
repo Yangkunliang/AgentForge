@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     rabbitmq_management_url: str = "http://localhost:15672"
 
     # JWT
-    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "")
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
@@ -97,6 +97,7 @@ class Settings(BaseSettings):
         "env_file": str(_find_env()),
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
+        "extra": "ignore",
     }
 
 
@@ -112,19 +113,19 @@ class CubeSandboxConfig(BaseSettings):
     # 是否启用沙箱（False 时 code_executor Skill 直接返回错误）
     cube_sandbox_enabled: bool = Field(default=True, validation_alias="CUBE_SANDBOX_ENABLED")
 
-    # 默认 provider：mock | docker | cubesandbox_e2b | cubesandbox_api
-    # macOS 开发环境强制设为 mock，CI/生产设为 docker 或 cubesandbox_*
+    # 默认 provider：cubesandbox_e2b | cubesandbox_api
+    # 开发和生产统一使用 E2B 云服务或自部署 CubeSandbox
     cube_sandbox_default_provider: str = Field(
-        default="mock", validation_alias="CUBE_SANDBOX_DEFAULT_PROVIDER"
+        default="cubesandbox_e2b", validation_alias="CUBE_SANDBOX_DEFAULT_PROVIDER"
     )
 
-    # CubeSandbox 服务地址（仅 cubesandbox_* provider 需要）
+    # 自部署 CubeSandbox 地址（不设置则使用 E2B 云服务）
     cube_sandbox_url: str = Field(
-        default="http://127.0.0.1:3000", validation_alias="CUBE_SANDBOX_URL"
+        default="", validation_alias="CUBE_SANDBOX_URL"
     )
 
-    # CubeSandbox API Key
-    cube_sandbox_api_key: str = Field(default="", validation_alias="CUBE_SANDBOX_API_KEY")
+    # E2B API Key 直接由 CubeSandboxE2BExecutor 从 E2B_API_KEY 环境变量读取
+    # 不在此处维护副本，避免两个变量不同步
 
     # 默认模板 ID（CubeSandbox 模板，包含预装的运行时环境）
     cube_template_id: str = Field(default="", validation_alias="CUBE_TEMPLATE_ID")

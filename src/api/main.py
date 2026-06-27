@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+# 必须在所有 import 之前加载 .env，确保 os.environ 包含所有配置
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+
 import logging
-import uuid
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from agent_forge.config import settings
+from middleware.rate_limit import limiter as middleware_limiter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,12 +24,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agent_forge")
 
-limiter = Limiter(key_func=get_remote_address)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("AgentForge starting up...")
+
+    # ── 0. 安全检查：JWT Secret Key 必须配置 ──────────────────────────
+    if not settings.jwt_secret_key:
+        logger.error(
+            "FATAL: JWT_SECRET_KEY is not set. "
+            "Please set the environment variable or add to .env. "
+            "The default 'change-me-in-production' has been removed."
+        )
+        raise RuntimeError(
+            "JWT_SECRET_KEY must be set in production. "
+            "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    elif settings.jwt_secret_key == "change-me-in-production":
+        logger.error(
+            "FATAL: JWT_SECRET_KEY still uses the default placeholder value. "
+            "Generate a strong key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+        raise RuntimeError("JWT_SECRET_KEY uses the default placeholder value.")
 
     # ── 1. 预热 LLM Provider（避免首次请求时 import litellm 阻塞 6s）────
     try:
@@ -109,7 +127,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.state.limiter = limiter
+app.state.limiter = middleware_limiter
 
 
 @app.exception_handler(RateLimitExceeded)
