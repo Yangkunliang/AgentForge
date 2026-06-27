@@ -5,38 +5,37 @@
 
 Thinking 事件拆分（TASK-009）
 ------------------------------
-stream_complete() 现在接受可选的 thinking 回调参数：
-  on_thinking_start: Callable[[], Awaitable[None]]
-  on_thinking_delta: Callable[[str], Awaitable[None]]
-  on_thinking_end:   Callable[[int], Awaitable[None]]  # duration_ms
+stream_complete() 接受可选的 thinking 回调参数：
+  on_thinking_start / on_thinking_delta / on_thinking_end
 
 当检测到 <thinking> / </thinking> 标签边界时，自动切换推送目标：
-  - thinking 内容 → on_thinking_delta（不走 on_chunk）
-  - 正文内容 → yield（调用方消费，同时推送 llm_response）
+  - thinking 内容 → on_thinking_delta（不走 yield）
+  - 正文内容 → yield
 
-两类内容严格互斥，同一时刻只推一种事件。
+Tracing（TASK-010）
+--------------------
+关键方法加了 @span 装饰器，自动采集耗时并输出结构化 JSON 日志。
+无需手动打日志，只需保证调用方已开启 trace context。
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from litellm import ModelResponse
+from agent_forge.tracing import get_current_span, span
 
 logger = logging.getLogger("agent_forge.llm")
 
 
 @dataclass
 class ToolCall:
-    """LLM 返回的一个工具调用"""
-
     id: str
     function_name: str
     function_args: dict[str, Any]
@@ -45,15 +44,12 @@ class ToolCall:
         return f"ToolCall(id={self.id}, function={self.function_name}({self.function_args!r}))"
 
 
-# ── 默认 System Prompt ──────────────────────────────────────────
-
 DEFAULT_SYSTEM_PROMPT: str = (
     "你是一个多智能体协同框架的 AI 助手。请遵循以下回答规范：\n"
     "\n"
     "## 思考过程\n"
     "- 如需推理分析，请在 <thinking>...</thinking> 标签内完成。\n"
-    "- 思考过程请使用**平铺直叙的段落文字**，不要使用 markdown 标题（### 等）、\n"
-    "  任务列表或大写字母标题（如 SUMMARY、KEY LINKS）。\n"
+    "- 思考过程请使用**平铺直叙的段落文字**，不要使用 markdown 标题（### 等）。\n"
     "- 如需列举要点，请使用 - 短横线列表或 1. 2. 数字列表。\n"
     "\n"
     "## 正文回复\n"
@@ -63,7 +59,6 @@ DEFAULT_SYSTEM_PROMPT: str = (
 
 
 def _build_messages(prompt: str, system_prompt: str) -> list[dict]:
-    """构造 messages 列表：始终在头部注入 system message。"""
     return [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": prompt},
@@ -72,8 +67,6 @@ def _build_messages(prompt: str, system_prompt: str) -> list[dict]:
 
 @dataclass
 class LLMConfig:
-    """LLM 配置"""
-
     model: str
     temperature: float = 0.7
     max_tokens: int = 2048
@@ -82,8 +75,6 @@ class LLMConfig:
 
 @dataclass
 class LLMResponse:
-    """LLM 响应"""
-
     content: str
     model: str
     tokens_used: int
@@ -101,11 +92,8 @@ class LLMResponse:
 
 
 class LLMProvider(ABC):
-    """LLM Provider 基类"""
-
     @abstractmethod
-    async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
-        pass
+    async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse: ...
 
     @abstractmethod
     async def stream_complete(
@@ -115,25 +103,14 @@ class LLMProvider(ABC):
         on_thinking_start: Callable[[], Awaitable[None]] | None = None,
         on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
         on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
-    ) -> AsyncGenerator[str, None]:
-        """流式完成。
-        
-        yield 的内容仅为正文（非 thinking）文字 chunk。
-        thinking 内容通过回调推送，与 yield 内容严格互斥。
-        """
-        pass
+    ) -> AsyncGenerator[str, None]: ...
 
     @abstractmethod
-    async def chat_complete(
-        self,
-        messages: list[dict],
-        config: LLMConfig | None = None,
-    ) -> LLMResponse:
-        pass
+    async def chat_complete(self, messages: list[dict], config: LLMConfig | None = None) -> LLMResponse: ...
 
 
 class LiteLLMProvider(LLMProvider):
-    """LiteLLM Provider（支持多种 LLM）"""
+    """LiteLLM Provider，关键方法均加了 @span 自动 tracing"""
 
     def __init__(self):
         try:
@@ -154,34 +131,110 @@ class LiteLLMProvider(LLMProvider):
     def is_available(self) -> bool:
         return self._available
 
+    @span("llm.complete")
     async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
         if not self.is_available:
             return LLMResponse(content="LiteLLM not available", model="none",
                                tokens_used=0, cost_usd=0.0, latency_ms=0)
-
         config = config or LLMConfig(model="gpt-4o")
-        start_time = time.time()
+        t0 = time.time()
         messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
-
         try:
             response = await self.litellm.acompletion(
-                model=config.model,
-                messages=messages,
-                temperature=config.temperature,
-                max_tokens=config.max_tokens,
+                model=config.model, messages=messages,
+                temperature=config.temperature, max_tokens=config.max_tokens,
             )
-            latency_ms = int((time.time() - start_time) * 1000)
-            return LLMResponse(
+            result = LLMResponse(
                 content=response["choices"][0]["message"]["content"],
                 model=config.model,
                 tokens_used=response.get("usage", {}).get("total_tokens", 0),
                 cost_usd=response.get("usage", {}).get("cost", 0.0),
-                latency_ms=latency_ms,
+                latency_ms=int((time.time() - t0) * 1000),
             )
+            _tag_tokens(result)
+            return result
         except Exception as e:
-            logger.error(f"LiteLLM completion error: {e}")
+            logger.error("LiteLLM complete error: %s", e)
             raise
 
+    @span("llm.chat_complete")
+    async def chat_complete(self, messages: list[dict], config: LLMConfig | None = None) -> LLMResponse:
+        if not self.is_available:
+            return LLMResponse(content="LiteLLM not available", model="none",
+                               tokens_used=0, cost_usd=0.0, latency_ms=0)
+        config = config or LLMConfig(model="gpt-4o")
+        t0 = time.time()
+        try:
+            response = await self.litellm.acompletion(
+                model=config.model, messages=messages,
+                temperature=config.temperature, max_tokens=config.max_tokens,
+            )
+            result = LLMResponse(
+                content=response["choices"][0]["message"]["content"],
+                model=config.model,
+                tokens_used=response.get("usage", {}).get("total_tokens", 0),
+                cost_usd=response.get("usage", {}).get("cost", 0.0),
+                latency_ms=int((time.time() - t0) * 1000),
+            )
+            _tag_tokens(result)
+            return result
+        except Exception as e:
+            logger.error("LiteLLM chat_complete error: %s", e)
+            raise
+
+    @span("llm.tool_use_complete")
+    async def tool_use_complete(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        config: LLMConfig | None = None,
+    ) -> LLMResponse:
+        """工具调用决策（非流式）。耗时通常是整个请求最大的单点。"""
+        if not self.is_available:
+            return LLMResponse(content="LiteLLM not available", model="none",
+                               tokens_used=0, cost_usd=0.0, latency_ms=0)
+        config = config or LLMConfig(model="gpt-4o")
+        t0 = time.time()
+
+        # 把工具数量写入 span tags，便于排查"工具太多导致 prompt 膨胀"
+        sp = get_current_span()
+        if sp:
+            sp.tags.update({"model": config.model, "tools": len(tools), "msgs": len(messages)})
+
+        try:
+            response: Any = await self.litellm.acompletion(
+                model=config.model, messages=messages,
+                temperature=config.temperature, max_tokens=config.max_tokens,
+                tools=tools,
+            )
+            latency_ms = int((time.time() - t0) * 1000)
+            choice = response["choices"][0]["message"]
+            tool_calls: list[ToolCall] = []
+            for tc in (choice.get("tool_calls") or []):
+                tool_calls.append(ToolCall(
+                    id=tc["id"],
+                    function_name=tc["function"]["name"],
+                    function_args=json.loads(tc["function"]["arguments"]),
+                ))
+            result = LLMResponse(
+                content=choice.get("content") or "",
+                model=config.model,
+                tokens_used=response.get("usage", {}).get("total_tokens", 0),
+                cost_usd=response.get("usage", {}).get("cost", 0.0),
+                latency_ms=latency_ms,
+                _tool_calls=tool_calls or None,
+            )
+            _tag_tokens(result)
+            if sp:
+                sp.tags["has_tool_calls"] = result.has_tool_calls
+                sp.tags["tool_names"] = [tc.function_name for tc in tool_calls]
+            return result
+        except Exception as e:
+            logger.error("LiteLLM tool_use_complete error: %s", e)
+            raise
+
+    # stream_complete 本身是 async generator，不能用 @span 直接包装；
+    # 在内部通过 get_tracer().start_span 手动开 span
     async def stream_complete(
         self,
         prompt: str,
@@ -190,183 +243,91 @@ class LiteLLMProvider(LLMProvider):
         on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
         on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """流式完成，支持 thinking 事件拆分。
-
-        处理两类 thinking 来源：
-          1. 模型原生 reasoning 字段（OpenAI o1/o3、部分 Claude）→ delta.reasoning
-          2. 模型在 content 中内嵌 <thinking>...</thinking> 标签（DeepSeek-R1 等）
-
-        yield 只输出正文内容；thinking 内容通过回调推送。
-        """
         if not self.is_available:
             yield "LiteLLM not available"
             return
-
         config = config or LLMConfig(model="gpt-4o")
         messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
 
-        try:
-            response = await self.litellm.acompletion(
-                model=config.model,
-                messages=messages,
-                temperature=config.temperature,
-                max_tokens=config.max_tokens,
-                stream=True,
-            )
+        from agent_forge.tracing import get_tracer
+        async with get_tracer().start_span(
+            "llm.stream_complete",
+            tags={"model": config.model, "prompt_len": len(prompt)},
+        ) as sp:
+            chunk_count = 0
+            first_chunk_ms: int | None = None
+            t0 = time.monotonic()
+            try:
+                response = await self.litellm.acompletion(
+                    model=config.model, messages=messages,
+                    temperature=config.temperature, max_tokens=config.max_tokens,
+                    stream=True,
+                )
+                async for chunk in _stream_with_thinking(
+                    response,
+                    on_thinking_start=on_thinking_start,
+                    on_thinking_delta=on_thinking_delta,
+                    on_thinking_end=on_thinking_end,
+                ):
+                    if chunk:
+                        if first_chunk_ms is None:
+                            first_chunk_ms = int((time.monotonic() - t0) * 1000)
+                        chunk_count += 1
+                        yield chunk
+            except Exception as e:
+                logger.error("LiteLLM stream_complete error: %s", e)
+                yield f"Error: {e}"
+            finally:
+                sp.tags.update({
+                    "chunks": chunk_count,
+                    "ttfc_ms": first_chunk_ms,   # time-to-first-chunk，关键延迟指标
+                })
 
-            async for chunk in _stream_with_thinking(
-                response,
-                on_thinking_start=on_thinking_start,
-                on_thinking_delta=on_thinking_delta,
-                on_thinking_end=on_thinking_end,
-            ):
-                yield chunk
-
-        except Exception as e:
-            logger.error(f"LiteLLM stream error: {e}")
-            yield f"Error: {e}"
-
-    async def chat_complete(
-        self,
-        messages: list[dict],
-        config: LLMConfig | None = None,
-    ) -> LLMResponse:
-        if not self.is_available:
-            return LLMResponse(content="LiteLLM not available", model="none",
-                               tokens_used=0, cost_usd=0.0, latency_ms=0)
-
-        config = config or LLMConfig(model="gpt-4o")
-        start_time = time.time()
-
-        try:
-            response = await self.litellm.acompletion(
-                model=config.model,
-                messages=messages,
-                temperature=config.temperature,
-                max_tokens=config.max_tokens,
-            )
-            latency_ms = int((time.time() - start_time) * 1000)
-            return LLMResponse(
-                content=response["choices"][0]["message"]["content"],
-                model=config.model,
-                tokens_used=response.get("usage", {}).get("total_tokens", 0),
-                cost_usd=response.get("usage", {}).get("cost", 0.0),
-                latency_ms=latency_ms,
-            )
-        except Exception as e:
-            logger.error(f"LiteLLM chat error: {e}")
-            raise
-
-    async def tool_use_complete(
-        self,
-        messages: list[dict],
-        tools: list[dict],
-        config: LLMConfig | None = None,
-    ) -> LLMResponse:
-        """工具调用完成（非流式）"""
-        if not self.is_available:
-            return LLMResponse(content="LiteLLM not available", model="none",
-                               tokens_used=0, cost_usd=0.0, latency_ms=0)
-
-        config = config or LLMConfig(model="gpt-4o")
-        start_time = time.time()
-
-        try:
-            response: Any = await self.litellm.acompletion(
-                model=config.model,
-                messages=messages,
-                temperature=config.temperature,
-                max_tokens=config.max_tokens,
-                tools=tools,
-            )
-
-            latency_ms = int((time.time() - start_time) * 1000)
-            choice = response["choices"][0]["message"]
-            content: str | None = choice.get("content")
-            tool_calls: list[ToolCall] = []
-
-            raw_tool_calls = choice.get("tool_calls") or []
-            for tc in raw_tool_calls:
-                tool_calls.append(ToolCall(
-                    id=tc["id"],
-                    function_name=tc["function"]["name"],
-                    function_args=json.loads(tc["function"]["arguments"]),
-                ))
-
-            return LLMResponse(
-                content=content or "",
-                model=config.model,
-                tokens_used=response.get("usage", {}).get("total_tokens", 0),
-                cost_usd=response.get("usage", {}).get("cost", 0.0),
-                latency_ms=latency_ms,
-                _tool_calls=tool_calls,  # type: ignore[arg-type]
-            )
-        except Exception as e:
-            logger.error(f"LiteLLM tool_use error: {e}")
-            raise
-
+    @span("llm.tool_use_stream")
     async def tool_use_stream(
         self,
         messages: list[dict],
         tools: list[dict],
         config: LLMConfig | None = None,
     ) -> AsyncGenerator[str | ToolCall, None]:
-        """流式工具调用"""
         if not self.is_available:
             yield "LiteLLM not available"
             return
-
         config = config or LLMConfig(model="gpt-4o")
-
         try:
             response = await self.litellm.acompletion(
-                model=config.model,
-                messages=messages,
-                temperature=config.temperature,
-                max_tokens=config.max_tokens,
-                tools=tools,
-                stream=True,
+                model=config.model, messages=messages,
+                temperature=config.temperature, max_tokens=config.max_tokens,
+                tools=tools, stream=True,
             )
-
-            pending_tool_calls: dict[str, ToolCall] = {}
-
+            pending: dict[str, ToolCall] = {}
             async for chunk in response:
                 delta = chunk["choices"][0].get("delta", {})
-
                 reasoning = delta.get("reasoning") or ""
                 if reasoning:
                     yield reasoning
-
                 content = delta.get("content") or ""
                 if content:
                     yield content
-
-                raw_tool_calls = delta.get("tool_calls") or []
-                for tc in raw_tool_calls:
+                for tc in (delta.get("tool_calls") or []):
                     tc_id = tc.get("id", "")
-                    if tc_id not in pending_tool_calls:
-                        pending_tool_calls[tc_id] = ToolCall(
-                            id=tc_id, function_name="", function_args={})
-
-                    pending = pending_tool_calls[tc_id]
+                    if tc_id not in pending:
+                        pending[tc_id] = ToolCall(id=tc_id, function_name="", function_args={})
+                    p = pending[tc_id]
                     fn = tc.get("function", {})
                     if fn.get("name"):
-                        pending.function_name = fn["name"]
+                        p.function_name = fn["name"]
                     if fn.get("arguments"):
-                        args_str = fn["arguments"]
-                        current_args = json.dumps(pending.function_args)
-                        if args_str != current_args:
-                            try:
-                                pending.function_args = json.loads(
-                                    current_args + args_str.lstrip(","))
-                            except json.JSONDecodeError:
-                                pass
-
-            for tc in pending_tool_calls.values():
-                if tc.function_name and tc.function_args:
+                        try:
+                            p.function_args = json.loads(
+                                json.dumps(p.function_args) + fn["arguments"].lstrip(","))
+                        except json.JSONDecodeError:
+                            pass
+            for tc in pending.values():
+                if tc.function_name:
                     yield tc
         except Exception as e:
-            logger.error(f"LiteLLM tool_use stream error: {e}")
+            logger.error("LiteLLM tool_use_stream error: %s", e)
             yield f"Error: {e}"
 
 
@@ -378,24 +339,21 @@ async def _stream_with_thinking(
     on_thinking_delta: Callable[[str], Awaitable[None]] | None,
     on_thinking_end: Callable[[int], Awaitable[None]] | None,
 ) -> AsyncGenerator[str, None]:
-    """从 LiteLLM 流式响应中拆分 thinking 和正文内容。
+    """从 LiteLLM 流式响应中拆分 thinking 和正文。
 
-    处理策略：
-      - delta.reasoning 非空 → 原生 reasoning 字段（o1/Claude）
-      - delta.content 含 <thinking> 标签 → 内嵌标签模式（DeepSeek-R1）
-      - 其余 delta.content → 正文，直接 yield
+    两类 thinking 来源：
+      1. delta.reasoning（原生 reasoning 字段，o1/Claude compat）
+      2. delta.content 中内嵌 <thinking>...</thinking> 标签（DeepSeek-R1 等）
 
-    thinking 内容通过回调推送，yield 只输出正文。
+    yield 只输出正文；thinking 通过回调推送，两者严格互斥。
     """
     in_thinking = False
     thinking_start_time: float = 0.0
-    # 跨 chunk 的标签缓冲区（处理标签被拆分到两个 chunk 的情况）
     tag_buffer = ""
-
     OPEN_TAG  = "<thinking>"
     CLOSE_TAG = "</thinking>"
 
-    async def _fire_thinking_start() -> None:
+    async def _start() -> None:
         nonlocal in_thinking, thinking_start_time
         if not in_thinking:
             in_thinking = True
@@ -403,8 +361,8 @@ async def _stream_with_thinking(
             if on_thinking_start:
                 await on_thinking_start()
 
-    async def _fire_thinking_end() -> None:
-        nonlocal in_thinking, thinking_start_time
+    async def _end() -> None:
+        nonlocal in_thinking
         if in_thinking:
             in_thinking = False
             duration_ms = int((time.time() - thinking_start_time) * 1000)
@@ -414,103 +372,86 @@ async def _stream_with_thinking(
     async for chunk in litellm_response:
         delta = chunk["choices"][0].get("delta", {})
 
-        # ── 来源 1：原生 reasoning 字段（o1/o3/Claude compat）────
+        # 来源1：原生 reasoning 字段
         reasoning = delta.get("reasoning") or ""
         if reasoning:
-            await _fire_thinking_start()
+            await _start()
             if on_thinking_delta:
                 await on_thinking_delta(reasoning)
-            continue  # reasoning 和 content 互斥，跳过 content 处理
+            continue
 
-        # ── 来源 2：content 字段，需解析内嵌 <thinking> 标签 ────
         content = delta.get("content") or ""
         if not content:
             continue
 
-        # 将 tag_buffer 中残留内容和新 chunk 合并处理
         text = tag_buffer + content
         tag_buffer = ""
 
         while text:
             if in_thinking:
-                # 在 thinking 块内，寻找结束标签
-                close_idx = text.find(CLOSE_TAG)
-                if close_idx == -1:
-                    # 检查末尾是否是结束标签的前缀（防止标签被拆断）
-                    suffix_len = _suffix_match(text, CLOSE_TAG)
-                    if suffix_len:
-                        # 末尾可能是不完整的结束标签，放入 buffer 等下一 chunk
-                        if on_thinking_delta and text[:-suffix_len]:
-                            await on_thinking_delta(text[:-suffix_len])
-                        tag_buffer = text[-suffix_len:]
+                idx = text.find(CLOSE_TAG)
+                if idx == -1:
+                    slen = _suffix_match(text, CLOSE_TAG)
+                    if slen:
+                        if on_thinking_delta and text[:-slen]:
+                            await on_thinking_delta(text[:-slen])
+                        tag_buffer = text[-slen:]
                     else:
                         if on_thinking_delta:
                             await on_thinking_delta(text)
                     break
                 else:
-                    # 找到结束标签
-                    thinking_part = text[:close_idx]
-                    if on_thinking_delta and thinking_part:
-                        await on_thinking_delta(thinking_part)
-                    await _fire_thinking_end()
-                    text = text[close_idx + len(CLOSE_TAG):]
-                    # 跳过标签后紧跟的换行
-                    text = text.lstrip("\n")
+                    if on_thinking_delta and text[:idx]:
+                        await on_thinking_delta(text[:idx])
+                    await _end()
+                    text = text[idx + len(CLOSE_TAG):].lstrip("\n")
             else:
-                # 在正文区，寻找开始标签
-                open_idx = text.find(OPEN_TAG)
-                if open_idx == -1:
-                    # 检查末尾是否是开始标签的前缀
-                    suffix_len = _suffix_match(text, OPEN_TAG)
-                    if suffix_len:
-                        body_part = text[:-suffix_len]
-                        if body_part:
-                            yield body_part
-                        tag_buffer = text[-suffix_len:]
+                idx = text.find(OPEN_TAG)
+                if idx == -1:
+                    slen = _suffix_match(text, OPEN_TAG)
+                    if slen:
+                        if text[:-slen]:
+                            yield text[:-slen]
+                        tag_buffer = text[-slen:]
                     else:
                         yield text
                     break
                 else:
-                    # 找到开始标签
-                    body_part = text[:open_idx]
-                    if body_part:
-                        yield body_part
-                    await _fire_thinking_start()
-                    text = text[open_idx + len(OPEN_TAG):]
+                    if text[:idx]:
+                        yield text[:idx]
+                    await _start()
+                    text = text[idx + len(OPEN_TAG):]
 
-    # 流结束时，若仍在 thinking 中（模型未输出结束标签），强制结束
     if in_thinking:
         if tag_buffer and on_thinking_delta:
             await on_thinking_delta(tag_buffer)
-        await _fire_thinking_end()
+        await _end()
     elif tag_buffer:
-        # tag_buffer 中是不完整的开始标签，当作正文输出
         yield tag_buffer
 
 
 def _suffix_match(text: str, tag: str) -> int:
-    """返回 text 末尾与 tag 前缀匹配的最大长度（1 ~ len(tag)-1）。
-    
-    用于处理标签被拆断到两个 chunk 的情况。
-    返回 0 表示无匹配。
-    """
+    """返回 text 末尾与 tag 前缀匹配的最大长度，处理跨 chunk 标签拆断。"""
     for length in range(min(len(tag) - 1, len(text)), 0, -1):
         if text.endswith(tag[:length]):
             return length
     return 0
 
 
+def _tag_tokens(result: LLMResponse) -> None:
+    """把 token 用量写入当前 span tags（有 span 时才写）。"""
+    sp = get_current_span()
+    if sp:
+        sp.tags.update({"model": result.model, "tokens": result.tokens_used})
+
+
 # ── Fallback Provider ──────────────────────────────────────────
 
 class FallbackLLMProvider(LLMProvider):
-    """降级 LLM Provider（无 API 时使用）"""
 
     async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse:
-        logger.warning("Using fallback LLM provider")
-        return LLMResponse(
-            content=f"[Fallback] Processed: {prompt[:100]}...",
-            model="fallback", tokens_used=0, cost_usd=0.0, latency_ms=100,
-        )
+        return LLMResponse(content=f"[Fallback] {prompt[:80]}", model="fallback",
+                           tokens_used=0, cost_usd=0.0, latency_ms=0)
 
     async def stream_complete(
         self,
@@ -520,25 +461,17 @@ class FallbackLLMProvider(LLMProvider):
         on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
         on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[str, None]:
-        logger.warning("Using fallback LLM provider (streaming)")
-        content = f"[Fallback] Processed: {prompt[:100]}..."
-        for char in content:
-            yield char
-            await asyncio.sleep(0.01)
+        for ch in f"[Fallback] {prompt[:80]}":
+            yield ch
+            await asyncio.sleep(0.005)
 
-    async def chat_complete(
-        self,
-        messages: list[dict],
-        config: LLMConfig | None = None,
-    ) -> LLMResponse:
-        last_message = messages[-1]["content"] if messages else ""
-        return LLMResponse(
-            content=f"[Fallback] Processed: {last_message[:100]}...",
-            model="fallback", tokens_used=0, cost_usd=0.0, latency_ms=100,
-        )
+    async def chat_complete(self, messages: list[dict], config: LLMConfig | None = None) -> LLMResponse:
+        last = messages[-1]["content"] if messages else ""
+        return LLMResponse(content=f"[Fallback] {last[:80]}", model="fallback",
+                           tokens_used=0, cost_usd=0.0, latency_ms=0)
 
 
-# ── 全局 Provider ──────────────────────────────────────────────
+# ── 全局单例 ──────────────────────────────────────────────────
 
 _global_llm_provider: LLMProvider | None = None
 
@@ -546,12 +479,6 @@ _global_llm_provider: LLMProvider | None = None
 def get_llm_provider() -> LLMProvider:
     global _global_llm_provider
     if _global_llm_provider is None:
-        provider = LiteLLMProvider()
-        if provider.is_available:
-            _global_llm_provider = provider
-        else:
-            _global_llm_provider = FallbackLLMProvider()
+        p = LiteLLMProvider()
+        _global_llm_provider = p if p.is_available else FallbackLLMProvider()
     return _global_llm_provider
-
-
-import asyncio

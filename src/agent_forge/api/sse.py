@@ -14,6 +14,9 @@ logger = logging.getLogger("agent_forge.api.sse")
 
 sse_router = APIRouter(prefix="/sse", tags=["sse"])
 
+# 标记 SSE 流结束的哨兵值
+_STREAM_DONE = "__STREAM_DONE__"
+
 
 class SSEEventTypes:
     """SSE 事件类型
@@ -41,21 +44,21 @@ class SSEEventTypes:
     SKILL_RESULT = "skill_result"
 
     # ── LLM 输出（用户感知）───────────────────────────────────
-    LLM_RESPONSE = "llm_response"          # 最终文字 chunk（非 thinking）
+    LLM_RESPONSE = "llm_response"
 
     # ── Thinking 过程（用户感知）──────────────────────────────
-    THINKING_START = "thinking_start"       # thinking 块开始，data: {}
-    THINKING_DELTA = "thinking_delta"       # thinking 增量文字，data: {delta: str}
-    THINKING_END   = "thinking_end"         # thinking 块结束，data: {duration_ms: int}
+    THINKING_START = "thinking_start"
+    THINKING_DELTA = "thinking_delta"
+    THINKING_END   = "thinking_end"
 
     # ── 工具调用（用户感知）───────────────────────────────────
-    TOOL_CALL_START = "tool_call_start"     # data: {tool_name, arguments, tool_call_id}
-    TOOL_CALL_END   = "tool_call_end"       # data: {tool_name, arguments, tool_call_id, result}
+    TOOL_CALL_START = "tool_call_start"
+    TOOL_CALL_END   = "tool_call_end"
 
     # ── 沙箱代码执行（用户感知）──────────────────────────────
-    SANDBOX_EXECUTING = "sandbox_executing"  # 开始执行代码，data: {code: str}
-    SANDBOX_COMPLETED = "sandbox_completed"  # 执行完成，data: {exit_code, duration_ms}
-    SANDBOX_TIMEOUT   = "sandbox_timeout"    # 执行超时，data: {timeout_seconds: int}
+    SANDBOX_EXECUTING = "sandbox_executing"
+    SANDBOX_COMPLETED = "sandbox_completed"
+    SANDBOX_TIMEOUT   = "sandbox_timeout"
 
     # ── 沙箱生命周期（内部，不透出给用户）────────────────────
     SANDBOX_CREATED   = "sandbox_created"
@@ -72,55 +75,77 @@ class SSEManager:
     """SSE 管理器"""
 
     def __init__(self):
-        # task_id -> list of queues
         self._subscribers: dict[str, list[asyncio.Queue]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
     def subscribe(self, task_id: str) -> asyncio.Queue:
-        """订阅任务事件"""
         if task_id not in self._locks:
             self._locks[task_id] = asyncio.Lock()
 
-        queue = asyncio.Queue()
+        queue: asyncio.Queue = asyncio.Queue()
         if task_id not in self._subscribers:
             self._subscribers[task_id] = []
         self._subscribers[task_id].append(queue)
-        logger.debug(f"New subscriber for task {task_id}")
+        logger.debug("New subscriber for task %s", task_id)
         return queue
 
     def unsubscribe(self, task_id: str, queue: asyncio.Queue) -> None:
-        """取消订阅"""
         if task_id in self._subscribers:
             try:
                 self._subscribers[task_id].remove(queue)
-                logger.debug(f"Removed subscriber for task {task_id}")
+                logger.debug("Removed subscriber for task %s", task_id)
             except ValueError:
                 pass
+            # 无订阅者时清理 key
+            if not self._subscribers[task_id]:
+                del self._subscribers[task_id]
+                self._locks.pop(task_id, None)
 
     async def publish(self, task_id: str, event_type: str, data: dict) -> None:
-        """发布事件到所有订阅者"""
+        """发布事件到所有订阅者。
+
+        task_completed / task_failed 后额外推送哨兵，通知 stream_events 退出。
+        """
         if task_id not in self._subscribers:
             return
 
         event = f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-        for queue in self._subscribers[task_id]:
+        for queue in list(self._subscribers[task_id]):
             try:
                 queue.put_nowait(event)
             except asyncio.QueueFull:
-                logger.warning(f"Queue full for task {task_id}, dropping event")
+                logger.warning("Queue full for task %s, dropping event", task_id)
+
+        # task_completed / task_failed 是终态事件，推完后通知关闭
+        if event_type in (SSEEventTypes.TASK_COMPLETED, SSEEventTypes.TASK_FAILED):
+            for queue in list(self._subscribers.get(task_id, [])):
+                try:
+                    queue.put_nowait(_STREAM_DONE)
+                except asyncio.QueueFull:
+                    pass
 
     async def stream_events(self, task_id: str) -> AsyncGenerator[str, None]:
-        """流式事件生成器"""
+        """流式事件生成器。
+
+        收到哨兵 _STREAM_DONE 时退出，连接自然关闭。
+        """
         queue = self.subscribe(task_id)
 
         try:
             while True:
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30)
-                    yield event
+                    item = await asyncio.wait_for(queue.get(), timeout=30)
                 except TimeoutError:
-                    # 发送心跳
+                    # 30s 无事件，发心跳保活
                     yield f"event: {SSEEventTypes.HEARTBEAT}\ndata: {{}}\n\n"
+                    continue
+
+                # 收到哨兵，退出循环，连接关闭
+                if item is _STREAM_DONE or item == _STREAM_DONE:
+                    logger.debug("SSE stream done for task %s", task_id)
+                    return
+
+                yield item
         except GeneratorExit:
             pass
         finally:
@@ -132,7 +157,6 @@ _global_sse_manager: SSEManager | None = None
 
 
 def get_sse_manager() -> SSEManager:
-    """获取全局 SSE 管理器"""
     global _global_sse_manager
     if _global_sse_manager is None:
         _global_sse_manager = SSEManager()
@@ -141,7 +165,6 @@ def get_sse_manager() -> SSEManager:
 
 @sse_router.get("/tasks/{task_id}/stream")
 async def stream_task_events(task_id: str):
-    """流式获取任务事件"""
     return StreamingResponse(
         get_sse_manager().stream_events(task_id),
         media_type="text/event-stream",
@@ -155,13 +178,10 @@ async def stream_task_events(task_id: str):
 
 @sse_router.post("/tasks/{task_id}/events")
 async def publish_task_event(task_id: str, request: Request):
-    """发布任务事件（内部使用）"""
     body = await request.json()
     event_type = body.get("event_type", SSEEventTypes.TASK_PROGRESS)
     data = body.get("data", {})
-
     await get_sse_manager().publish(task_id, event_type, data)
-
     return {"status": "ok"}
 
 
@@ -205,40 +225,26 @@ async def emit_bid_received(task_id: str, agent_id: str, confidence: float) -> N
 # ── Thinking 事件 ─────────────────────────────────────────────
 
 async def emit_thinking_start(task_id: str) -> None:
-    """LLM 开始 thinking 块"""
-    await get_sse_manager().publish(
-        task_id, SSEEventTypes.THINKING_START, {},
-    )
+    await get_sse_manager().publish(task_id, SSEEventTypes.THINKING_START, {})
 
 
 async def emit_thinking_delta(task_id: str, delta: str) -> None:
-    """thinking 增量文字（流式）"""
-    await get_sse_manager().publish(
-        task_id, SSEEventTypes.THINKING_DELTA, {"delta": delta},
-    )
+    await get_sse_manager().publish(task_id, SSEEventTypes.THINKING_DELTA, {"delta": delta})
 
 
 async def emit_thinking_end(task_id: str, duration_ms: int) -> None:
-    """LLM thinking 块结束"""
-    await get_sse_manager().publish(
-        task_id, SSEEventTypes.THINKING_END, {"duration_ms": duration_ms},
-    )
+    await get_sse_manager().publish(task_id, SSEEventTypes.THINKING_END, {"duration_ms": duration_ms})
 
 
 # ── 沙箱代码执行事件 ──────────────────────────────────────────
 
 async def emit_sandbox_executing(task_id: str, code: str) -> None:
-    """沙箱开始执行代码（用户可见）"""
     await get_sse_manager().publish(
-        task_id, SSEEventTypes.SANDBOX_EXECUTING,
-        {"code": code},
+        task_id, SSEEventTypes.SANDBOX_EXECUTING, {"code": code},
     )
 
 
-async def emit_sandbox_completed(
-    task_id: str, exit_code: int, duration_ms: int
-) -> None:
-    """沙箱代码执行完成（状态辅助，结果由 tool_call_end 携带）"""
+async def emit_sandbox_completed(task_id: str, exit_code: int, duration_ms: int) -> None:
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_COMPLETED,
         {"exit_code": exit_code, "duration_ms": duration_ms},
@@ -246,37 +252,29 @@ async def emit_sandbox_completed(
 
 
 async def emit_sandbox_timeout(task_id: str, timeout_seconds: int) -> None:
-    """沙箱执行超时"""
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_TIMEOUT,
         {"timeout_seconds": timeout_seconds},
     )
 
 
-# ── 沙箱生命周期事件（内部，保留供 REST API 等低层使用）────────
+# ── 沙箱生命周期事件（内部保留）────────────────────────────────
 
-async def emit_sandbox_created(
-    task_id: str, sandbox_id: str, template_id: str = ""
-) -> None:
+async def emit_sandbox_created(task_id: str, sandbox_id: str, template_id: str = "") -> None:
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_CREATED,
         {"sandbox_id": sandbox_id, "template_id": template_id},
     )
 
 
-async def emit_sandbox_connected(
-    task_id: str, sandbox_id: str, host: str = "", port: int = 0
-) -> None:
+async def emit_sandbox_connected(task_id: str, sandbox_id: str, host: str = "", port: int = 0) -> None:
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_CONNECTED,
         {"sandbox_id": sandbox_id, "host": host, "port": port},
     )
 
 
-async def emit_sandbox_code_executing(
-    task_id: str, sandbox_id: str, code_preview: str = ""
-) -> None:
-    """旧接口保留（被 CoderAgent 使用），内部转发到 SANDBOX_EXECUTING"""
+async def emit_sandbox_code_executing(task_id: str, sandbox_id: str, code_preview: str = "") -> None:
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_EXECUTING,
         {"sandbox_id": sandbox_id, "code": code_preview[:200]},
@@ -286,7 +284,6 @@ async def emit_sandbox_code_executing(
 async def emit_sandbox_code_completed(
     task_id: str, sandbox_id: str, exit_code: int = 0, duration_ms: int = 0
 ) -> None:
-    """旧接口保留（被 CoderAgent 使用），内部转发到 SANDBOX_COMPLETED"""
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_COMPLETED,
         {"sandbox_id": sandbox_id, "exit_code": exit_code, "duration_ms": duration_ms},
@@ -294,21 +291,14 @@ async def emit_sandbox_code_completed(
 
 
 async def emit_sandbox_paused(task_id: str, sandbox_id: str) -> None:
-    await get_sse_manager().publish(
-        task_id, SSEEventTypes.SANDBOX_PAUSED,
-        {"sandbox_id": sandbox_id},
-    )
+    await get_sse_manager().publish(task_id, SSEEventTypes.SANDBOX_PAUSED, {"sandbox_id": sandbox_id})
 
 
 async def emit_sandbox_destroyed(task_id: str, sandbox_id: str) -> None:
-    await get_sse_manager().publish(
-        task_id, SSEEventTypes.SANDBOX_DESTROYED,
-        {"sandbox_id": sandbox_id},
-    )
+    await get_sse_manager().publish(task_id, SSEEventTypes.SANDBOX_DESTROYED, {"sandbox_id": sandbox_id})
 
 
 async def emit_sandbox_timeout_legacy(task_id: str, sandbox_id: str, reason: str = "") -> None:
-    """旧接口保留"""
     await get_sse_manager().publish(
         task_id, SSEEventTypes.SANDBOX_TIMEOUT,
         {"sandbox_id": sandbox_id, "reason": reason},
