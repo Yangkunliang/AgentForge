@@ -152,7 +152,11 @@ function stopStreaming() {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && e.ctrlKey && !e.shiftKey && !e.metaKey) {
+  // 输入法组合中（中文输入拼音时）跳过，避免拦截选词
+  if (e.isComposing || e.keyCode === 229) {
+    return
+  }
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault()
     send()
   }
