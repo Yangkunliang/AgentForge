@@ -262,11 +262,11 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
 
               case 'tool_call_end': {
                 const toolName = event.data.tool_name as string
-                const args = event.data.arguments as Record<string, unknown>
                 const result = event.data.result as Record<string, unknown>
 
-                // code_executor 的 tool_call_end 只携带耗时信息，
-                // 完整 stdout/stderr 已在 sandbox_completed 中填充
+                // code_executor 的 tool_call_end 同时更新 tool_call 步骤和 code_execution 步骤：
+                // - tool_call_start 创建了一个 ToolCallStep（用于执行过程可视化），需要标记完成
+                // - sandbox_completed 已经更新了 CodeExecutionStep，这里补全 stdout/stderr
                 if (toolName === 'code_executor') {
                   const duration_ms = (event.data.duration_ms as number) ?? 0
                   const stdout = (result?.stdout as string) ?? ''
@@ -275,6 +275,13 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                   sessionStore.completeCodeExecution(
                     localAssistantId, stdout, stderr, exit_code, duration_ms,
                   )
+                  // 同时完成 tool_call_start 创建的 ToolCallStep
+                  sessionStore.completeToolCallStep(localAssistantId, toolName, {
+                    stdout,
+                    stderr,
+                    exit_code,
+                    duration_ms,
+                  }, duration_ms)
                 } else {
                   sessionStore.completeToolCallStep(
                     localAssistantId, toolName, result ?? {},
