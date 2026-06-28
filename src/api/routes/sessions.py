@@ -133,8 +133,8 @@ async def send_message(
 
     if session.title == "新对话":
         # 标题生成延迟到任务完成后，由异步任务用 LLM 生成并通过 SSE 推送给前端
-        # 此处仅设置一个临时占位，防止重复触发
-        session.title = body.content.strip()[:20]
+        # 保持默认占位，避免中间状态显示截断前缀
+        session.title = "新对话"
 
     task_id = str(uuid.uuid4())
     trace_id = get_trace_id() or task_id
