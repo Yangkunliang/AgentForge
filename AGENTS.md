@@ -154,6 +154,16 @@ git push https://<PAT>@github.com/<owner>/<repo>.git <branch>
 > git config --global credential.helper store
 > ```
 
+**Sandbox 环境下 push 失败**（如 `fatal: could not read Username`）：
+Sandbox 的 shell 对 `!command` 语法（`gh auth git-credential` helper 使用此格式）可能不兼容，此时直接切换为 SSH 协议：
+
+```bash
+git remote set-url origin git@github.com:<owner>/<repo>.git
+git push origin <branch>
+```
+
+SSH 方式依赖本地已配置 SSH key（`gh auth setup-git` 会自动配置），后续 push 无需再输入凭证。
+
 ---
 
 ## 8. 验证要求

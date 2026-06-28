@@ -17,6 +17,24 @@ const props = defineProps<{
 
 const aiName = computed(() => props.agentName?.trim() || 'CodeSoul')
 
+/** 格式化消息时间：今天只显示 HH:mm，跨天显示日期+时间 */
+function formatMsgTime(isoStr: string): string {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  if (isToday) return `${hh}:${mm}`
+  const M = d.getMonth() + 1
+  const D = d.getDate()
+  return `${M}月${D}日 ${hh}:${mm}`
+}
+
 // ── Execution Steps（TASK-009）────────────────────────────────
 // execution_steps 存在时走新渲染路径；
 // 旧 tool_calls 字段作为兜底，兼容历史消息
@@ -105,89 +123,97 @@ function handleContentClick(e: MouseEvent) {
       <span class="ai-name">{{ aiName }}</span>
     </div>
 
-    <div class="bubble">
+    <div class="ai-msg-body">
+      <div class="bubble">
 
-      <!-- 流式进度条（streaming 时显示） -->
-      <ExecutionProgressBar :streaming="!!message.streaming" />
+        <!-- 流式进度条（streaming 时显示） -->
+        <ExecutionProgressBar :streaming="!!message.streaming" />
 
-      <!-- 思考中提示（无内容且无步骤时显示粒子旋转动画） -->
-      <div
-        v-if="message.streaming && !bodyText && !hasExecutionSteps"
-        class="thinking-hint"
-      >
-        <span class="thinking-hint__text">正在思考中</span>
-        <div class="thinking-hint__particles">
-          <span class="particle" />
-          <span class="particle" />
-          <span class="particle" />
+        <!-- 思考中提示（无内容且无步骤时显示粒子旋转动画） -->
+        <div
+          v-if="message.streaming && !bodyText && !hasExecutionSteps"
+          class="thinking-hint"
+        >
+          <span class="thinking-hint__text">正在思考中</span>
+          <div class="thinking-hint__particles">
+            <span class="particle" />
+            <span class="particle" />
+            <span class="particle" />
+          </div>
         </div>
-      </div>
 
-      <!-- ── 新路径：execution_steps 可视化（TASK-009）──────── -->
-      <ExecutionStepList
-        v-if="hasExecutionSteps"
-        :steps="message.execution_steps!"
-        :streaming="!!message.streaming"
-      />
+        <!-- ── 新路径：execution_steps 可视化（TASK-009）──────── -->
+        <ExecutionStepList
+          v-if="hasExecutionSteps"
+          :steps="message.execution_steps!"
+          :streaming="!!message.streaming"
+        />
 
-      <!-- ── 旧路径兜底：历史消息 tool_calls（JSON 展示）────── -->
-      <div v-if="hasLegacyToolCalls" class="tool-calls-block">
-        <button class="tool-calls-block__toggle" @click="legacyToolCallsExpanded = !legacyToolCallsExpanded">
-          <svg
-            width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2"
-            :style="{ transform: legacyToolCallsExpanded ? 'rotate(90deg)' : '', transition: 'transform .2s' }"
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-          <span class="tool-calls-block__label">
-            工具调用 ({{ message.tool_calls?.length }})
-          </span>
-        </button>
+        <!-- ── 旧路径兜底：历史消息 tool_calls（JSON 展示）────── -->
+        <div v-if="hasLegacyToolCalls" class="tool-calls-block">
+          <button class="tool-calls-block__toggle" @click="legacyToolCallsExpanded = !legacyToolCallsExpanded">
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2"
+              :style="{ transform: legacyToolCallsExpanded ? 'rotate(90deg)' : '', transition: 'transform .2s' }"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            <span class="tool-calls-block__label">
+              工具调用 ({{ message.tool_calls?.length }})
+            </span>
+          </button>
 
-        <div v-show="legacyToolCallsExpanded" class="tool-calls-block__content">
-          <div v-for="(tc, idx) in message.tool_calls" :key="idx" class="tool-call-item">
-            <div class="tool-call-item__header">
-              <span class="tool-call-item__name">{{ tc.tool_name }}</span>
-              <span class="tool-call-item__status" :class="`tool-call-item__status--${tc.status}`">
-                {{ tc.status === 'running' ? '执行中' : tc.status === 'completed' ? '成功' : '失败' }}
-              </span>
-            </div>
-            <div v-if="Object.keys(tc.arguments).length > 0" class="tool-call-item__args">
-              <span class="tool-call-item__label">参数</span>
-              <pre class="tool-call-item__json">{{ JSON.stringify(tc.arguments, null, 2) }}</pre>
-            </div>
-            <div v-if="tc.result" class="tool-call-item__result">
-              <span class="tool-call-item__label">结果</span>
-              <pre class="tool-call-item__json">{{ JSON.stringify(tc.result, null, 2) }}</pre>
+          <div v-show="legacyToolCallsExpanded" class="tool-calls-block__content">
+            <div v-for="(tc, idx) in message.tool_calls" :key="idx" class="tool-call-item">
+              <div class="tool-call-item__header">
+                <span class="tool-call-item__name">{{ tc.tool_name }}</span>
+                <span class="tool-call-item__status" :class="`tool-call-item__status--${tc.status}`">
+                  {{ tc.status === 'running' ? '执行中' : tc.status === 'completed' ? '成功' : '失败' }}
+                </span>
+              </div>
+              <div v-if="Object.keys(tc.arguments).length > 0" class="tool-call-item__args">
+                <span class="tool-call-item__label">参数</span>
+                <pre class="tool-call-item__json">{{ JSON.stringify(tc.arguments, null, 2) }}</pre>
+              </div>
+              <div v-if="tc.result" class="tool-call-item__result">
+                <span class="tool-call-item__label">结果</span>
+                <pre class="tool-call-item__json">{{ JSON.stringify(tc.result, null, 2) }}</pre>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 主体内容 -->
-      <div
-        v-if="bodyText || !message.streaming"
-        class="body-wrapper"
-        :class="{ 'body-wrapper--collapsed': collapsed }"
-        :style="collapsed ? { maxHeight: COLLAPSE_THRESHOLD + 'px' } : {}"
-      >
+        <!-- 主体内容 -->
         <div
-          ref="bodyRef"
-          class="markdown-body"
-          v-html="renderedBody"
-          @click="handleContentClick"
-        />
-        <div v-if="collapsed" class="collapse-mask" />
+          v-if="bodyText || !message.streaming"
+          class="body-wrapper"
+          :class="{ 'body-wrapper--collapsed': collapsed }"
+          :style="collapsed ? { maxHeight: COLLAPSE_THRESHOLD + 'px' } : {}"
+        >
+          <div
+            ref="bodyRef"
+            class="markdown-body"
+            v-html="renderedBody"
+            @click="handleContentClick"
+          />
+          <div v-if="collapsed" class="collapse-mask" />
+        </div>
+
+        <!-- 展开 / 收起 -->
+        <button v-if="collapsible" class="collapse-toggle" @click="collapsed = !collapsed">
+          {{ collapsed ? '展开全部 ↓' : '收起 ↑' }}
+        </button>
+
+        <!-- 流式光标 -->
+        <span v-if="message.streaming && bodyText" class="stream-cursor" />
       </div>
 
-      <!-- 展开 / 收起 -->
-      <button v-if="collapsible" class="collapse-toggle" @click="collapsed = !collapsed">
-        {{ collapsed ? '展开全部 ↓' : '收起 ↑' }}
-      </button>
-
-      <!-- 流式光标 -->
-      <span v-if="message.streaming && bodyText" class="stream-cursor" />
+      <!-- 消息发送时间（流式完成后显示） -->
+      <span
+        v-if="message.created_at && !message.streaming && !message.id.startsWith('local-')"
+        class="msg-time"
+      >{{ formatMsgTime(message.created_at) }}</span>
     </div>
 
     <!-- 图片放大遮罩 -->
@@ -226,6 +252,19 @@ function handleContentClick(e: MouseEvent) {
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
+}
+
+.ai-msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.msg-time {
+  font-size: 11px;
+  color: #9ca3af;
+  padding: 0 2px;
 }
 
 .bubble {

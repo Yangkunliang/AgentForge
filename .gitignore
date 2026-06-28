@@ -5,6 +5,9 @@
 *.swo
 *~
 
+# Other AI assistants
+.qoder/
+
 # OS
 .DS_Store
 Thumbs.db

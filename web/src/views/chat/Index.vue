@@ -71,6 +71,24 @@ const topbarTitle = computed(() => {
   return null
 })
 
+/** 格式化消息时间：今天只显示 HH:mm，跨天显示日期+时间 */
+function formatMsgTime(isoStr: string): string {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  if (isToday) return `${hh}:${mm}`
+  const M = d.getMonth() + 1
+  const D = d.getDate()
+  return `${M}月${D}日 ${hh}:${mm}`
+}
+
 // 从用户消息内容中提取图片 URL（markdown 格式 ![alt](url)）
 function extractImages(content: string): Array<{ url: string; alt: string }> {
   if (!content) return []
@@ -292,11 +310,14 @@ function removePendingImage(idx: number) {
 
         <template v-for="msg in sessionStore.messages" :key="msg.id">
           <div v-if="msg.role === 'user'" class="user-message">
-            <div class="bubble">
-              <div v-if="extractImages(msg.content).length" class="user-images">
-                <img v-for="img in extractImages(msg.content)" :key="img.url" :src="img.url" :alt="img.alt" class="user-image-thumb" />
+            <div class="user-msg-body">
+              <div class="bubble">
+                <div v-if="extractImages(msg.content).length" class="user-images">
+                  <img v-for="img in extractImages(msg.content)" :key="img.url" :src="img.url" :alt="img.alt" class="user-image-thumb" />
+                </div>
+                <span v-if="stripImages(msg.content)">{{ stripImages(msg.content) }}</span>
               </div>
-              <span v-if="stripImages(msg.content)">{{ stripImages(msg.content) }}</span>
+              <span v-if="msg.created_at && !msg.id.startsWith('local-')" class="msg-time">{{ formatMsgTime(msg.created_at) }}</span>
             </div>
             <div class="user-identity" :title="userName">
               <UserAvatar :name="userName" :avatar-url="userAvatarUrl" shape="circle" :size="32" />
@@ -544,7 +565,22 @@ function removePendingImage(idx: number) {
   max-width: 80%;
   align-self: flex-end;
   flex-direction: row-reverse;
+}
 
+.user-msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.msg-time {
+  font-size: 11px;
+  color: #9ca3af;
+  padding: 0 2px;
+}
+
+.user-message {
   .bubble {
     background: #409eff;
     color: #fff;
