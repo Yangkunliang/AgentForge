@@ -12,37 +12,55 @@
 docs/
 ├── standards/      # 长期规范：文档、迭代、Skill 使用策略
 ├── architecture/   # 当前系统架构蓝图
-├── product-design/   # 产品文档
-├── tech-design/   # 技术设计文档
-├── iterations/    # 迭代记录
+├── product-design/ # 产品文档
+├── tech-design/    # 技术设计文档
+├── iterations/     # 迭代记录
+└── tasks/          # 任务清单
 ```
 
 ## 长期规范 (standards/)
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| ITERATION-STANDARD.md | 迭代目录、产物命名、checklist 字段、小步提交、本地 UI/UX Skill 使用策略 | ✅ |
-| DEVELOPMENT-GUIDE.md | 环境配置、启动步骤、测试方法、开发规范 | ✅ |
+| [ITERATION-STANDARD.md](standards/ITERATION-STANDARD.md) | 迭代目录、产物命名、checklist 字段、小步提交、本地 UI/UX Skill 使用策略 | ✅ |
+| [DEVELOPMENT-GUIDE.md](standards/DEVELOPMENT-GUIDE.md) | 环境配置、启动步骤、测试方法、开发规范 | ✅ |
 
 ## 当前系统架构 (architecture/)
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| AGENT-MODEL.md | AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制 | ✅ |
+| [AGENT-MODEL.md](architecture/AGENT-MODEL.md) | AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制 | ✅ |
 
 ## 设计文档清单 (tech-design/)
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| ARCHITECTURE.md | 整体架构、六层 Harness、执行流程 | ✅ |
-| DATABASE.md | 数据库实体、索引、关系图 | ✅ |
-| API-SPEC.md | 完整 API 规范（含注册、Dashboard、反馈、费用、Skill 安装进度） | ✅ |
-| SECURITY.md | 认证、限流、沙箱、Secrets 管理 | ✅ |
-| LLM-CONFIG.md | LLM Provider、模型路由、Cost 追踪 | ✅ |
-| DATA-EXPORT.md | 训练数据导出、脱敏策略 | ✅ |
-| FRONTEND-ARCHITECTURE.md | 前端架构（含 SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
-| RABBITMQ.md | 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理 | ✅ |
-| DEPLOYMENT.md | 本地开发环境、生产部署、Nginx 配置、数据库迁移 | ✅ |
+| [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 | ✅ |
+| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
+| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体（9 张表）+ 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
+| [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
+| [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
+| [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
+| [RABBITMQ.md](tech-design/RABBITMQ.md) | 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理 | ✅ |
+| [DEPLOYMENT.md](tech-design/DEPLOYMENT.md) | 本地开发环境、生产部署、Nginx 配置、数据库迁移 | ✅ |
+| [SANDBOX-RESEARCH.md](tech-design/SANDBOX-RESEARCH.md) | 沙箱机制调研报告（Docker vs CubeSandbox 对比） | ✅ |
+| [INTEGRATION-CUBESANDBOX.md](tech-design/INTEGRATION-CUBESANDBOX.md) | CubeSandbox 集成设计（E2B SDK / REST API、API 设计、分级策略） | ✅ |
+| [DATA-EXPORT.md](tech-design/DATA-EXPORT.md) | 训练数据导出（JSONL）、PII 脱敏策略 | ✅ |
+| [SSE-EXECUTION-VISUALIZATION.md](tech-design/SSE-EXECUTION-VISUALIZATION.md) | SSE 执行可视化方案 | ✅ |
+
+## 产品文档 (product-design/)
+
+| 文档 | 说明 | 状态 |
+|------|------|------|
+| [PRD-全栈Agent交互体验-20260623.md](product-design/PRD-全栈Agent交互体验-20260623.md) | 项目管理、意图路由、阶段感知对话、快捷动作体系、Agent Bridge | ✅ |
+| [PRD-CLAW-集成能力层-20260622.md](product-design/PRD-CLAW-集成能力层-20260622.md) | CLAW 集成能力层（Skill / MCP / ClaWHub 市场） | ✅ |
+| [PRD-多智能体框架-20260617.md](product-design/PRD-多智能体框架-20260617.md) | 产品定位、用户故事、核心功能、技术栈 | ✅ |
+
+## 任务清单 (tasks/)
+
+| 文档 | 说明 | 状态 |
+|------|------|------|
+| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单，按 P1→P2→P3→P4 优先级排列，共 28 项 | ✅ |
 
 ## 迭代链条
 
@@ -59,62 +77,28 @@ docs/
 
 | 迭代 | 日期 | 主题 | 状态 |
 |------|------|------|------|
-| TASK-001 | 2025-06-20 | 项目基础设施与认证系统 | ✅ 已完成 |
-| TASK-002 | 2025-06-20 | 任务管理与 Agent 管理 API | ✅ 已完成 |
-| TASK-003 | 2025-06-20 | Harness 核心 + RabbitMQ + SSE | ✅ 已完成 |
-| TASK-004 | 2025-06-20 | Skill 管理 + Dashboard + 费用统计 + 数据导出 | ✅ 已完成 |
-| TASK-005 | 2025-06-20 | 前端工作台（Vue 3 + Element Plus + SSE） | ✅ 已完成 |
+| TASK-001 | 2026-01-20 | 项目基础设施与认证系统 | ✅ 已完成 |
+| TASK-002 | 2026-06-17 | 架构设计 | ✅ 已完成 |
+| TASK-003 | 2026-06-20 | Harness 核心 + RabbitMQ + SSE | ✅ 已完成 |
+| TASK-004 | 2026-06-20 | Skill 管理 + Dashboard + 费用统计 + 数据导出 | ✅ 已完成 |
+| TASK-005 | 2026-06-20 | 前端工作台（Vue 3 + Element Plus + SSE） | ✅ 已完成 |
+| TASK-006 | 2026-06-22 | Skill 引擎（ReAct + Thinking 拆分 + Tracing） | ✅ 已完成 |
 
 ### TASK-002 详细信息
-- **目录**：`docs/iterations/2025-06-20-task-agent-management-api/`
+- **目录**：`docs/iterations/2026-06-17-architecture-design/`
 - **产物**：
-  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-task-agent-management-api/PRODUCT-REQUIREMENTS.md)
-  - [TASK-CHECKLIST.md](iterations/2025-06-20-task-agent-management-api/TASK-CHECKLIST.md)
-  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-task-agent-management-api/TECHNICAL-DESIGN.md)
-- **核心功能**：
-  - 任务管理 API（创建、查询、取消、反馈）
-  - Agent 管理 API（CRUD 操作）
-  - 权限控制和认证
-  - 完整的单元测试覆盖
+  - [ITER-architecture-design-20260617.md](iterations/2026-06-17-architecture-design/ITER-architecture-design-20260617.md)
+- **核心功能**：Harness 六层架构、Skill 格式、技术栈决策
 
-### TASK-003 详细信息
-- **目录**：`docs/iterations/2025-06-20-harness-core-rabbitmq-sse/`
-- **产物**：
-  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-harness-core-rabbitmq-sse/PRODUCT-REQUIREMENTS.md)
-  - [TASK-CHECKLIST.md](iterations/2025-06-20-harness-core-rabbitmq-sse/TASK-CHECKLIST.md)
-  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-harness-core-rabbitmq-sse/TECHNICAL-DESIGN.md)
-- **核心功能**：
-  - RabbitMQ 消息总线（Exchange/Queue 拓扑）
-  - Harness 六层架构（Validator、Router、Registry、Governance、Executor、Memory）
-  - SSE 流式输出（10 种事件类型）
-  - LLM Provider 抽象层（LiteLLM、模型路由、Cost 追踪）
-  - Agent 基类和内置 Agent（Coder、Reviewer、Researcher）
+### TASK-003 ~ TASK-005 详细信息
+以上三个 TASK 共享 `docs/iterations/2025-06-20-*` 目录，产物见各子目录的 `PRODUCT-REQUIREMENTS.md`、`TASK-CHECKLIST.md`、`TECHNICAL-DESIGN.md`。
+- **核心功能**：RabbitMQ 消息总线、Harness 六层架构、SSE 流式输出、LLM Provider 抽象、Agent 基类
+- Skill 管理 API、Dashboard、费用统计、数据导出
+- 前端项目骨架、API 层、Pinia Store、SSE 客户端、路由守卫
 
-### TASK-004 详细信息
-- **目录**：`docs/iterations/2025-06-20-skill-dashboard-cost-exports/`
-- **产物**：
-  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-skill-dashboard-cost-exports/PRODUCT-REQUIREMENTS.md)
-  - [TASK-CHECKLIST.md](iterations/2025-06-20-skill-dashboard-cost-exports/TASK-CHECKLIST.md)
-  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-skill-dashboard-cost-exports/TECHNICAL-DESIGN.md)
-- **核心功能**：
-  - Skill 管理 API（安装、卸载、进度查询）
-  - Dashboard API（任务统计、Agent 状态、费用趋势）
-  - 费用统计 API（每日费用、模型成本分布）
-  - 数据导出 API（JSONL 格式、三级脱敏策略）
-
-### TASK-005 详细信息
-- **目录**：`docs/iterations/2025-06-20-frontend-workbench/`
-- **产物**：
-  - [PRODUCT-REQUIREMENTS.md](iterations/2025-06-20-frontend-workbench/PRODUCT-REQUIREMENTS.md)
-  - [TASK-CHECKLIST.md](iterations/2025-06-20-frontend-workbench/TASK-CHECKLIST.md)
-  - [TECHNICAL-DESIGN.md](iterations/2025-06-20-frontend-workbench/TECHNICAL-DESIGN.md)
-- **核心功能**：
-  - 前端项目骨架（Vite + Vue 3 + TypeScript + Element Plus + Pinia）
-  - API 层（Axios 实例、模块化 API、类型生成脚本）
-  - 状态管理（auth、task、agent、skill、app stores）
-  - SSE 客户端（fetch + ReadableStream、指数退避重连）
-  - 页面组件（Login、Register、Dashboard、Task、Agent、Skill、Export）
-  - 路由守卫和权限控制
+### TASK-006 详细信息
+- **目录**：`docs/iterations/2026-06-22-skill-engine/`
+- **核心功能**：Skill 引擎 ReAct 多轮 tool_use 循环、Thinking 流式拆分、@span Tracing 自动采集
 
 ## 版本号规范
 

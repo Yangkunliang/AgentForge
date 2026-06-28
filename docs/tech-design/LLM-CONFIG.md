@@ -2,137 +2,363 @@
 
 ## 1. 架构设计
 
-### 1.1 Provider 接口
+### 1.1 模块位置
+
+LLM 相关代码集中在 `src/agent_forge/llm/`：
+
+```
+src/agent_forge/llm/
+├── __init__.py          # 统一导出：Provider / Config / Response / Fallback
+└── provider.py          # 核心实现：接口 + LiteLLM + Fallback + Tracing
+```
+
+Skill 执行引擎在 `src/agent_forge/skills/engine.py`，负责 LLM ↔ Skill 的多轮 `tool_use` 循环。
+
+### 1.2 Provider 接口
+
 ```python
-class LLMProvider(Protocol):
-    async def chat(self, messages: List[dict], **kwargs) -> str:
-        ...
-    async def get_token_usage(self) -> dict:
-        ...
-    async def get_cost(self) -> float:
-        ...
+class LLMProvider(ABC):
+    """所有 LLM 调用的统一抽象"""
+
+    async def complete(self, prompt: str, config: LLMConfig | None = None) -> LLMResponse: ...
+    """单轮非流式：system prompt + user prompt → 完整回复"""
+
+    async def stream_complete(
+        self,
+        prompt: str,
+        config: LLMConfig | None = None,
+        on_thinking_start: Callable[[], Awaitable[None]] | None = None,
+        on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
+        on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
+        system_prompt: str | None = None,
+    ) -> AsyncGenerator[str, None]: ...
+    """流式：拆分 thinking / 正文，通过回调推送 thinking 事件"""
+
+    async def chat_complete(self, messages: list[dict], config: LLMConfig | None = None) -> LLMResponse: ...
+    """多轮对话：传入完整 messages 列表（含 history）"""
+
+    async def tool_use_complete(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        config: LLMConfig | None = None,
+    ) -> LLMResponse: ...
+    """工具调用决策（非流式）：LLM 返回 tool_calls → SkillDispatcher 执行"""
+
+    async def tool_use_stream(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        config: LLMConfig | None = None,
+    ) -> AsyncGenerator[str | ToolCall, None]: ...
+    """工具调用决策（流式）：边生成边解析 reasoning + tool_calls"""
 ```
 
-### 1.2 统一调用流程
+### 1.3 统一调用流程
+
 ```
-TaskOrchestrator
+SkillExecutionEngine (ReAct 循环)
     │
     ▼
-ModelSelector (根据任务复杂度选择模型)
+LLMProvider.tool_use_complete (路由决策)
     │
-    ▼
-LiteLLMAdapter (统一 API 调用)
+    ├─ has_tool_calls=True  → SkillDispatcher.invoke → 追加 tool result → 下一轮
     │
-    ▼
-Provider (OpenAI/Anthropic/Gemini/...)
-    │
-    ▼
-CostTracker (记录 token 和成本)
+    └─ has_tool_calls=False → LLMProvider.stream_complete → 流式最终回复
+                                      │
+                                      ├─ on_thinking_start / delta / end (思考过程)
+                                      └─ yield (正文 chunk)
 ```
 
-## 2. LiteLLM 配置
+### 1.4 全局单例
 
-### 2.1 模型路由配置
-```yaml
-# llm_config.yaml
-models:
-  simple:           # 简单任务
-    models:
-      - model: "gpt-4o-mini"
-        weight: 0.7
-      - model: "claude-3-haiku"
-        weight: 0.3
-  medium:           # 中等任务
-    models:
-      - model: "gpt-4"
-        weight: 0.5
-      - model: "claude-3-sonnet"
-        weight: 0.5
-  complex:          # 复杂任务
-    models:
-      - model: "gpt-4-turbo"
-        weight: 0.4
-      - model: "claude-3-opus"
-        weight: 0.6
-
-fallback:           # 降级策略
-  enabled: true
-  max_retries: 3
-  retry_delay_ms: 1000
-```
-
-### 2.2 环境变量配置
-```bash
-# .env
-LITELLM_MODEL_ROUTE=simple:medium:complex
-OPENAI_API_KEY=sk-xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
-GEMINI_API_KEY=xxx
-```
-
-## 3. 模型选择策略
-
-### 3.1 自动选择逻辑
 ```python
-def select_model(task):
-    """根据任务特征选择模型"""
-    complexity = assess_complexity(task.description)
-    budget = task.budget
-    
-    if complexity == "simple":
-        return pick_cheapest(models.simple, budget)
-    elif complexity == "medium":
-        return pick_best_cost_performance(models.medium, budget)
+# provider.py 底部
+def get_llm_provider() -> LLMProvider:
+    """返回 LiteLLMProvider（可用）或 FallbackLLMProvider（降级）"""
+```
+
+应用启动时无需手动初始化，首次调用 `get_llm_provider()` 自动创建。
+
+---
+
+## 2. 配置管理
+
+### 2.1 配置文件位置
+
+所有 LLM 相关配置集中在 `src/agent_forge/config.py`（Pydantic `BaseSettings`），从 `.env` 和环境变量加载：
+
+```python
+# LLM
+llm_base_url: str          # LLM_BASE_URL — 代理或兼容 API 的 base URL
+api_key: str               # LLM_API_KEY  — 统一 API Key
+default_model: str         # LLM_MODEL    — 默认模型（如 "openai/gpt-4o-mini"）
+default_temperature: float # 默认温度
+max_tokens: int            # 默认最大 token 数
+
+# 多模型路由
+vision_model: str          # VL_MODEL — 图像理解专用
+image_gen_model: str       # T2I_MODEL — 文生图专用
+model_routes: str          # MODEL_ROUTES — JSON: {"claude": "anthropic/claude-3-5-sonnet"}
+
+# Embedding
+embedding_model: str       # EMBEDDING_MODEL
+embedding_dimension: int   # EMBEDDING_DIM
+```
+
+### 2.2 模型路由
+
+`config.Settings.model_routes_map` 属性自动合并用户自定义路由 + 多模态模型：
+
+```python
+settings.model_routes_map
+# 示例返回: {"claude": "anthropic/claude-3-5-sonnet", "vision": "openai/gpt-4o", "image_gen": "dall-e-3"}
+```
+
+**不使用的 YAML 文件方式**。所有路由通过环境变量或 `.env` 中的 JSON 字符串配置。
+
+### 2.3 环境变量速查
+
+| 环境变量 | 默认值 | 说明 |
+|---------|--------|------|
+| `LLM_BASE_URL` | (空) | 代理 URL 或兼容 API 地址 |
+| `LLM_API_KEY` | (空) | 统一 API Key |
+| `LLM_MODEL` | `openai/gpt-4o-mini` | 默认模型 |
+| `VL_MODEL` | (空) | 视觉模型 |
+| `T2I_MODEL` | (空) | 文生图模型 |
+| `MODEL_ROUTES` | `{}` | 多模型路由 JSON |
+| `EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Embedding 模型 |
+
+---
+
+## 3. Prompt 管理
+
+### 3.1 两级 Prompt 体系
+
+项目使用 **两级 Prompt**：
+
+| 层级 | 位置 | 用途 |
+|------|------|------|
+| **全局 System Prompt** | `provider.py::DEFAULT_SYSTEM_PROMPT` | 每次 `complete()` / `chat_complete()` 自动注入，约束 thinking 格式与行为准则 |
+| **Agent System Prompt** | `engine.py::SYSTEM_PROMPT` | Skill 执行引擎在 ReAct 循环中注入，定义 Agent 身份与工具使用规则 |
+
+### 3.2 全局 System Prompt（provider.py）
+
+每次 LLM 调用自动注入，不随需求变化：
+
+```python
+DEFAULT_SYSTEM_PROMPT = (
+    "你是一个多智能体协同框架的 AI 助手。请遵循以下回答规范：\n"
+    "\n"
+    "## 思考过程\n"
+    "- 如需推理分析，请在 <thinking>...</thinking> 标签内完成。\n"
+    "- 思考过程请使用平铺直叙的段落文字，不要使用 markdown 标题。\n"
+    "\n"
+    "## 正文回复\n"
+    "- 在 <thinking> 标签之外输出面向用户的正式回复。\n"
+    "- 可以使用完整的 markdown 格式。\n"
+)
+```
+
+### 3.3 Agent System Prompt（engine.py）
+
+Skill 执行引擎在 ReAct 循环开始时注入，每次会话可注入不同 `agent_name`：
+
+```python
+SYSTEM_PROMPT = """你是 {agent_name}，一个面向全栈开发工程师的 AI 智能助手。
+
+**身份**：
+- 你唯一的名字是 {agent_name}。
+- 不要透露底层模型、平台或框架的名称。
+
+**工具使用规则**：
+1. 需要实时数据时，必须调用相应工具，严禁凭记忆猜测。
+2. 需要执行代码时，必须调用沙箱工具。
+3. 思考过程写在 <thinking>...</thinking> 标签内。
+"""
+```
+
+### 3.4 动态 Prompt 构建
+
+**不再使用 YAML 模板文件**。所有 Prompt 直接在 Python 代码中以三引号字符串定义，按需 `format()` 注入变量：
+
+```python
+system_prompt = _build_system_prompt(agent_name="CodeSoul")  # engine.py
+```
+
+如果需要未来迁移到模板存储，建议保持当前字符串 + `format()` 模式，只需将字符串来源改为 DB / 文件系统读取。
+
+### 3.5 最终回复 Prompt
+
+工具执行完成后，`engine.py::_build_final_prompt()` 从 messages 中提取 tool results，构造汇总 prompt：
+
+```python
+f"用户问题：{user_question}\n\n工具返回的真实数据：\n{combined}\n\n"
+f"请用自然语言、清晰友好地整理并回答用户的问题..."
+```
+
+---
+
+## 4. 流式 Thinking 拆分
+
+### 4.1 双来源 thinking
+
+`_stream_with_thinking()` 从 LiteLLM 流式响应中同时处理两类 thinking 来源：
+
+| 来源 | 字段 | 适用模型 |
+|------|------|---------|
+| 原生 reasoning | `delta.reasoning` | o1 / Claude (compat) |
+| 内嵌标签 | `delta.content` 中的 `<thinking>...</thinking>` | DeepSeek-R1 等 |
+
+### 4.2 处理逻辑
+
+```
+流式 chunk 到达
+    │
+    ├─ delta.reasoning 非空 → on_thinking_delta(reasoning)  ← 不 yield
+    │
+    └─ delta.content 非空 → 检查 <thinking> 标签边界
+                          │
+                          ├─ 在 thinking 内 → on_thinking_delta(content)
+                          └─ 在 thinking 外 → yield(content)  ← 正文输出
+```
+
+### 4.3 跨 chunk 标签保护
+
+如果 `<thinking>` 或 `</thinking>` 被拆到两个 chunk 中，`_suffix_match()` 会检测后缀匹配并 buffer 待合并，不会误触发状态切换。
+
+### 4.4 SSE 推送
+
+SkillExecutionEngine 为 thinking 事件设置了三个回调，全部通过 SSE 推送到前端：
+
+| 事件 | 回调 | SSE 类型 |
+|------|------|---------|
+| thinking 开始 | `on_thinking_start` | `"thinking_start"` |
+| thinking 增量 | `on_thinking_delta(delta)` | `"thinking_delta"` |
+| thinking 结束 | `on_thinking_end(duration_ms)` | `"thinking_end"` |
+
+---
+
+## 5. ReAct 多轮 tool_use 循环
+
+### 5.1 执行引擎
+
+`SkillExecutionEngine` 在 `src/agent_forge/skills/engine.py` 中实现，核心循环：
+
+```python
+for round_num in range(1, MAX_ROUNDS + 1):  # MAX_ROUNDS = 5
+    if messages[-1].role == "tool":
+        # 有工具结果 → 直接 stream_complete 生成最终回复
+        yield from _stream_final(...)
     else:
-        return pick_best_quality(models.complex, budget)
+        response = llm.tool_use_complete(messages, tools, config)
+        if response.has_tool_calls:
+            # 执行工具 → 追加 tool result → 下一轮
+            await dispatcher.invoke(...)
+        else:
+            # 无工具调用 → 直接流式回复
+            yield from _stream_final(user_message)
 ```
 
-### 3.2 复杂度评估指标
-| 指标 | 简单 (simple) | 中等 (medium) | 复杂 (complex) |
-|------|--------------|--------------|---------------|
-| 输入长度 | < 500 tokens | < 2000 tokens | > 2000 tokens |
-| 所需 Skill 数 | 0 | 1-2 | > 2 |
-| 子任务数 | 1 | 2-3 | > 3 |
-| 时间敏感度 | 低 | 中 | 高 |
+### 5.2 关键优化：省掉多余 LLM 调用
 
-## 4. Fallback 策略
-
-### 4.1 模型降级
+**旧流程**（3 次 LLM 调用）：
 ```
-gpt-4 (主) → gpt-4o-mini (备选) → claude-3-sonnet (最后备选)
+round 1: tool_use_complete → has_tool_calls=true  → 执行工具
+round 2: tool_use_complete → has_tool_calls=false → content 被丢弃（浪费）
+round 3: stream_complete   → 重新生成相同内容     ← 多余，浪费 3~5s
 ```
 
-### 4.2 故障转移
-- 超时：> 60s → 切换到更快模型
-- 429 (限流)：等待后重试
-- 500 (服务不可用)：切换到备选模型
+**新流程**（2 次 LLM 调用）：
+```
+round 1: tool_use_complete → has_tool_calls=true  → 执行工具
+round 2: stream_complete   → 直接流式生成最终回复  ← 省掉一次 LLM 调用
+```
 
-## 5. Cost 追踪
+判断依据：`messages[-1].role == "tool"` 表示刚执行完工具，直接走 `stream_complete` 生成最终回复。
 
-### 5.1 每次调用记录
+### 5.3 ToolCall 数据模型
+
 ```python
-{
-    "model": "gpt-4",
-    "tokens_used": {"prompt": 1200, "completion": 800, "total": 2000},
-    "cost_usd": 0.03,
-    "duration_ms": 2500,
-    "success": True
-}
+@dataclass
+class ToolCall:
+    id: str
+    function_name: str
+    function_args: dict[str, Any]
 ```
 
-### 5.2 每日成本统计
+`LLMResponse.tool_calls` 返回 `list[ToolCall]`，`LLMResponse.has_tool_calls` 提供快捷判断。
+
+---
+
+## 6. Fallback 策略
+
+### 6.1 Provider 级降级
+
+`FallbackLLMProvider` 是 `LLMProvider` 的降级实现，在 LiteLLM 不可用或导入失败时启用：
+
+```python
+def get_llm_provider() -> LLMProvider:
+    p = LiteLLMProvider()
+    return p if p.is_available else FallbackLLMProvider()
+```
+
+Fallback 返回结构化响应但不实际调用 LLM：
+- `complete()` → `[Fallback] {prompt[:80]}`
+- `stream_complete()` → 逐字符 yield
+- `chat_complete()` → `[Fallback] {last_message}`
+
+### 6.2 单次调用异常
+
+每个方法都有 `try/except`，记录错误日志后重新抛出异常。调用方（SkillExecutionEngine）对 `stream_complete` 捕获了异常并返回友好提示。
+
+### 6.3 模型级降级
+
+**未实现**。当前所有调用都使用 `config.model` 指定的模型，没有自动降级到其他模型的逻辑。如需实现，可在 `LiteLLMProvider` 的 `except` 块中尝试备选模型。
+
+---
+
+## 7. Cost 追踪
+
+### 7.1 调用级追踪
+
+每次 LLM 调用返回的 `LLMResponse` 包含：
+
+```python
+@dataclass
+class LLMResponse:
+    content: str
+    model: str
+    tokens_used: int      # response.usage.total_tokens
+    cost_usd: float       # response.usage.cost
+    latency_ms: int
+    _tool_calls: list[ToolCall] | None
+```
+
+通过 `_tag_tokens()` 将 token 用量写入当前 tracing span tags。
+
+### 7.2 持久化追踪
+
+每次任务执行后，token 用量和 cost 写入数据库：
+
+- `Task.total_cost_usd` — 任务总成本
+- `TaskExecution.model_used` / `TaskExecution.cost_usd` — 子任务级明细
+
+### 7.3 API 端点
+
 ```http
-GET /api/v1/cost?date=2026-06-17
+GET /api/v1/cost?date=2026-06-28
 ```
 
-**响应**:
+响应：
+
 ```json
 {
-  "date": "2026-06-17",
+  "date": "2026-06-28",
   "total_cost_usd": 15.50,
   "model_costs": {
-    "gpt-4": 10.20,
-    "gpt-4o-mini": 3.30,
+    "gpt-4o-mini": 10.20,
+    "gpt-4o": 3.30,
     "claude-3-sonnet": 2.00
   },
   "total_tasks": 50,
@@ -140,54 +366,53 @@ GET /api/v1/cost?date=2026-06-17
 }
 ```
 
-## 6. Prompt 管理
+实现位于 `src/agent_forge/api/routes/cost.py`。
 
-### 6.1 System Prompt 模板
-```yaml
-# prompts/
-├── system/
-│   ├── coder.yaml
-│   ├── reviewer.yaml
-│   └── researcher.yaml
-└── tasks/
-    ├── code_review.yaml
-    └── bug_fix.yaml
-```
+---
 
-### 6.2 Prompt 模板示例
-```yaml
-# prompts/system/reviewer.yaml
-name: code-reviewer
-role: "代码审查专家"
-instructions: |
-  你是一个资深的代码审查专家。请审查以下代码：
-  1. 代码风格和规范
-  2. 潜在的安全漏洞
-  3. 性能问题
-  4. 可维护性
-  
-  请用以下格式输出：
-  - 总体评分: [1-5]
-  - 问题列表:
-    1. [严重等级] 问题描述
-    2. ...
-  - 改进建议: ...
-```
+## 8. Tracing
 
-## 7. 性能优化
+### 8.1 自动采集
 
-### 7.1 缓存策略
-- 相同任务的响应缓存（TTL: 1h）
-- Prompt 模板缓存
-- 模型选择结果缓存
+关键方法使用 `@span("llm.*")` 装饰器自动采集：
 
-### 7.2 并发控制
-- 每个模型最大并发数限制
-- 队列管理（超出时排队等待）
+| 方法 | Span 名称 | 采集 tags |
+|------|-----------|-----------|
+| `complete()` | `llm.complete` | model, tokens |
+| `chat_complete()` | `llm.chat_complete` | model, tokens |
+| `tool_use_complete()` | `llm.tool_use_complete` | model, tools(数量), msgs(数量), has_tool_calls, tool_names |
+| `stream_complete()` | `llm.stream_complete` | model, prompt_len, chunks, ttfc_ms |
+| `tool_use_stream()` | `llm.tool_use_stream` | model, tokens |
 
-```yaml
-concurrency:
-  gpt-4: 10
-  gpt-4o-mini: 50
-  claude-3-sonnet: 20
-```
+### 8.2 Thinking 延迟指标
+
+`ttfc_ms` (time-to-first-chunk) 在 `stream_complete()` 中自动记录，是衡量用户感知延迟的关键指标。
+
+---
+
+## 9. 性能优化（规划中）
+
+以下功能在文档中提及但尚未实现：
+
+| 功能 | 状态 | 备注 |
+|------|------|------|
+| 相同任务响应缓存 (TTL 1h) | 未实现 | 可基于 Redis + prompt hash |
+| Prompt 模板缓存 | 部分实现 | 当前 Prompt 硬编码在 Python 中 |
+| 模型选择结果缓存 | 未实现 | |
+| 每模型并发数限制 | 未实现 | YAML 配置方案未落地 |
+| 队列管理 | 未实现 | |
+
+---
+
+## 10. 相关文件索引
+
+| 路径 | 内容 |
+|------|------|
+| `src/agent_forge/llm/provider.py` | Provider 接口 + LiteLLM + Fallback + Thinking 拆分 + Tracing |
+| `src/agent_forge/llm/__init__.py` | 统一导出 |
+| `src/agent_forge/config.py` | LLM 配置（Settings + CubeSandboxConfig） |
+| `src/agent_forge/skills/engine.py` | ReAct 执行引擎 + Prompt 定义 + tool_use 循环 |
+| `src/agent_forge/api/routes/cost.py` | Cost 统计 API |
+| `src/agent_forge/models/task.py` | Task 成本字段 |
+| `src/agent_forge/models/task_execution.py` | TaskExecution 成本字段 |
+| `docs/tech-design/ARCHITECTURE.md` §3.8 | LLM Provider 抽象层架构概览 |

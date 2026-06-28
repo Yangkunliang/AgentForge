@@ -56,16 +56,54 @@
 
 ## 文档索引
 
-所有设计文档位于 `docs/` 目录下，索引以 `docs/README.md` 为准。
+### 索引源
 
-| 目录 | 内容 |
+- **Claude Code 快速索引**（本文档 § 文档速查）— 按路径列出每篇文档的一句话说明，供 Agent 快速定位
+- `docs/README.md` — 文档体系总目录（版本历史、迭代链条说明）
+- `docs/tasks/CHECKLIST.md` — 实现任务清单（P1→P4 优先级）
+- 根目录 `MEMORY.md` — 项目上下文索引（开发约定、关键文件路径）
+
+### 文档速查
+
+| 路径 | 一句话说明 |
+|------|-----------|
+| `docs/tech-design/ARCHITECTURE.md` | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 |
+| `docs/tech-design/API-SPEC.md` | 完整 API 规范（认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） |
+| `docs/tech-design/DATABASE.md` | 数据库实体（9 张表）+ 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
+| `docs/tech-design/SECURITY.md` | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 |
+| `docs/tech-design/LLM-CONFIG.md` | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 |
+| `docs/tech-design/FRONTEND-ARCHITECTURE.md` | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） |
+| `docs/tech-design/RABBITMQ.md` | 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理 |
+| `docs/tech-design/DEPLOYMENT.md` | 本地开发环境、生产部署、Nginx 配置、数据库迁移 |
+| `docs/tech-design/SANDBOX-RESEARCH.md` | 沙箱机制调研报告（Docker vs CubeSandbox 对比） |
+| `docs/tech-design/INTEGRATION-CUBESANDBOX.md` | CubeSandbox 集成设计（E2B SDK / REST API、API 设计、分级策略） |
+| `docs/tech-design/DATA-EXPORT.md` | 训练数据导出（JSONL）、PII 脱敏策略 |
+| `docs/tech-design/SSE-EXECUTION-VISUALIZATION.md` | SSE 执行可视化方案 |
+| `docs/architecture/AGENT-MODEL.md` | Agent 领域模型（类型、能力、Contract Net 协作机制）— **产品定义**，非仓库工作规范 |
+| `docs/product-design/PRD-全栈Agent交互体验-20260623.md` | 项目管理、意图路由、阶段感知对话、快捷动作、Agent Bridge |
+| `docs/product-design/PRD-CLAW-集成能力层-20260622.md` | CLAW 集成能力层（Skill / MCP / ClaWHub 市场） |
+| `docs/product-design/PRD-多智能体框架-20260617.md` | 产品定位、用户故事、核心功能、技术栈 |
+| `docs/tasks/CHECKLIST.md` | 实现任务清单（P1→P4，共 28 项） |
+| `docs/standards/ITERATION-STANDARD.md` | 迭代目录命名、产物规范、小步提交、Skill 使用策略 |
+| `docs/standards/DEVELOPMENT-GUIDE.md` | 环境配置、启动步骤、测试方法、开发规范 |
+| `docs/iterations/` | 迭代记录（按日期/主题建目录） |
+
+### 关键代码文件速查
+
+| 路径 | 说明 |
 |------|------|
-| `docs/product-design/` | 产品需求文档 |
-| `docs/tech-design/` | 技术设计文档（数据库、安全、LLM 配置、部署、RabbitMQ、前端架构、记忆系统、沙箱） |
-| `docs/tasks/` | 任务清单（`CHECKLIST.md`） |
-| `docs/iterations/` | 迭代记录 |
-
-根目录 `MEMORY.md` 也索引了所有文档。
+| `src/agent_forge/llm/provider.py` | LLM Provider 抽象（complete/stream/tool_use + Thinking 拆分 + Tracing） |
+| `src/agent_forge/config.py` | 全局配置（Pydantic Settings，含 LLM/DB/RabbitMQ/Sandbox） |
+| `src/agent_forge/skills/engine.py` | ReAct 执行引擎（多轮 tool_use 循环） |
+| `src/agent_forge/skills/manager.py` | Skill 插件管理器 |
+| `src/agent_forge/skills/dispatcher.py` | Skill 调用分发 |
+| `src/agent_forge/agents/base.py` | Agent 基类 + CodeWriterAgent/AnalysisAgent/SearchAgent + create_agent |
+| `src/agent_forge/agents/coder.py` | CoderAgent |
+| `src/agent_forge/memory/` | 4 层记忆实现 |
+| `src/agent_forge/models/` | SQLAlchemy 数据模型（22 张表） |
+| `src/agent_forge/tracing.py` | 分布式 tracing（span 装饰器 + 结构化 JSON 日志） |
+| `api/main.py` | FastAPI 入口 |
+| `api/api.py` | 路由注册 |
 
 ---
 
