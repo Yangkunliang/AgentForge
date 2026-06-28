@@ -21,6 +21,8 @@
 
 ## 3. 本地开发环境
 
+> 本文档侧重生产部署和架构配置。本地开发环境完整操作步骤见 `docs/standards/DEVELOPMENT-GUIDE.md`。
+
 ### 3.1 前提条件
 
 - Docker Desktop >= 4.x
@@ -28,14 +30,10 @@
 - Node.js 20+
 - `uv`（Python 包管理，可用 pip 替代）
 
-### 3.2 启动依赖服务
+> **注意**：完整的 `docker compose` → `alembic` → `uvicorn` → `npm run dev` 操作链见 `docs/standards/DEVELOPMENT-GUIDE.md`。
+> 本节保留 `docker-compose.yml` 和 `.env` 配置参考，便于快速查看端口和变量。
 
-```bash
-# 项目根目录
-docker-compose up -d
-```
-
-`docker-compose.yml`（完整版）：
+### 3.2 docker-compose.yml（完整配置）
 
 ```yaml
 version: "3.9"
@@ -92,13 +90,7 @@ volumes:
   redisdata:
 ```
 
-### 3.3 配置环境变量
-
-```bash
-cp .env.example .env
-```
-
-`.env.example`（完整模板）：
+### 3.3 .env 完整模板
 
 ```bash
 # ── 数据库 ──────────────────────────────────────
@@ -132,60 +124,19 @@ APP_ENV=development
 LOG_LEVEL=INFO
 ```
 
-### 3.4 数据库初始化
+### 3.4 服务端口速查
 
-```bash
-# 安装后端依赖
-cd src
-uv install   # 或 pip install -r requirements.txt
-
-# 运行数据库迁移
-alembic upgrade head
-```
-
-### 3.5 启动后端
-
-```bash
-# uvicorn api.main:app --reload --port 8000
-PYTHONPATH=/Users/yangkl/AgentForge/src uvicorn api.main:app --reload --port 8000
-# API 文档：http://localhost:8000/docs
-# OpenAPI JSON：http://localhost:8000/openapi.json
-```
-
-### 3.6 启动前端
-
-```bash
-cd web
-npm install
-npm run gen:types   # 从后端自动生成 API 类型（后端须已启动）
-npm run dev
-# 前端：http://localhost:3000
-```
-
-### 3.7 验证服务状态
-
-```bash
-# 检查后端
-curl http://localhost:8000/health
-
-# 检查 RabbitMQ 管理界面
-open http://localhost:15672   # 用户名/密码：agent / agent_dev_pass
-
-# 检查数据库连接
-docker exec -it <postgres_container> psql -U agent -d agentforge -c "\dt"
-```
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| PostgreSQL | 5432 | 主数据库 |
+| RabbitMQ | 5672 / 15672（管理界面） | 消息队列 |
+| Redis | 6379 | 缓存 + 限流计数器 |
+| 后端 API | 8000 | Swagger UI: http://localhost:8000/docs |
+| 前端 | 3000 | Vue 3 开发服务器 |
 
 ---
 
-## 4. 本地开发启动顺序
-
-```
-1. docker-compose up -d          # 启动 PG + RabbitMQ + Redis
-2. alembic upgrade head          # 初始化数据库表（首次或有新迁移时）
-3. uvicorn api.main:app --reload # 启动后端
-4. npm run gen:types             # 同步 API 类型（首次或后端 Schema 变更时）
-5. npm run dev                   # 启动前端
-```
+> **本地开发操作链**（`docker compose` → `alembic` → `uvicorn` → `npm run dev` → 验证）的完整步骤见 `docs/standards/DEVELOPMENT-GUIDE.md`。
 
 ---
 

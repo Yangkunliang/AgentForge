@@ -171,26 +171,7 @@ AgentForge/
 
 实现任务清单见 `docs/tasks/CHECKLIST.md`，按 P1 → P2 → P3 → P4 顺序执行，每完成一项勾选并单独 commit。
 
-实现后预期命令：
-
-```bash
-# 依赖服务
-docker compose up -d              # 启动 PostgreSQL + RabbitMQ + Redis
-
-# 后端
-alembic upgrade head              # 数据库迁移
-PYTHONPATH=/Users/yangkl/AgentForge/src uvicorn api.main:app --reload --port 8000  # 启动 API
-
-# 前端
-cd web
-npm run gen:types                 # 同步后端 API 类型（后端须先启动）
-npm run dev                       # 启动前端（localhost:3000）
-
-# 代码质量
-ruff check src/
-mypy src/
-pytest tests/ -v
-```
+本地开发完整步骤详见 `docs/standards/DEVELOPMENT-GUIDE.md`。
 
 ---
 
