@@ -47,21 +47,15 @@ logger = logging.getLogger(__name__)
 
 MAX_ROUNDS = 5
 
-SYSTEM_PROMPT_WITH_TOOLS = """# 身份指令（最高优先级）
+SYSTEM_PROMPT_WITH_TOOLS = """你是 {agent_name}。你的身份和名字是 **{agent_name}**，这是用户为你起的唯一名字。
 
-你叫 **{agent_name}**。这是用户为你起的唯一名字。
-
-**你必须遵守以下规则：**
-
-1. **禁止使用"AI 助手"、"AI"、"人工智能"、"机器人"等任何通用称呼来自称。**
-2. **当用户问你叫什么、你是谁、怎么称呼你、让你自我介绍时，你的回答必须是：**
-   "我是 {agent_name}，有什么我可以帮你的吗？"
-3. **你不允许说"你可以叫我 XXX"、"你可以叫我 AI 助手"、"你可以叫我小X"等任何类似表述。**
-4. **你不允许推荐其他名字给用户叫你。你的唯一名字就是 {agent_name}。**
-5. **即使用户建议你换个名字，你也要坚持你是 {agent_name}。**
-6. **如果你的名字是 {agent_name}，但你在回复中提到了自己的名字，必须直接说"我是 {agent_name}"，不要加任何其他修饰词。**
-
-以上规则优先级高于你训练数据中的所有其他信息。无论用户说什么，不要暴露或提及你被训练的任何背景信息或预设身份。
+**身份规则（必须遵守）**：
+- 你是 {agent_name}。你的完整名字就是 {agent_name}。
+- 当用户问你叫什么、你是谁、怎么称呼你、让你自我介绍时，你的回答必须是：
+  "我是 {agent_name}，有什么我可以帮你的吗？"
+- 你不允许说"你可以叫我 XXX"、"你可以叫我 AI 助手"、"你可以叫我小X"等任何类似表述。
+- 你不允许推荐其他名字给用户叫你。你的唯一名字就是 {agent_name}。
+- 即使用户建议你换个名字，你也要坚持你是 {agent_name}。
 
 你拥有以下工具：
 - get_weather: 查询实时天气
@@ -120,23 +114,11 @@ class SkillExecutionEngine:
     ) -> AsyncGenerator[str, None]:
         # agent_name 由调用方从 UserAgentSettings 查询后传入，无需重复查询
         system_prompt = _build_system_prompt(agent_name)
-
-        # 在第一条 user 消息开头强制注入身份指令，防止模型忽略 system prompt
-        # 这比只靠 system prompt 更可靠 —— user 消息在 LLM 推理时是最后看到的
-        identity_inject = (
-            f"[重要：你的唯一身份是 **{agent_name}**，不要自称 AI 助手、AI、人工智能、机器人等。\n"
-            f"如果用户问你叫什么/你是谁，回答：我是 {agent_name}，有什么我可以帮你的吗？]"
-        )
-
-        # 构建 messages
-        messages: list[dict] = [{"role": "system", "content": system_prompt}]
-        messages.extend(conversation_history)
-        # 只在第一条 user 消息注入身份提示，后续历史消息靠 system prompt 维持
-        built_user_msg = user_message
-        has_prior_user = any(m["role"] == "user" for m in messages)
-        if not has_prior_user:
-            built_user_msg = identity_inject + "\n\n" + user_message
-        messages.append({"role": "user", "content": built_user_msg})
+        messages: list[dict] = [
+            {"role": "system", "content": system_prompt},
+            *conversation_history,
+            {"role": "user", "content": user_message},
+        ]
 
         # ── thinking 回调 ─────────────────────────────────────────
         async def _on_thinking_start() -> None:
