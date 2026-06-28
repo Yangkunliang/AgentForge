@@ -1,13 +1,17 @@
-"""声明式基类"""
+"""SQLAlchemy 声明式基类与时间戳混入
+
+Base — 声明式模型基类,定义了表名/字段名的命名约定。
+TimestampMixin — 为继承它的模型自动注入 created_at / updated_at 列。
+"""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-# 命名策略：表名用小写复数，字段名用 snake_case
+# 命名策略:表名用小写复数,字段名用 snake_case
 constraint_naming_convention = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -21,7 +25,7 @@ class Base(DeclarativeBase):
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class TimestampMixin:
