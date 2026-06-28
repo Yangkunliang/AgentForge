@@ -110,12 +110,22 @@ function handleContentClick(e: MouseEvent) {
       <!-- 流式进度条（streaming 时显示） -->
       <ExecutionProgressBar :streaming="!!message.streaming" />
 
-      <!-- 思考中提示（无内容且无步骤时显示文字，不重复进度条动画） -->
+      <!-- 思考中提示（无内容且无步骤时显示动效） -->
       <div
         v-if="message.streaming && !bodyText && !hasExecutionSteps"
         class="thinking-hint"
       >
-        正在思考中，请稍候…
+        <div class="thinking-hint__sparkles">
+          <span class="sparkle" />
+          <span class="sparkle" />
+          <span class="sparkle" />
+        </div>
+        <span class="thinking-hint__text">正在思考中</span>
+        <span class="thinking-hint__dots">
+          <span class="dot" />
+          <span class="dot" />
+          <span class="dot" />
+        </span>
       </div>
 
       <!-- ── 新路径：execution_steps 可视化（TASK-009）──────── -->
@@ -234,12 +244,69 @@ function handleContentClick(e: MouseEvent) {
   min-width: 40px;
 }
 
-// ── 思考中文字提示 ──────────────────────────────────────────
+// ── 思考中动效提示 ──────────────────────────────────────────
 .thinking-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0 6px;
+  min-height: 28px;
+}
+
+.thinking-hint__sparkles {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sparkle {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6366f1;
+  opacity: 0.5;
+  animation: sparkle-fade 1.4s ease-in-out infinite;
+
+  &:nth-child(1) { animation-delay: 0s; }
+  &:nth-child(2) { animation-delay: 0.2s; }
+  &:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes sparkle-fade {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+.thinking-hint__text {
   font-size: 13px;
   color: #9ca3af;
-  padding: 2px 0 4px;
   letter-spacing: 0.01em;
+  font-weight: 500;
+}
+
+.thinking-hint__dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #6366f1;
+  opacity: 0.6;
+  animation: dot-bounce 1.4s ease-in-out infinite;
+}
+
+.dot:nth-child(1) { animation-delay: 0s; }
+.dot:nth-child(2) { animation-delay: 0.15s; }
+.dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
 
 // ── 旧路径 tool_calls 折叠块（历史消息兜底）────────────────────
