@@ -57,6 +57,30 @@ _WMO_CODES: dict[int, str] = {
     95: "雷暴", 96: "轻冰雹雷暴", 99: "强冰雹雷暴",
 }
 
+# 中文城市名 → 英文名映射（Open-Meteo Geocoding API 对部分中文短地名识别不稳定）
+# 优先用英文名查询，保障准确性
+_CITY_NAME_MAP: dict[str, str] = {
+    # 直辖市
+    "北京": "Beijing", "上海": "Shanghai", "天津": "Tianjin", "重庆": "Chongqing",
+    # 省会 / 主要城市
+    "广州": "Guangzhou", "深圳": "Shenzhen", "成都": "Chengdu", "杭州": "Hangzhou",
+    "武汉": "Wuhan", "西安": "Xi'an", "南京": "Nanjing", "郑州": "Zhengzhou",
+    "长沙": "Changsha", "沈阳": "Shenyang", "青岛": "Qingdao", "大连": "Dalian",
+    "厦门": "Xiamen", "福州": "Fuzhou", "济南": "Jinan", "哈尔滨": "Harbin",
+    "长春": "Changchun", "昆明": "Kunming", "贵阳": "Guiyang", "南宁": "Nanning",
+    "海口": "Haikou", "三亚": "Sanya", "太原": "Taiyuan", "合肥": "Hefei",
+    "南昌": "Nanchang", "石家庄": "Shijiazhuang", "呼和浩特": "Hohhot",
+    "乌鲁木齐": "Urumqi", "拉萨": "Lhasa", "西宁": "Xining", "银川": "Yinchuan",
+    "兰州": "Lanzhou", "南京": "Nanjing", "苏州": "Suzhou", "无锡": "Wuxi",
+    "宁波": "Ningbo", "温州": "Wenzhou", "佛山": "Foshan", "东莞": "Dongguan",
+    "珠海": "Zhuhai", "中山": "Zhongshan", "汕头": "Shantou",
+    # 港澳台
+    "香港": "Hong Kong", "澳门": "Macao", "台北": "Taipei", "台湾": "Taiwan",
+    # 其他常见
+    "烟台": "Yantai", "威海": "Weihai", "唐山": "Tangshan", "保定": "Baoding",
+    "洛阳": "Luoyang", "开封": "Kaifeng", "徐州": "Xuzhou", "南通": "Nantong",
+}
+
 
 async def get_weather(city: str, unit: str = "celsius") -> dict[str, Any]:
     """
@@ -64,19 +88,19 @@ async def get_weather(city: str, unit: str = "celsius") -> dict[str, Any]:
 
     Returns:
         {
-          "city": "北京",
-          "latitude": 39.9,
-          "longitude": 116.4,
+          "city": "厦门",
+          "latitude": 24.48,
+          "longitude": 118.08,
           "current": {
-            "temperature": 26.5,
+            "temperature": 30.2,
             "unit": "°C",
-            "description": "晴空",
-            "humidity": 40,
-            "wind_speed_kmh": 12.3,
-            "feels_like": 27.1,
+            "description": "局部多云",
+            "humidity": 75,
+            "wind_speed_kmh": 18.5,
+            "feels_like": 35.1,
           },
           "forecast_3days": [
-            {"date": "2026-06-22", "max": 30, "min": 22, "description": "局部多云"},
+            {"date": "2026-06-28", "max": 33, "min": 27, "description": "小阵雨"},
             ...
           ]
         }
@@ -139,34 +163,50 @@ async def get_weather(city: str, unit: str = "celsius") -> dict[str, Any]:
 
 
 async def _geocode(city: str) -> dict | None:
-    """Open-Meteo Geocoding API：城市名 → 经纬度"""
+    """Open-Meteo Geocoding API：城市名 → 经纬度
+
+    查询顺序：
+      1. 若城市名在 _CITY_NAME_MAP 中，优先用英文名查询（最可靠）
+      2. 否则直接用原始名查询（支持中文，但部分短地名可能识别失败）
+      3. 若失败，用英文再试一次
+    """
     url = "https://geocoding-api.open-meteo.com/v1/search"
-    params = {"name": city, "count": 1, "language": "zh", "format": "json"}
+
+    # 若有预设映射，优先用英文名
+    query_name = _CITY_NAME_MAP.get(city, city)
+    if query_name != city:
+        logger.info("Geocoding: mapped '%s' → '%s'", city, query_name)
 
     async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-            results = data.get("results", [])
-            if not results:
-                # 尝试英文搜索
-                logger.info("Geocoding '%s' in zh failed, trying en", city)
-                params["language"] = "en"
+        # 尝试顺序：优先映射名（中文城市走英文），失败则 fallback 原名
+        candidates = [query_name]
+        if query_name == city:
+            # 没有映射：先试中文，失败再试英文（open-meteo 有时识别中文）
+            candidates = [city]
+        # 若映射名与原名不同（已转英文），无需额外 fallback
+        # 若完全没命中（偏远地名），最后追加一次英文搜索（language=en）
+        if query_name == city:
+            candidates.append(city + " China")  # 加 China 后缀提升识别率
+
+        for name in candidates:
+            try:
+                params = {"name": name, "count": 1, "language": "zh", "format": "json"}
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
-                data = resp.json()
-                results = data.get("results", [])
-            if results:
-                r = results[0]
-                return {
-                    "name": r.get("name", city),
-                    "latitude": r["latitude"],
-                    "longitude": r["longitude"],
-                    "country": r.get("country", ""),
-                }
-        except Exception as e:
-            logger.warning("Geocoding failed for '%s': %s", city, e)
+                results = resp.json().get("results", [])
+                if results:
+                    r = results[0]
+                    logger.info("Geocoding success: '%s' → %s", name, r.get("name"))
+                    return {
+                        "name": r.get("name", city),
+                        "latitude": r["latitude"],
+                        "longitude": r["longitude"],
+                        "country": r.get("country", ""),
+                    }
+                logger.info("Geocoding '%s' returned no results", name)
+            except Exception as e:
+                logger.warning("Geocoding failed for '%s': %s", name, e)
+
     return None
 
 
