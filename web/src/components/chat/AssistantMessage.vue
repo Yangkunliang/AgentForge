@@ -110,22 +110,17 @@ function handleContentClick(e: MouseEvent) {
       <!-- 流式进度条（streaming 时显示） -->
       <ExecutionProgressBar :streaming="!!message.streaming" />
 
-      <!-- 思考中提示（无内容且无步骤时显示动效） -->
+      <!-- 思考中提示（无内容且无步骤时显示粒子旋转动画） -->
       <div
         v-if="message.streaming && !bodyText && !hasExecutionSteps"
         class="thinking-hint"
       >
-        <div class="thinking-hint__sparkles">
-          <span class="sparkle" />
-          <span class="sparkle" />
-          <span class="sparkle" />
-        </div>
         <span class="thinking-hint__text">正在思考中</span>
-        <span class="thinking-hint__dots">
-          <span class="dot" />
-          <span class="dot" />
-          <span class="dot" />
-        </span>
+        <div class="thinking-hint__particles">
+          <span class="particle" />
+          <span class="particle" />
+          <span class="particle" />
+        </div>
       </div>
 
       <!-- ── 新路径：execution_steps 可视化（TASK-009）──────── -->
@@ -244,38 +239,14 @@ function handleContentClick(e: MouseEvent) {
   min-width: 40px;
 }
 
-// ── 思考中动效提示 ──────────────────────────────────────────
+// ── 思考中粒子旋转动画 ────────────────────────────────────
 .thinking-hint {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
   padding: 4px 0 6px;
   min-height: 28px;
-}
-
-.thinking-hint__sparkles {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.sparkle {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #6366f1;
-  opacity: 0.5;
-  animation: sparkle-fade 1.4s ease-in-out infinite;
-
-  &:nth-child(1) { animation-delay: 0s; }
-  &:nth-child(2) { animation-delay: 0.2s; }
-  &:nth-child(3) { animation-delay: 0.4s; }
-}
-
-@keyframes sparkle-fade {
-  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.2); }
 }
 
 .thinking-hint__text {
@@ -285,28 +256,55 @@ function handleContentClick(e: MouseEvent) {
   font-weight: 500;
 }
 
-.thinking-hint__dots {
+.thinking-hint__particles {
   display: flex;
   gap: 4px;
   align-items: center;
+  padding: 2px;
 }
 
-.dot {
-  width: 5px;
-  height: 5px;
+.particle {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #6366f1;
-  opacity: 0.6;
-  animation: dot-bounce 1.4s ease-in-out infinite;
+  opacity: 0;
+  animation: particle-orbit 2s ease-in-out infinite;
+
+  &:nth-child(1) {
+    background: #c7d2fe;
+    animation-delay: 0s;
+  }
+  &:nth-child(2) {
+    background: #a5b4fc;
+    animation-delay: 0.6s;
+  }
+  &:nth-child(3) {
+    background: #818cf8;
+    animation-delay: 1.2s;
+  }
 }
 
-.dot:nth-child(1) { animation-delay: 0s; }
-.dot:nth-child(2) { animation-delay: 0.15s; }
-.dot:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes dot-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-4px); opacity: 1; }
+@keyframes particle-orbit {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(0);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.1) translateY(-4px);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1) translateY(0);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(0.8) translateY(4px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) translateY(0);
+  }
 }
 
 // ── 旧路径 tool_calls 折叠块（历史消息兜底）────────────────────
