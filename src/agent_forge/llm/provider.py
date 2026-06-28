@@ -242,12 +242,13 @@ class LiteLLMProvider(LLMProvider):
         on_thinking_start: Callable[[], Awaitable[None]] | None = None,
         on_thinking_delta: Callable[[str], Awaitable[None]] | None = None,
         on_thinking_end: Callable[[int], Awaitable[None]] | None = None,
+        system_prompt: str | None = None,
     ) -> AsyncGenerator[str, None]:
         if not self.is_available:
             yield "LiteLLM not available"
             return
         config = config or LLMConfig(model="gpt-4o")
-        messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
+        messages = _build_messages(prompt, system_prompt or DEFAULT_SYSTEM_PROMPT)
 
         from agent_forge.tracing import get_tracer
         async with get_tracer().start_span(
