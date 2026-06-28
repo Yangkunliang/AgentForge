@@ -10,6 +10,7 @@ sandbox/
 ├── base.py              ← Protocol 接口、数据类、异常定义
 ├── manager.py           ← SandboxManager（生命周期 + TTL 管理）
 ├── pool.py              ← SandboxPool（热沙箱池，可选优化）
+├── reclaimer.py         ← SandboxReclaimer（TTL 后台扫描 + 自动回收）
 ├── factory.py           ← SandboxProviderFactory（按配置创建 Executor）
 └── cubesandbox/
     ├── __init__.py
@@ -45,6 +46,7 @@ from agent_forge.sandbox.base import (
 )
 from agent_forge.sandbox.manager import SandboxManager
 from agent_forge.sandbox.pool import SandboxPool
+from agent_forge.sandbox.reclaimer import SandboxReclaimer
 from agent_forge.sandbox.factory import SandboxProviderFactory
 
 __all__ = [
@@ -65,6 +67,7 @@ __all__ = [
     # 核心组件
     "SandboxManager",
     "SandboxPool",
+    "SandboxReclaimer",
     # 工厂
     "SandboxProviderFactory",
 ]

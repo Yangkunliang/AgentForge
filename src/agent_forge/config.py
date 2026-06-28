@@ -149,6 +149,19 @@ class CubeSandboxConfig(BaseSettings):
         default=120, validation_alias="CUBE_SANDBOX_PAUSE_TTL"
     )
 
+    # ── 沙箱池 + 并发控制 ─────────────────────────────────
+    # 池预热数量（应用启动时预创建的热沙箱数）
+    sandbox_pool_min_size: int = Field(default=5, validation_alias="SANDBOX_POOL_MIN_SIZE")
+
+    # 池最大容量（归还时池满的直接销毁）
+    sandbox_pool_max_size: int = Field(default=20, validation_alias="SANDBOX_POOL_MAX_SIZE")
+
+    # 全局并发信号量上限（同时执行的沙箱数）
+    sandbox_max_concurrent: int = Field(default=20, validation_alias="SANDBOX_MAX_CONCURRENT")
+
+    # 单个请求获取沙箱的等待超时（秒）
+    sandbox_acquire_timeout: float = Field(default=30.0, validation_alias="SANDBOX_ACQUIRE_TIMEOUT")
+
     model_config = {
         "env_file": str(_find_env()),
         "env_file_encoding": "utf-8",

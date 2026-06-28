@@ -100,6 +100,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("SandboxReclaimer startup failed (non-fatal): %s", e)
 
+    # ── 6. 预热沙箱池 ────────────────────────────────────────────────
+    try:
+        from agent_forge.skills.code_executor import init_sandbox_pool
+        await init_sandbox_pool()
+        logger.info("SandboxPool warmed up")
+    except Exception as e:
+        logger.warning("SandboxPool warmup failed (non-fatal): %s", e)
+
     logger.info("AgentForge startup complete ✓")
     yield
 
@@ -116,6 +124,14 @@ async def lifespan(app: FastAPI):
         logger.info("MCP servers stopped")
     except Exception as e:
         logger.warning("MCP server shutdown error: %s", e)
+
+    # ── Shutdown: 沙箱池 ────────────────────────────────────────────
+    try:
+        from agent_forge.skills.code_executor import shutdown_sandbox_pool
+        await shutdown_sandbox_pool()
+        logger.info("SandboxPool shut down")
+    except Exception as e:
+        logger.warning("SandboxPool shutdown error: %s", e)
 
     logger.info("AgentForge shutting down...")
 

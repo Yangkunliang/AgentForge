@@ -274,7 +274,8 @@ CUBE_SANDBOX_DEFAULT_PROVIDER=mock
 |------|------|------|
 | `SandboxExecutor` Protocol + 数据类 + 异常 | ✅ 已实现 | `src/agent_forge/sandbox/base.py` |
 | `SandboxManager`（生命周期 + TTL） | ✅ 已实现 | `src/agent_forge/sandbox/manager.py` |
-| `SandboxPool`（热沙箱池） | ✅ 已实现 | `src/agent_forge/sandbox/pool.py` |
+| `SandboxPool`（热沙箱池 + cleanup + 冷启动降级） | ✅ 已实现 | `src/agent_forge/sandbox/pool.py` |
+| `SandboxReclaimer`（TTL 后台扫描 + 自动回收） | ✅ 已实现 | `src/agent_forge/sandbox/reclaimer.py` |
 | `MockSandboxExecutor`（本地开发） | ✅ 已实现 | `src/agent_forge/sandbox/mock.py` |
 | `DockerSandboxExecutor`（方案一） | ✅ 已实现 | `src/agent_forge/sandbox/docker.py` |
 | `CubeSandboxE2BExecutor`（E2B SDK 路径） | ✅ 已实现 | `src/agent_forge/sandbox/cubesandbox/e2b.py` |

@@ -84,18 +84,62 @@ class SandboxPool:
                 break
         logger.info("SandboxPool: 预热完成，热沙箱数量 %d/%d", created, self._min_size)
 
-    async def acquire(self) -> ConnectInfo:
-        """从池中获取一个沙箱。
+    async def acquire(self, timeout: float | None = None) -> ConnectInfo:
+        """从池中获取一个沙箱，支持超时。
 
-        如果池为空，冷启动新沙箱（等待 ~60ms）。
+        Args:
+            timeout: 等待池中有可用沙箱的超时秒数；
+                     None 表示立即取或走冷启动。
+
+        Returns:
+            热沙箱 ConnectInfo，或冷启动创建的新沙箱 ConnectInfo。
         """
         try:
-            info = self._pool.get_nowait()
+            if timeout is not None:
+                info = await asyncio.wait_for(self._pool.get(), timeout=timeout)
+            else:
+                info = self._pool.get_nowait()
             logger.debug("SandboxPool: acquired sandbox_id=%s from pool", info.sandbox_id)
             return info
         except asyncio.QueueEmpty:
-            logger.debug("SandboxPool: pool empty, cold-starting new sandbox")
-            return await self._executor.create(self._config)
+            pass
+        except asyncio.TimeoutError:
+            logger.debug("SandboxPool: acquire timed out (%.1fs), cold-starting", timeout)
+            # 走冷启动路径
+
+        logger.debug("SandboxPool: cold-starting new sandbox")
+        return await self._executor.create(self._config)
+
+    async def cleanup(self, sandbox_id: str) -> None:
+        """清理沙箱内状态（为复用做准备）。
+
+        在归还前：
+        1. 杀掉子进程（/proc 中 PID > 1 的进程）
+        2. 清除可写层中的临时数据（/tmp, /root, /home）
+
+        这样下一个 acquire 的使用者看到干净环境。
+
+        注意：E2B 沙箱是可写层（writable layer），
+        任何文件写入都持久化到下一次 reuse，
+        因此需要清理比 /tmp 更广的范围。
+        """
+        try:
+            await self._executor.execute(
+                sandbox_id,
+                code=(
+                    "import os, signal; "
+                    "# 杀掉子进程（保留 PID 1 主进程）; "
+                    "[os.kill(int(p), signal.SIGKILL) for p in os.listdir('/proc') "
+                    "if p.isdigit() and int(p) != 1]; "
+                    "# 清除临时文件和用户数据; "
+                    "os.system('rm -rf /tmp/* /root/.cache /root/.local/lib'); "
+                    "os.system('rm -rf /home/*')"
+                ),
+                timeout=5,
+            )
+            logger.debug("SandboxPool: cleaned up sandbox_id=%s", sandbox_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("SandboxPool: cleanup failed for %s: %s", sandbox_id, e)
 
     async def release(self, info: ConnectInfo) -> None:
         """归还沙箱到池中；池满时直接销毁。"""

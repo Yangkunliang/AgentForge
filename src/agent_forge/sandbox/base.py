@@ -184,6 +184,10 @@ class SandboxTimeoutError(SandboxError):
     """代码 / Shell 执行超时。"""
 
 
+class SandboxAcquireTimeoutError(SandboxError):
+    """获取沙箱超时（semaphore 或 pool acquire 等待超过阈值）。"""
+
+
 class SandboxAuthError(SandboxError):
     """API Key 无效或权限不足。不触发降级，直接返回 401。"""
 
