@@ -90,9 +90,10 @@ class SkillExecutionEngine:
         config: "LLMConfig",
         sse_publish: Callable[[str, dict], Awaitable[None]],
         user_id: str | None = None,
+        agent_name: str = "CodeSoul",
     ) -> AsyncGenerator[str, None]:
         return self._react_loop(
-            user_message, conversation_history, tools, llm, config, sse_publish, user_id
+            user_message, conversation_history, tools, llm, config, sse_publish, user_id, agent_name
         )
 
     async def _react_loop(
@@ -104,25 +105,9 @@ class SkillExecutionEngine:
         config: "LLMConfig",
         sse_publish: Callable[[str, dict], Awaitable[None]],
         user_id: str | None = None,
+        agent_name: str = "CodeSoul",
     ) -> AsyncGenerator[str, None]:
-        # 查询用户的 AI 助手名称
-        agent_name = "CodeSoul"
-        if user_id:
-            try:
-                from agent_forge.database import async_session_factory
-                from agent_forge.models import UserAgentSettings
-                from sqlalchemy import select
-
-                async with async_session_factory() as db:
-                    result = await db.execute(
-                        select(UserAgentSettings).where(UserAgentSettings.user_id == user_id)
-                    )
-                    settings = result.scalar_one_or_none()
-                    if settings:
-                        agent_name = settings.agent_name or "CodeSoul"
-            except Exception as e:
-                logger.warning("SkillEngine: failed to fetch agent_name, using default: %s", e)
-
+        # agent_name 由调用方从 UserAgentSettings 查询后传入，无需重复查询
         system_prompt = _build_system_prompt(agent_name)
         messages: list[dict] = [
             {"role": "system", "content": system_prompt},

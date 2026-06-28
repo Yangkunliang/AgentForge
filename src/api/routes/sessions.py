@@ -16,6 +16,7 @@ from agent_forge.api.sse import get_sse_manager, emit_task_started
 from agent_forge.database import get_async_session
 from agent_forge.models import Task, TaskStatus, User
 from agent_forge.models.session import Session, Message
+from agent_forge.models.user_agent_settings import UserAgentSettings
 from agent_forge.tracing import get_trace_id, get_tracer
 from middleware.auth import get_current_user
 
@@ -183,6 +184,18 @@ async def send_message(
         )
         history_messages = list(history_result.scalars().all())
 
+    # 查询用户自定义的 AI 助手名称，传给异步任务
+    agent_name = "CodeSoul"
+    try:
+        sa = await db.execute(
+            select(UserAgentSettings).where(UserAgentSettings.user_id == current_user.id)
+        )
+        settings = sa.scalar_one_or_none()
+        if settings:
+            agent_name = settings.agent_name or "CodeSoul"
+    except Exception:
+        pass
+
     asyncio.create_task(
         _run_task_with_skills(
             task_id=task_id,
@@ -192,6 +205,7 @@ async def send_message(
             user_message=body.content,
             history_messages=history_messages,
             user_id=current_user.id,
+            agent_name=agent_name,
         )
     )
 
@@ -216,6 +230,7 @@ async def _run_task_with_skills(
     user_message: str,
     history_messages: list[Message],
     user_id: str | None = None,
+    agent_name: str = "CodeSoul",
 ) -> None:
     from agent_forge.config import settings
     from agent_forge.database import async_session_factory
@@ -313,6 +328,7 @@ async def _run_task_with_skills(
                     config=llm_config,
                     sse_publish=sse_publish_and_collect,
                     user_id=user_id,
+                    agent_name=agent_name,
                 )
 
                 async for chunk in async_gen:
