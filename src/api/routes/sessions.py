@@ -36,6 +36,7 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     task_id: str | None
+    extra_data: list | None = None
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -131,6 +132,8 @@ async def send_message(
         session = await _get_session_or_404(db, session_id, current_user.id)
 
     if session.title == "新对话":
+        # 标题生成延迟到任务完成后，由异步任务用 LLM 生成并通过 SSE 推送给前端
+        # 此处仅设置一个临时占位，防止重复触发
         session.title = body.content.strip()[:20]
 
     task_id = str(uuid.uuid4())
@@ -184,6 +187,7 @@ async def send_message(
         _run_task_with_skills(
             task_id=task_id,
             trace_id=trace_id,
+            session_id=session_id,
             assistant_msg_id=assistant_msg.id,
             user_message=body.content,
             history_messages=history_messages,
@@ -207,6 +211,7 @@ async def _get_session_or_404(db: AsyncSession, session_id: str, user_id: str) -
 async def _run_task_with_skills(
     task_id: str,
     trace_id: str,
+    session_id: str,
     assistant_msg_id: str,
     user_message: str,
     history_messages: list[Message],
@@ -254,13 +259,59 @@ async def _run_task_with_skills(
                 engine = SkillExecutionEngine(dispatcher)
 
                 full_content = ""
+                execution_steps: list[dict] = []  # 收集执行过程数据用于持久化
+
+                async def sse_publish_and_collect(event_type: str, data: dict) -> None:
+                    """SSE 发射同时收集 execution_steps 事件。"""
+                    await sse.publish(task_id, event_type, data)
+                    # 收集需要持久化的步骤事件
+                    if event_type == "thinking_start":
+                        execution_steps.append({"type": "thinking", "content": "", "streaming": False})
+                    elif event_type == "thinking_delta":
+                        if execution_steps and execution_steps[-1]["type"] == "thinking":
+                            execution_steps[-1]["content"] += data.get("delta", "")
+                    elif event_type == "thinking_end":
+                        if execution_steps and execution_steps[-1]["type"] == "thinking":
+                            execution_steps[-1]["duration_ms"] = data.get("duration_ms", 0)
+                    elif event_type == "tool_call_start":
+                        execution_steps.append({
+                            "type": "tool_call",
+                            "tool_name": data.get("tool_name", ""),
+                            "arguments": data.get("arguments", {}),
+                            "status": "running",
+                        })
+                    elif event_type == "tool_call_end":
+                        for s in reversed(execution_steps):
+                            if s["type"] == "tool_call" and s["tool_name"] == data.get("tool_name") and s["status"] == "running":
+                                s["status"] = "completed"
+                                s["result"] = data.get("result", {})
+                                break
+                    elif event_type == "sandbox_executing":
+                        execution_steps.append({
+                            "type": "code_execution",
+                            "code": data.get("code", ""),
+                            "status": "running",
+                            "stdout": "", "stderr": "",
+                        })
+                    elif event_type == "sandbox_completed":
+                        for s in reversed(execution_steps):
+                            if s["type"] == "code_execution" and s["status"] == "running":
+                                s["status"] = "completed"
+                                s["exit_code"] = data.get("exit_code", 0)
+                                s["duration_ms"] = data.get("duration_ms", 0)
+                                break
+                    elif event_type == "sandbox_timeout":
+                        for s in reversed(execution_steps):
+                            if s["type"] == "code_execution" and s["status"] == "running":
+                                s["status"] = "timeout"
+                                break
                 async_gen = await engine.run(
                     user_message=user_message,
                     conversation_history=conversation_history,
                     tools=tools,
                     llm=get_llm_provider(),
                     config=llm_config,
-                    sse_publish=sse_publish,
+                    sse_publish=sse_publish_and_collect,
                     user_id=user_id,
                 )
 
@@ -286,10 +337,23 @@ async def _run_task_with_skills(
                         msg = msg_result.scalar_one_or_none()
                         if msg:
                             msg.content = full_content
+                            if execution_steps:
+                                msg.extra_data = execution_steps
 
                         await db.commit()
 
                 await emit_task_completed(task_id, {"content": full_content})
+
+                # ── 异步生成优质标题，推送给前端实时刷新 ────────────────
+                asyncio.create_task(
+                    _generate_session_title(
+                        session_id=session_id,
+                        user_message=user_message,
+                        assistant_reply=full_content[:500],
+                        task_id=task_id,
+                        trace_id=trace_id,
+                    )
+                )
 
             except Exception as exc:
                 logger.exception("Task %s failed: %s", task_id[:8], exc)
@@ -300,3 +364,67 @@ async def _run_task_with_skills(
                         task.status = TaskStatus.FAILED
                         await db.commit()
                 await emit_task_failed(task_id, str(exc))
+
+
+async def _generate_session_title(
+    session_id: str,
+    user_message: str,
+    assistant_reply: str,
+    task_id: str,
+    trace_id: str,
+) -> None:
+    """任务完成后异步生成优质会话标题，通过 SSE 实时推送前端更新。
+
+    规则：
+    - 用轻量 LLM 生成 6～12 字的中文标题，概括这次对话的主题
+    - 生成失败时倒退到截取用户输入前 15 字
+    - 通过 SSE session_title_updated 事件通知前端
+    """
+    from agent_forge.config import settings
+    from agent_forge.database import async_session_factory
+    from agent_forge.llm.provider import LLMConfig, get_llm_provider
+    from agent_forge.tracing import start_task_trace
+
+    try:
+        llm = get_llm_provider()
+        config = LLMConfig(
+            model=settings.default_model or "openai/deepseek-v3",
+            temperature=0.3,
+            max_tokens=32,
+        )
+        prompt = (
+            f"用户说：{user_message[:200]}\n\n"
+            f"AI 回复：{assistant_reply[:300]}\n\n"
+            "请用 6～12 个中文字为这次对话起一个简洁标题，"
+            "只输出标题文字，不加引号、标点、序号，不加任何其他内容。"
+        )
+        response = await llm.complete(prompt, config)
+        title = response.content.strip().strip('"\'《》【】').strip()[:20]
+        if not title:
+            raise ValueError("empty title")
+    except Exception as e:
+        logger.warning("_generate_session_title: LLM 失败，使用截断占位: %s", e)
+        title = user_message.strip()[:15]
+
+    # 写入数据库
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(select(Session).where(Session.id == session_id))
+            session = result.scalar_one_or_none()
+            if session:
+                session.title = title
+                await db.commit()
+    except Exception as e:
+        logger.warning("_generate_session_title: DB 写入失败: %s", e)
+        return
+
+    # 通过 SSE 推送标题更新事件，前端监听后刷新侧边栏
+    try:
+        sse = get_sse_manager()
+        await sse.publish(task_id, "session_title_updated", {
+            "session_id": session_id,
+            "title": title,
+        })
+        logger.info("session_title_updated session_id=%s title=%r", session_id[:8], title)
+    except Exception as e:
+        logger.warning("_generate_session_title: SSE 推送失败: %s", e)

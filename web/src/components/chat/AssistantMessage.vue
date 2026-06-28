@@ -110,12 +110,12 @@ function handleContentClick(e: MouseEvent) {
       <!-- 流式进度条（streaming 时显示） -->
       <ExecutionProgressBar :streaming="!!message.streaming" />
 
-      <!-- 思考中点动画（无内容且无步骤时） -->
+      <!-- 思考中提示（无内容且无步骤时显示文字，不重复进度条动画） -->
       <div
         v-if="message.streaming && !bodyText && !hasExecutionSteps"
-        class="thinking-dots"
+        class="thinking-hint"
       >
-        <span /><span /><span />
+        正在思考中，请稍候…
       </div>
 
       <!-- ── 新路径：execution_steps 可视化（TASK-009）──────── -->
@@ -234,28 +234,12 @@ function handleContentClick(e: MouseEvent) {
   min-width: 40px;
 }
 
-// ── 思考中点动画 ─────────────────────────────────────────────
-.thinking-dots {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  height: 22px;
-
-  span {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #9ca3af;
-    animation: dot-bounce 1.2s infinite;
-
-    &:nth-child(2) { animation-delay: .2s; }
-    &:nth-child(3) { animation-delay: .4s; }
-  }
-}
-
-@keyframes dot-bounce {
-  0%, 80%, 100% { transform: scale(.8); opacity: .5; }
-  40%           { transform: scale(1.2); opacity: 1; }
+// ── 思考中文字提示 ──────────────────────────────────────────
+.thinking-hint {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 2px 0 4px;
+  letter-spacing: 0.01em;
 }
 
 // ── 旧路径 tool_calls 折叠块（历史消息兜底）────────────────────

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import Base, TimestampMixin
 
@@ -50,6 +52,10 @@ class Message(Base, TimestampMixin):
     task_id: Mapped[str | None] = mapped_column(
         ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
+
+    # 执行过程数据：thinking / tool_call / code_execution 步骤，JSON 列存储
+    # 列名用 extra_data 避开 SQLAlchemy 保留属性名 metadata
+    extra_data: list | None = Column("extra_data", JSONB, nullable=True, default=None)
 
     # Relationships
     session = relationship("Session", back_populates="messages")

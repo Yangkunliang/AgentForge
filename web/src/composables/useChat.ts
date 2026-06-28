@@ -287,6 +287,20 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                 break
               }
 
+              // 会话标题更新（任务完成后 LLM 生成优质标题）
+              case 'session_title_updated': {
+                const sid = event.data.session_id as string
+                const title = event.data.title as string
+                if (sid && title) {
+                  const s = sessionStore.sessions.find((s) => s.id === sid)
+                  if (s) s.title = title
+                  if (sessionStore.currentSession?.id === sid) {
+                    sessionStore.currentSession.title = title
+                  }
+                }
+                break
+              }
+
               // 任务完成，用完整结果替换流式内容
               case 'task_completed': {
                 const content = (event.data.content as string) ?? ''

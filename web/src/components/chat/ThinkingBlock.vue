@@ -10,21 +10,17 @@ const props = defineProps<{
   }
 }>()
 
-const expanded = ref(true)
+// streaming 时展开；完成后保持展开，让用户主动折叠
+// 历史消息（初始非 streaming）默认折叠
+const expanded = ref(props.step.streaming)
 const thinkingDone = computed(() => !props.step.streaming)
-
-// streaming 时自动展开，完成后自动折叠
 watch(
   () => props.step.streaming,
   (streaming) => {
-    expanded.value = streaming
+    if (streaming) expanded.value = true  // 开始思考时展开
+    // 思考完成后不自动折叠
   },
 )
-
-// 动画过渡结束后重置（确保折叠/展开切换平滑）
-function onTransitionEnd() {
-  // no-op — 仅用于触发 CSS transition
-}
 
 const displayContent = computed(() => {
   return props.step.content || '思考中…'

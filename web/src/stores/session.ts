@@ -25,7 +25,11 @@ export const useSessionStore = defineStore('session', () => {
     loading.value = true
     try {
       const { data } = await sessionsApi.messages(session.id)
-      messages.value = data
+      // extra_data 是后端持久化的 execution_steps，还原到前端字段
+      messages.value = data.map((msg: any) => ({
+        ...msg,
+        execution_steps: msg.extra_data ?? undefined,
+      }))
     } finally {
       loading.value = false
     }

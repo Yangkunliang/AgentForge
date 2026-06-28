@@ -5,7 +5,7 @@
   1. 构造 messages（system + history + user）
   2. 调用 LLM（带 tools 定义）
   3. LLM 返回 tool_calls → SkillDispatcher 执行 → 追加 tool result → 继续
-  4. LLM 不再调用工具 → 退出循环，直接 yield 文字给调用方
+  4. LLM 不再调用工具 → 退出循环，stream_complete 流式输出最终回复
 
 关键优化（避免多余 LLM 调用）
 ------------------------------
@@ -19,13 +19,14 @@
   round 2: stream_complete   → 直接流式生成最终回复  ← 省掉一次 LLM 调用
 
 策略：
-  - 有工具结果待总结时（messages[-1].role == "tool"）→ 直接用 stream_complete
-  - 没有工具调用的纯对话 → tool_use_complete（需要工具路由决策）
-  - 工具路由决策返回 content 且无 tool_calls → 直接 yield（不再发 stream_complete）
+  - 有工具结果（messages[-1].role == "tool"）→ 直接 stream_complete
+  - 无工具结果 → tool_use_complete 路由决策
+    - has_tool_calls=true  → 执行工具，下一轮走上面
+    - has_tool_calls=false → stream_complete 流式输出（thinking 回调正常触发）
 
 thinking 事件（TASK-009）
 --------------------------
-stream_complete 接入 thinking 回调，LLM 的思考过程以独立 SSE 事件推送。
+所有最终回复统一走 stream_complete，thinking 回调在两条路径都能正常推送。
 yield 只携带正文文字 chunk，thinking 与 llm_response 严格互斥。
 
 循环上限：MAX_ROUNDS（默认 5），防止无限循环。
@@ -114,6 +115,22 @@ class SkillExecutionEngine:
             if sse_publish:
                 await sse_publish("thinking_end", {"duration_ms": duration_ms})
 
+        async def _stream_final(prompt: str) -> AsyncGenerator[str, None]:
+            """统一的流式最终回复，thinking 回调在此触发。"""
+            try:
+                async for chunk in llm.stream_complete(
+                    prompt,
+                    config,
+                    on_thinking_start=_on_thinking_start,
+                    on_thinking_delta=_on_thinking_delta,
+                    on_thinking_end=_on_thinking_end,
+                ):
+                    if chunk:
+                        yield chunk
+            except Exception as e:
+                logger.warning("SkillEngine: stream_complete failed: %s", e)
+                yield "抱歉，生成回复时出现错误，请重试。"
+
         for round_num in range(1, MAX_ROUNDS + 1):
             has_tool_results = messages[-1].get("role") == "tool"
 
@@ -124,29 +141,13 @@ class SkillExecutionEngine:
 
             # ── 有工具执行结果 → 直接流式生成最终回复，省掉一次 LLM 调用 ──
             if has_tool_results:
-                stream_prompt = _build_final_prompt(messages)
                 logger.info("SkillEngine: streaming final reply after tool results")
-                try:
-                    async for chunk in llm.stream_complete(
-                        stream_prompt,
-                        config,
-                        on_thinking_start=_on_thinking_start,
-                        on_thinking_delta=_on_thinking_delta,
-                        on_thinking_end=_on_thinking_end,
-                    ):
-                        if chunk:
-                            yield chunk
-                    return
-                except Exception as e:
-                    logger.warning("SkillEngine: stream_complete failed: %s", e)
-                    yield "抱歉，生成回复时出现错误，请重试。"
-                    return
+                async for chunk in _stream_final(_build_final_prompt(messages)):
+                    yield chunk
+                return
 
             # ── 无工具结果 → tool_use_complete 做路由决策 ────────────
-            if tools:
-                response = await llm.tool_use_complete(messages, tools, config)
-            else:
-                response = await llm.chat_complete(messages, config)
+            response = await llm.tool_use_complete(messages, tools, config)
 
             if response.has_tool_calls:
                 # ── 有工具调用：执行工具，追加结果，进入下一轮 ──────
@@ -205,16 +206,16 @@ class SkillExecutionEngine:
                         "tool_call_id": tc.id,
                     })
 
-                # 下一轮会检测到 has_tool_results=True，直接走 stream_complete
+                # 下一轮检测到 has_tool_results=True，直接走 stream_complete
                 continue
 
             else:
-                # ── 无工具调用：LLM 直接给出回复，yield 后退出 ──────
-                # tool_use_complete 返回的 content 里可能含 <thinking> 标签，剥离后输出
-                final_text = _strip_thinking_tags(response.content or "")
-                if not final_text:
-                    final_text = "抱歉，未能生成回复，请重试。"
-                yield final_text
+                # ── 无工具调用：LLM 决定直接回复 ──────────────────────
+                # 走 stream_complete 而不是直接 yield response.content，
+                # 这样 thinking 回调才能正常触发，前端才能显示思考过程
+                logger.info("SkillEngine: no tool calls, streaming direct reply")
+                async for chunk in _stream_final(user_message):
+                    yield chunk
                 return
 
         # ── 超过最大轮次兜底 ──────────────────────────────────────

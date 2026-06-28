@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import ThinkingBlock from './ThinkingBlock.vue'
 import ToolCallCard from './ToolCallCard.vue'
 import CodeExecutionCard from './CodeExecutionCard.vue'
@@ -9,28 +9,15 @@ const props = defineProps<{
   streaming: boolean
 }>()
 
-// 外层折叠容器
-const collapsed = ref(false)
+// streaming 时自动展开；完成后保持展开，让用户主动折叠
+// 只有历史消息（初始就是非 streaming 状态）才默认折叠
+const collapsed = ref(!props.streaming)
 const stepCount = computed(() => props.steps.length)
-const allDone = computed(
-  () => props.steps.every(
-    s => s.type !== 'thinking' ? (s.status !== 'running') : (!s.streaming),
-  ),
-)
-
-// streaming 时自动展开，全部完成时自动折叠
-import { watch } from 'vue'
 watch(
   () => props.streaming,
   (streaming) => {
-    collapsed.value = !streaming
-  },
-  { immediate: false },
-)
-watch(
-  () => allDone.value,
-  (done) => {
-    if (done) collapsed.value = true
+    if (streaming) collapsed.value = false  // 开始时展开
+    // 结束时不自动折叠，让用户自己决定
   },
 )
 
