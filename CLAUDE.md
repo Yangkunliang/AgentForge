@@ -136,32 +136,7 @@
 
 ### 计划项目结构
 
-```
-AgentForge/
-├── src/
-│   ├── agent_forge/
-│   │   ├── harness/     # 六层 harness（validator, router, registry, governance, executor）
-│   │   ├── bus/         # 消息总线（publisher, consumer, init）
-│   │   ├── agents/      # Agent 实现（基类 base.py + coder.py）
-│   │   ├── skills/      # 插件系统（manager, loader, registry, dispatcher, engine, builtin, code_executor 等）
-│   │   ├── memory/      # 4 层记忆（Working/Episodic/Semantic/User）
-│   │   ├── llm/         # LLM Provider 抽象（litellm_adapter, router, cost）
-│   │   ├── exporter/    # 数据导出（JSONL, 脱敏）
-│   │   ├── sandbox/     # 沙箱执行层（SandboxProviderFactory, SandboxPool, SandboxReclaimer）
-│   │   ├── api/         # 内部 API 层
-│   │   ├── auth/        # 认证相关
-│   │   ├── models/      # SQLAlchemy 数据模型
-│   │   ├── mcp/         # MCP 集成
-│   │   └── webhooks/    # Webhook 集成
-│   ├── api/             # FastAPI 路由（main.py + agents, auth, dashboard, health, llm, memory, sandboxes, sessions, skills, tasks, tools, uploads）
-│   └── middleware/      # auth.py, rate_limit.py
-└── web/                 # Vue 3 前端
-    └── src/
-        ├── api/         # Axios + SSE 客户端 + 自动生成类型
-        ├── stores/      # Pinia 状态（auth, task, agent, skill）
-        ├── composables/ # useSSE, useAuth, useSkillInstall
-        └── views/       # 页面组件
-```
+完整项目结构见 `docs/tech-design/ARCHITECTURE.md` 第 3.7 节。
 
 ---
 
