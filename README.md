@@ -66,7 +66,7 @@ AgentForge/
 - **全链路追踪**：端到端的 trace_id 审计与监控
 - **SSE 流式输出**：10 种事件类型，fetch + ReadableStream 实现
 - **LLM Provider 抽象**：LiteLLM 统一多厂商 API，支持模型路由、降级与 Cost 追踪
-- **LiteLLM Proxy Server**：独立部署的管理后台，自带 `/ui/liteLLM` Dashboard，可视化 token 用量、Cost 趋势、模型路由配置与限流告警
+- **LiteLLM Proxy Server**：独立部署的管理后台，`/ui/liteLLM` Dashboard 可视化 token 用量、Cost 趋势、模型路由配置与限流告警（部署后访问 `http://localhost:4000/ui/liteLLM`）
 - **沙箱执行层**：CubeSandbox（E2B SDK v1 兼容，KVM 内核级隔离）+ Docker 分级策略；`SandboxPool` 热沙箱池降低冷启动延迟，`SandboxReclaimer` 后台协程 TTL 自动回收
 - **数据导出**：JSONL 训练数据导出 + 三级 PII 脱敏策略
 
@@ -102,3 +102,9 @@ AgentForge/
 | [前端架构](docs/tech-design/FRONTEND-ARCHITECTURE.md) | 前端架构、SSE 方案、Token 策略 |
 | [消息队列](docs/tech-design/RABBITMQ.md) | RabbitMQ 拓扑、Exchange/Queue 设计 |
 | [部署指南](docs/tech-design/DEPLOYMENT.md) | 本地开发、生产部署、Nginx 配置 |
+
+## 参考
+
+- [LiteLLM](https://github.com/BerriAI/litellm) — 多厂商 LLM 统一 API + Cost 追踪
+- [LiteLLM Proxy Server](https://github.com/BerriAI/litellm/tree/main/proxy) — 管理后台，`/ui/liteLLM` Dashboard
+- [CubeSandbox](https://github.com/TencentCloud/CubeSandbox) — 腾讯开源，E2B 兼容，KVM 内核级隔离沙箱
