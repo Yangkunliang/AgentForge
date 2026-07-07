@@ -202,14 +202,16 @@ export const useSessionStore = defineStore('session', () => {
     stderr: string,
     exitCode: number,
     durationMs: number,
+    code = '',
   ) {
     const msg = messages.value.find((m) => m.id === localId)
     if (!msg) return
     const steps = msg.execution_steps ?? []
     for (let i = steps.length - 1; i >= 0; i--) {
       const s = steps[i]
-      if (s.type === 'code_execution' && s.status === 'running') {
-        s.status = 'completed'
+      if (s.type === 'code_execution' && s.status !== 'timeout') {
+        s.status = exitCode === 0 ? 'completed' : 'failed'
+        if (code && !s.code) s.code = code
         s.stdout = stdout
         s.stderr = stderr
         s.exit_code = exitCode
@@ -217,6 +219,15 @@ export const useSessionStore = defineStore('session', () => {
         return
       }
     }
+    _appendStep(msg, {
+      type: 'code_execution',
+      code,
+      status: exitCode === 0 ? 'completed' : 'failed',
+      stdout,
+      stderr,
+      exit_code: exitCode,
+      duration_ms: durationMs,
+    })
   }
 
   function failCodeExecution(localId: string, reason: string) {

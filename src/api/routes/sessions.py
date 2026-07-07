@@ -13,10 +13,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_forge.api.sse import get_sse_manager, emit_task_started
+from agent_forge.api.execution_steps import ExecutionStepCollector
+from agent_forge.api.sse import emit_task_started, get_sse_manager
 from agent_forge.database import get_async_session
 from agent_forge.models import Task, TaskStatus, User
-from agent_forge.models.session import Session, Message
+from agent_forge.models.session import Message, Session
 from agent_forge.models.user_agent_settings import UserAgentSettings
 from agent_forge.tracing import get_trace_id, get_tracer
 from middleware.auth import get_current_user
@@ -267,14 +268,14 @@ async def _run_task_with_skills(
     agent_name: str = "CodeSoul",
     advanced_context: dict | None = None,
 ) -> None:
+    from agent_forge.api.sse import emit_task_completed, emit_task_failed, get_sse_manager
     from agent_forge.config import settings
     from agent_forge.database import async_session_factory
-    from agent_forge.api.sse import emit_task_completed, emit_task_failed, get_sse_manager
     from agent_forge.llm.provider import LLMConfig, get_llm_provider
     from agent_forge.skills.dispatcher import SkillDispatcher
     from agent_forge.skills.engine import SkillExecutionEngine
     from agent_forge.skills.registry import get_skill_registry
-    from agent_forge.tracing import start_task_trace, get_tracer
+    from agent_forge.tracing import get_tracer, start_task_trace
 
     sse = get_sse_manager()
 
@@ -309,52 +310,12 @@ async def _run_task_with_skills(
                 engine = SkillExecutionEngine(dispatcher)
 
                 full_content = ""
-                execution_steps: list[dict] = []  # 收集执行过程数据用于持久化
+                execution_step_collector = ExecutionStepCollector()
 
                 async def sse_publish_and_collect(event_type: str, data: dict) -> None:
                     """SSE 发射同时收集 execution_steps 事件。"""
                     await sse.publish(task_id, event_type, data)
-                    # 收集需要持久化的步骤事件
-                    if event_type == "thinking_start":
-                        execution_steps.append({"type": "thinking", "content": "", "streaming": False})
-                    elif event_type == "thinking_delta":
-                        if execution_steps and execution_steps[-1]["type"] == "thinking":
-                            execution_steps[-1]["content"] += data.get("delta", "")
-                    elif event_type == "thinking_end":
-                        if execution_steps and execution_steps[-1]["type"] == "thinking":
-                            execution_steps[-1]["duration_ms"] = data.get("duration_ms", 0)
-                    elif event_type == "tool_call_start":
-                        execution_steps.append({
-                            "type": "tool_call",
-                            "tool_name": data.get("tool_name", ""),
-                            "arguments": data.get("arguments", {}),
-                            "status": "running",
-                        })
-                    elif event_type == "tool_call_end":
-                        for s in reversed(execution_steps):
-                            if s["type"] == "tool_call" and s["tool_name"] == data.get("tool_name") and s["status"] == "running":
-                                s["status"] = "completed"
-                                s["result"] = data.get("result", {})
-                                break
-                    elif event_type == "sandbox_executing":
-                        execution_steps.append({
-                            "type": "code_execution",
-                            "code": data.get("code", ""),
-                            "status": "running",
-                            "stdout": "", "stderr": "",
-                        })
-                    elif event_type == "sandbox_completed":
-                        for s in reversed(execution_steps):
-                            if s["type"] == "code_execution" and s["status"] == "running":
-                                s["status"] = "completed"
-                                s["exit_code"] = data.get("exit_code", 0)
-                                s["duration_ms"] = data.get("duration_ms", 0)
-                                break
-                    elif event_type == "sandbox_timeout":
-                        for s in reversed(execution_steps):
-                            if s["type"] == "code_execution" and s["status"] == "running":
-                                s["status"] = "timeout"
-                                break
+                    execution_step_collector.collect(event_type, data)
                 async_gen = await engine.run(
                     user_message=user_message,
                     conversation_history=conversation_history,
@@ -389,8 +350,8 @@ async def _run_task_with_skills(
                         msg = msg_result.scalar_one_or_none()
                         if msg:
                             msg.content = full_content
-                            if execution_steps:
-                                msg.extra_data = execution_steps
+                            if execution_step_collector.steps:
+                                msg.extra_data = execution_step_collector.steps
 
                         await db.commit()
 
@@ -435,8 +396,6 @@ async def _generate_session_title(
     from agent_forge.config import settings
     from agent_forge.database import async_session_factory
     from agent_forge.llm.provider import LLMConfig, get_llm_provider
-    from agent_forge.tracing import start_task_trace
-
     try:
         llm = get_llm_provider()
         config = LLMConfig(

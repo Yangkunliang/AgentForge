@@ -58,8 +58,8 @@
 | `thinking_start` | 用户感知 ⭐ | 展开 thinking 折叠块，开始流式 |
 | `thinking_delta` | 用户感知 ⭐ | 向 thinking 块追加文字（新增） |
 | `thinking_end` | 状态辅助 | 折叠 thinking 块，标记完成 |
-| `tool_call_start` | 用户感知 ⭐ | 创建工具调用卡片，显示 running |
-| `tool_call_end` | 用户感知 ⭐ | 更新卡片状态，渲染结果 |
+| `tool_call_start` | 用户感知 ⭐ | 普通工具创建工具调用卡片；`code_executor` 不创建通用卡 |
+| `tool_call_end` | 用户感知 ⭐ | 普通工具更新卡片状态；`code_executor` 补全代码执行卡 stdout/stderr |
 | `sandbox_executing` | 用户感知 ⭐ | 在 code_executor 卡片内展示代码 + loading |
 | `sandbox_completed` | 状态辅助 | 更新执行耗时 |
 | `sandbox_timeout` | 用户感知 ⭐ | 在卡片内显示超时错误 |
@@ -505,8 +505,7 @@ task_started                    →   进度条出现，bubble 空白
 thinking_start                  →   ThinkingBlock 出现，spinner 转
 thinking_delta × N              →   thinking 文字流式出现
 thinking_end (1200ms)           →   spinner → ✓，自动折叠，显示 1.2s
-tool_call_start (code_executor) →   CodeExecutionCard 出现，running
-sandbox_executing (code=...)    →   代码内容填入卡片
+sandbox_executing (code=...)    →   CodeExecutionCard 出现，代码内容填入卡片
                                     [代码块 + 进度动画]
 sandbox_completed (300ms)       →   进度动画消失，显示耗时
 tool_call_end (stdout/stderr)   →   输出区域填入结果，状态→✓ 成功

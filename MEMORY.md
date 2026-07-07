@@ -37,6 +37,9 @@
 - [2025-06-20-frontend-workbench/](docs/iterations/2025-06-20-frontend-workbench/) — 前端工作台迭代
 - [2025-06-20-skill-dashboard-cost-exports/](docs/iterations/2025-06-20-skill-dashboard-cost-exports/) — Skill 面板与成本导出
 - [2026-06-22-skill-engine/](docs/iterations/2026-06-22-skill-engine/) — Skill 引擎迭代
+- [2026-07-07-task-009-sse-validation/](docs/iterations/2026-07-07-task-009-sse-validation/) — TASK-009 SSE 执行过程可视化联调验证
+  - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-07-task-009-sse-validation/TECHNICAL-DESIGN.md) — 执行步骤收集器、code_executor 单卡展示、stdout/stderr 补全、失败/超时状态风险修正
+  - [TEST-PLAN.md](docs/iterations/2026-07-07-task-009-sse-validation/TEST-PLAN.md) — thinking、tool_call、code_executor、timeout、多步骤顺序的自动化测试和视觉验收计划
 - [2026-07-07-task-011-risk-fixes/](docs/iterations/2026-07-07-task-011-risk-fixes/) — TASK-011 高级设置真实透传与技术风险修正
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-07-task-011-risk-fixes/TECHNICAL-DESIGN.md) — intent/context/stage 透传、system prompt 注入、沙箱配置、API 路由前缀、依赖锁、SQLite 测试方言与全量 pytest 风险修正
 

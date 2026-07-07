@@ -1,7 +1,7 @@
 # TASK-009：SSE 执行过程可视化
 
 **优先级**：P2  
-**状态**：Phase 4 联调验证中  
+**状态**：Phase 4 自动化验证已补充，待真实浏览器视觉验收
 **依赖**：TASK-006（Chat UI）、TASK-008（沙箱执行层）  
 **关联设计文档**：[SSE-EXECUTION-VISUALIZATION.md](../tech-design/SSE-EXECUTION-VISUALIZATION.md)  
 **关联代码**：`src/agent_forge/api/sse.py`、`src/agent_forge/llm/provider.py`、`src/agent_forge/skills/code_executor.py`、`src/agent_forge/skills/dispatcher.py`、`web/src/`
@@ -128,13 +128,13 @@
 ### 4.1 核心场景测试
 - [ ] **纯对话**：只有 llm_response，无 ExecutionStepList，气泡正常流式
 - [ ] **天气查询**：thinking → get_weather tool_call → llm_response，3步顺序正确
-- [ ] **代码执行**：thinking → code_executor（含代码预览 + 输出）→ llm_response
-- [ ] **多工具穿插**：thinking → tool_call_1 → thinking → tool_call_2，顺序保留
-- [ ] **代码执行失败**：CodeExecutionCard 显示 stderr
+- [x] **代码执行**：thinking → code_executor（含代码预览 + 输出）→ llm_response；自动化覆盖 code_executor 单 CodeExecutionStep 与 stdout/stderr 补全
+- [x] **多工具穿插**：thinking → tool_call_1 → thinking → tool_call_2，顺序保留；自动化覆盖 execution_steps 按事件到达顺序落库
+- [x] **代码执行失败**：CodeExecutionCard 显示 stderr；自动化覆盖无 sandbox 事件的安全拦截失败兜底
 
 ### 4.2 异常场景测试
-- [ ] 代码执行超时（30s）：timeout 状态卡片，整体任务不崩溃
-- [ ] 工具调用失败：failed 状态卡片，有错误文字
+- [x] 代码执行超时（30s）：timeout 状态卡片，整体任务不崩溃；自动化覆盖 `sandbox_timeout` 状态收集
+- [x] 工具调用失败：failed 状态卡片，有错误文字；自动化覆盖 `result.error` → failed
 - [ ] SSE 中断：streaming 状态正确 finalize
 - [ ] 历史消息加载：旧 `tool_calls` 格式不报错，有兜底渲染
 
@@ -143,6 +143,13 @@
 - [ ] 多步骤时间线连接线对齐
 - [ ] 折叠/展开动画 < 300ms
 - [ ] 移动端（375px）各卡片不溢出
+
+### 4.4 本轮风险修正与自动化覆盖 ✅
+- [x] 抽取 `ExecutionStepCollector`，避免 `sessions.py` 内联收集逻辑不可测试
+- [x] 后端持久化跳过 `code_executor` 通用 ToolCallStep，历史消息不再重复展示工具卡和代码卡
+- [x] 前端 `tool_call_start/end` 对 `code_executor` 只补全 CodeExecutionStep，不再创建 ToolCallStep
+- [x] 修复 `sandbox_completed` 先到后，`tool_call_end` 无法补齐 stdout/stderr 的状态更新问题
+- [x] 补充 `tests/api/test_execution_steps.py` 覆盖 thinking、普通工具、code_executor、超时和多步骤顺序
 
 ---
 
@@ -159,6 +166,8 @@
 | 类型定义 | `web/src/types/index.ts` | ✅ |
 | Session Store | `web/src/stores/session.ts` | ✅ |
 | useChat 事件处理 | `web/src/composables/useChat.ts` | ✅ |
+| 执行步骤收集器 | `src/agent_forge/api/execution_steps.py` | ✅ |
+| 执行步骤回归测试 | `tests/api/test_execution_steps.py` | ✅ |
 | ExecutionProgressBar | `web/src/components/chat/ExecutionProgressBar.vue` | ✅ |
 | ThinkingBlock | `web/src/components/chat/ThinkingBlock.vue` | ✅ |
 | ToolCallCard | `web/src/components/chat/ToolCallCard.vue` | ✅ |
@@ -174,3 +183,4 @@
 - `thinking_delta` 和 `llm_response` 严格互斥，由 `_stream_with_thinking()` 保证
 - `_suffix_match()` 处理跨 chunk 标签拆断问题，覆盖 `<thi`、`</think` 等不完整前缀
 - `on_event` 注入到 Skill 时 `_emit()` 辅助函数做了异常守卫，回调失败不影响主流程
+- `code_executor` 是代码执行专属卡片，不再作为普通 ToolCallCard 展示；若没有 `sandbox_executing` 事件，`tool_call_end` 会兜底生成失败的 CodeExecutionStep

@@ -11,7 +11,7 @@
  * thinking_start/delta/end    → sessionStore.start/append/endThinkingStep
  * sandbox_executing           → sessionStore.startCodeExecution
  * sandbox_completed/timeout   → sessionStore.complete/failCodeExecution
- * tool_call_start/end         → code_executor → CodeExecutionStep
+ * tool_call_start/end         → code_executor → 补全 CodeExecutionStep 输出
  *                             → 其他工具 → ToolCallStep
  */
 import { ref } from 'vue'
@@ -259,6 +259,9 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
               // ── 工具调用 ───────────────────────────────────────────
               case 'tool_call_start': {
                 const toolName = event.data.tool_name as string
+                if (toolName === 'code_executor') {
+                  break
+                }
                 const args = event.data.arguments as Record<string, unknown>
                 sessionStore.startToolCallStep(localAssistantId, toolName, args)
                 break
@@ -268,24 +271,18 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                 const toolName = event.data.tool_name as string
                 const result = event.data.result as Record<string, unknown>
 
-                // code_executor 的 tool_call_end 同时更新 tool_call 步骤和 code_execution 步骤：
-                // - tool_call_start 创建了一个 ToolCallStep（用于执行过程可视化），需要标记完成
-                // - sandbox_completed 已经更新了 CodeExecutionStep，这里补全 stdout/stderr
+                // code_executor 的执行过程由 sandbox_* 事件生成 CodeExecutionStep；
+                // tool_call_end 只负责补全 stdout/stderr，避免重复生成通用工具卡。
                 if (toolName === 'code_executor') {
-                  const duration_ms = (event.data.duration_ms as number) ?? 0
+                  const duration_ms = (result?.duration_ms as number) ?? (event.data.duration_ms as number) ?? 0
                   const stdout = (result?.stdout as string) ?? ''
                   const stderr = (result?.stderr as string) ?? ''
-                  const exit_code = (result?.exit_code as number) ?? 0
+                  const exit_code = (result?.exit_code as number) ?? (result?.success === false ? -1 : 0)
+                  const args = event.data.arguments as Record<string, unknown> | undefined
+                  const code = (args?.code as string) ?? ''
                   sessionStore.completeCodeExecution(
-                    localAssistantId, stdout, stderr, exit_code, duration_ms,
+                    localAssistantId, stdout, stderr, exit_code, duration_ms, code,
                   )
-                  // 同时完成 tool_call_start 创建的 ToolCallStep
-                  sessionStore.completeToolCallStep(localAssistantId, toolName, {
-                    stdout,
-                    stderr,
-                    exit_code,
-                    duration_ms,
-                  }, duration_ms)
                 } else {
                   sessionStore.completeToolCallStep(
                     localAssistantId, toolName, result ?? {},
