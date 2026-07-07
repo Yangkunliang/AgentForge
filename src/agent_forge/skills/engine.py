@@ -38,7 +38,7 @@ import json
 import logging
 import re
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,9 +64,66 @@ SYSTEM_PROMPT = """你是 {agent_name}，一个面向全栈开发工程师的 AI
 """
 
 
-def _build_system_prompt(agent_name: str = "CodeSoul") -> str:
+INTENT_LABELS = {
+    "new_feature": "全新功能",
+    "iteration": "迭代优化",
+    "ui_adjust": "UI 调整",
+    "bug_fix": "Bug 修复",
+}
+
+
+def _build_system_prompt(
+    agent_name: str = "CodeSoul",
+    advanced_context: dict[str, Any] | None = None,
+) -> str:
     """从模板构建 system prompt，注入用户自定义的助手名称。"""
-    return SYSTEM_PROMPT.format(agent_name=agent_name)
+    prompt = SYSTEM_PROMPT.format(agent_name=agent_name)
+    task_context = _format_advanced_context(advanced_context)
+    if task_context:
+        return f"{prompt}\n\n{task_context}"
+    return prompt
+
+
+def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
+    """把用户在高级设置里选择的意图、上下文和阶段覆盖转成执行提示。"""
+    if not advanced_context:
+        return ""
+
+    lines = ["**当前任务设置**："]
+
+    intent = advanced_context.get("intent")
+    if isinstance(intent, str) and intent:
+        label = INTENT_LABELS.get(intent, "未知类型")
+        lines.append(f"- 需求类型：{label}（{intent}）")
+
+    context_files = advanced_context.get("context_files")
+    if isinstance(context_files, list) and context_files:
+        lines.append("- 用户指定上下文：")
+        for item in context_files[:10]:
+            if not isinstance(item, dict):
+                continue
+            item_type = str(item.get("type", "")).strip()
+            value = str(item.get("value", "")).strip()
+            if item_type and value:
+                lines.append(f"  - {item_type}: {value}")
+
+    stage_overrides = advanced_context.get("stage_overrides")
+    if isinstance(stage_overrides, dict) and stage_overrides:
+        disabled = [
+            str(stage_id)
+            for stage_id, enabled in stage_overrides.items()
+            if enabled is False
+        ]
+        if disabled:
+            lines.append(f"- 关闭阶段：{', '.join(disabled)}")
+
+    lines.append(
+        "- 上下文条目只是用户给出的关注线索，不代表你已经读取了文件内容；"
+        "需要真实内容时应调用可用工具获取，或明确说明需要用户授权/提供内容。"
+    )
+    lines.append("- 回答和执行时优先尊重需求类型与阶段设置，但不得跳过必要的风险说明和用户确认。")
+
+    return "\n".join(lines)
 
 
 class SkillExecutionEngine:
@@ -85,9 +142,18 @@ class SkillExecutionEngine:
         sse_publish: Callable[[str, dict], Awaitable[None]],
         user_id: str | None = None,
         agent_name: str = "CodeSoul",
+        advanced_context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[str, None]:
         return self._react_loop(
-            user_message, conversation_history, tools, llm, config, sse_publish, user_id, agent_name
+            user_message,
+            conversation_history,
+            tools,
+            llm,
+            config,
+            sse_publish,
+            user_id,
+            agent_name,
+            advanced_context,
         )
 
     async def _react_loop(
@@ -100,9 +166,10 @@ class SkillExecutionEngine:
         sse_publish: Callable[[str, dict], Awaitable[None]],
         user_id: str | None = None,
         agent_name: str = "CodeSoul",
+        advanced_context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[str, None]:
         # agent_name 由调用方从 UserAgentSettings 查询后传入，无需重复查询
-        system_prompt = _build_system_prompt(agent_name)
+        system_prompt = _build_system_prompt(agent_name, advanced_context)
         messages: list[dict] = [
             {"role": "system", "content": system_prompt},
             *conversation_history,

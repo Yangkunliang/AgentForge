@@ -37,6 +37,8 @@
 - [2025-06-20-frontend-workbench/](docs/iterations/2025-06-20-frontend-workbench/) — 前端工作台迭代
 - [2025-06-20-skill-dashboard-cost-exports/](docs/iterations/2025-06-20-skill-dashboard-cost-exports/) — Skill 面板与成本导出
 - [2026-06-22-skill-engine/](docs/iterations/2026-06-22-skill-engine/) — Skill 引擎迭代
+- [2026-07-07-task-011-risk-fixes/](docs/iterations/2026-07-07-task-011-risk-fixes/) — TASK-011 高级设置真实透传与技术风险修正
+  - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-07-task-011-risk-fixes/TECHNICAL-DESIGN.md) — intent/context/stage 透传、system prompt 注入、沙箱配置与 API 路由前缀风险修正
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范

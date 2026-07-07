@@ -18,14 +18,18 @@ import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
 import { useSessionStore } from '@/stores/session'
 import { useAuthStore } from '@/stores/auth'
-import type { SSEEvent } from '@/types'
+import type { ChatAdvancedPayload, SSEEvent } from '@/types'
 
 export function useChat(sessionId?: string) {
   const sessionStore = useSessionStore()
   const sending = ref(false)
   let currentController: AbortController | null = null
 
-  async function sendMessage(content: string, id?: string): Promise<AbortController | null> {
+  async function sendMessage(
+    content: string,
+    id?: string,
+    advancedPayload?: ChatAdvancedPayload,
+  ): Promise<AbortController | null> {
     const targetId = id ?? sessionId
     if (!content.trim() || sending.value || !targetId) return null
     sending.value = true
@@ -44,7 +48,7 @@ export function useChat(sessionId?: string) {
       }
 
       // 发送到后端，获取 task_id
-      const { data } = await sessionsApi.chat(targetId, content)
+      const { data } = await sessionsApi.chat(targetId, content, advancedPayload)
       const taskId = data.task_id
 
       // 订阅 SSE，监听执行过程

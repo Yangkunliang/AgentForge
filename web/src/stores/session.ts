@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
-import type { Session, ChatMessage, ExecutionStep, ThinkingStep, ToolCallStep, CodeExecutionStep } from '@/types'
+import type { Session, ChatMessage, ExecutionStep } from '@/types'
 
 export const useSessionStore = defineStore('session', () => {
   const sessions = ref<Session[]>([])
@@ -96,18 +96,6 @@ export const useSessionStore = defineStore('session', () => {
   /** 追加新步骤到消息 */
   function _appendStep(msg: ChatMessage, step: ExecutionStep) {
     _ensureSteps(msg).push(step)
-  }
-
-  /** 找到消息当前正在运行的步骤（最后一个 running 步骤）*/
-  function _findRunningStep(msg: ChatMessage, type?: string): ExecutionStep | undefined {
-    const steps = msg.execution_steps ?? []
-    for (let i = steps.length - 1; i >= 0; i--) {
-      const s = steps[i]
-      if (s.type === 'running' || s.status === 'running') {
-        if (!type || s.type === type) return s
-      }
-    }
-    return undefined
   }
 
   // ── Thinking ────────────────────────────────────────────────

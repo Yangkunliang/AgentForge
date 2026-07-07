@@ -233,6 +233,28 @@ export interface WebSearchResponse {
   total: number
 }
 
+// 高级设置（TASK-011）
+export type ChatIntentType = 'new_feature' | 'iteration' | 'ui_adjust' | 'bug_fix'
+export type ContextFileType = 'branch' | 'file' | 'url'
+
+export interface ContextFile {
+  id: string
+  type: ContextFileType
+  label: string
+  value: string
+  active: boolean
+}
+
+export interface ChatAdvancedPayload {
+  intent?: ChatIntentType
+  context_files?: Array<{
+    type: ContextFileType
+    value: string
+    label?: string
+  }>
+  stage_overrides?: Record<string, boolean>
+}
+
 // SSE 事件
 export type SSEEventType =
   | 'task_started'
@@ -254,6 +276,7 @@ export type SSEEventType =
   | 'sandbox_executing'
   | 'sandbox_completed'
   | 'sandbox_timeout'
+  | 'session_title_updated'
   | 'heartbeat'
 
 export interface SSEEvent {

@@ -1,5 +1,5 @@
 import request from '@/api/request'
-import type { Session, ChatMessage } from '@/types'
+import type { Session, ChatMessage, ChatAdvancedPayload } from '@/types'
 
 export const sessionsApi = {
   list: () => request.get<Session[]>('/sessions'),
@@ -13,8 +13,11 @@ export const sessionsApi = {
 
   messages: (id: string) => request.get<ChatMessage[]>(`/sessions/${id}/messages`),
 
-  chat: (id: string, content: string) =>
-    request.post<{ message_id: string; task_id: string }>(`/sessions/${id}/chat`, { content }),
+  chat: (id: string, content: string, advanced?: ChatAdvancedPayload) =>
+    request.post<{ message_id: string; task_id: string }>(`/sessions/${id}/chat`, {
+      content,
+      ...advanced,
+    }),
 }
 
 export const uploadApi = {

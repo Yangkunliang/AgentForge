@@ -25,7 +25,7 @@ from agent_forge.sandbox.manager import SandboxManager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/sandboxes", tags=["沙箱执行层"])
+router = APIRouter(tags=["沙箱执行层"])
 
 # 全局 SandboxManager 单例（由 main.py lifespan 初始化）
 _global_sandbox: SandboxManager | None = None

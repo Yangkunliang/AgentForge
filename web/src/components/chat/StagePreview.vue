@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { IntentType } from '@/composables/usePipeline'
 import { usePipeline } from '@/composables/usePipeline'
+import { useAdvancedSettingsStore } from '@/stores/advancedSettings'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -8,15 +9,30 @@ const props = defineProps<{
 }>()
 
 const { getConfig } = usePipeline()
+const advancedSettings = useAdvancedSettingsStore()
 
 const config = computed(() => getConfig(props.intent))
+
+function isSkipped(stageId: string): boolean {
+  return !advancedSettings.isStageEnabled(stageId)
+}
+
+function toggleStage(stage: { id: string; optional?: boolean }) {
+  if (!stage.optional) return
+  advancedSettings.toggleStage(stage.id)
+}
 </script>
 
 <template>
   <div class="stage-preview">
     <div class="stage-list">
       <template v-for="(stage, index) in config.stages" :key="stage.id">
-        <div class="stage-pill" :class="{ optional: stage.optional }">
+        <div
+          class="stage-pill"
+          :class="{ optional: stage.optional, skipped: isSkipped(stage.id) }"
+          :title="stage.optional ? '点击跳过或恢复此阶段' : '此阶段为必需步骤'"
+          @click="toggleStage(stage)"
+        >
           <span class="stage-label">{{ stage.label }}</span>
           <span v-if="stage.optional" class="optional-mark">*</span>
         </div>
@@ -28,6 +44,16 @@ const config = computed(() => getConfig(props.intent))
     <div v-if="config.skippedStages.length > 0" class="skipped-stages">
       <span class="skipped-label">跳过：</span>
       <span v-for="stage in config.skippedStages" :key="stage" class="skipped-item">{{ stage }}</span>
+    </div>
+    <div v-if="Object.keys(advancedSettings.stageOverrides).length > 0" class="skipped-stages">
+      <span class="skipped-label">用户调整：</span>
+      <span
+        v-for="(_enabled, stageId) in advancedSettings.stageOverrides"
+        :key="stageId"
+        class="skipped-item"
+      >
+        {{ stageId }}
+      </span>
     </div>
   </div>
 </template>
@@ -68,6 +94,15 @@ const config = computed(() => getConfig(props.intent))
     background: #fef3c7;
     border-color: #fde68a;
     color: #b45309;
+    cursor: pointer;
+  }
+
+  &.skipped {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+    text-decoration: line-through;
+    opacity: 0.72;
   }
 }
 
@@ -101,5 +136,6 @@ const config = computed(() => getConfig(props.intent))
   border-radius: 4px;
   text-decoration: line-through;
   text-decoration-color: #cbd5e1;
+
 }
 </style>

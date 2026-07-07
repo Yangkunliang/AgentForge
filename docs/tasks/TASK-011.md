@@ -287,13 +287,34 @@ Step 10：端到端联调验收
 
 ## 验收标准
 
-- [ ] 选择不同 intent 后，执行阶段自动更新，stageOverrides 清空
-- [ ] optional 阶段点击后变为删除线灰色；再次点击恢复
-- [ ] 添加上下文文件后，Chip 正确显示；点击可切换激活状态；支持删除
-- [ ] 刷新页面后，intent / contextFiles / stageOverrides 保持上次状态
-- [ ] 发送消息时，Network 请求体包含 `intent`、`context_files`、`stage_overrides` 字段
-- [ ] 后端日志显示 intent 已注入 system prompt
-- [ ] 快捷动作随 intent 切换联动更新
+- [x] 选择不同 intent 后，执行阶段自动更新，stageOverrides 清空
+- [x] optional 阶段点击后变为删除线灰色；再次点击恢复
+- [x] 添加上下文文件后，Chip 正确显示；点击可切换激活状态；支持删除
+- [x] 刷新页面后，intent / contextFiles / stageOverrides 保持上次状态
+- [x] 发送消息时，请求体包含 `intent`、`context_files`、`stage_overrides` 字段
+- [x] 后端将 intent/context/stage 注入 system prompt
+- [x] 快捷动作随 intent 切换联动更新
+
+---
+
+## 2026-07-07 实现记录
+
+### 已完成
+
+- 新增 `web/src/stores/advancedSettings.ts`，统一管理 `intent`、`contextFiles`、`stageOverrides`，并持久化到 `localStorage('agentforge:advanced-settings')`。
+- 新增 `ContextPickerDialog.vue`，支持手动添加文件、分支、URL 三类上下文。
+- 改造 `ContextChips.vue`，移除静态假数据，支持激活/停用/删除上下文。
+- 改造 `StagePreview.vue`，optional 阶段可点击跳过/恢复，切换 intent 后重置覆盖状态。
+- 提取 `QuickActions.vue`，让快捷动作继续由 intent 派生，但从 `Index.vue` 解耦。
+- 扩展 `useChat.ts`、`sessions.ts`、`ChatRequest`，把高级设置 payload 传入后端。
+- `SkillExecutionEngine` 将高级设置格式化进 system prompt，并明确上下文线索不等于已读取文件内容。
+
+### 同步修正的技术风险
+
+- `SandboxProviderFactory.create()` 增加 `api_key` 参数，修复 `cubesandbox_api` 分支未定义变量风险。
+- `CubeSandboxConfig` 增加 `cube_sandbox_api_key` 字段，修复调用方与配置类不一致。
+- `memory`、`sandboxes` 路由统一由 `main.py` 挂载 API 前缀，避免 `/api/v1/api/...` 双前缀。
+- 新增后端回归测试覆盖沙箱工厂、路由前缀和高级设置 prompt 注入。
 
 ---
 

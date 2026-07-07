@@ -35,6 +35,7 @@ class SandboxProviderFactory:
     def create(
         provider: str = "cubesandbox_e2b",
         url: str = "",
+        api_key: str = "",
         template_id: str = "",
     ):
         """根据 provider 名称返回对应的 SandboxExecutor 实例。
@@ -44,6 +45,7 @@ class SandboxProviderFactory:
         Args:
             provider:     cubesandbox_e2b | cubesandbox_api
             url:          自部署 CubeSandbox 地址（空字符串 = 使用 E2B 云）
+            api_key:      cubesandbox_api 的 Bearer Token；E2B provider 忽略此参数
             template_id:  默认模板 ID
         """
         if provider == "cubesandbox_e2b":

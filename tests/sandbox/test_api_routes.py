@@ -44,7 +44,7 @@ def client(manager):
     """FastAPI TestClient"""
     from fastapi import FastAPI
     app = FastAPI()
-    app.include_router(sandboxes.router)
+    app.include_router(sandboxes.router, prefix="/api/v1/sandboxes")
     return TestClient(app)
 
 

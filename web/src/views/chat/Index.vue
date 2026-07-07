@@ -4,16 +4,18 @@ import AssistantMessage from '@/components/chat/AssistantMessage.vue'
 import ContextChips from '@/components/chat/ContextChips.vue'
 import IntentSelector from '@/components/chat/IntentSelector.vue'
 import ProjectBar from '@/components/chat/ProjectBar.vue'
+import QuickActions from '@/components/chat/QuickActions.vue'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
 import StagePreview from '@/components/chat/StagePreview.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import { useChat } from '@/composables/useChat'
 import { usePipeline } from '@/composables/usePipeline'
-import type { IntentType } from '@/composables/usePipeline'
+import { useAdvancedSettingsStore } from '@/stores/advancedSettings'
 import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionStore } from '@/stores/session'
+import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -22,10 +24,11 @@ const router = useRouter()
 const sessionStore = useSessionStore()
 const authStore = useAuthStore()
 const agentStore = useAgentStore()
+const advancedSettings = useAdvancedSettingsStore()
+const { intent: currentIntent } = storeToRefs(advancedSettings)
 
 const { getConfig, intentLabels } = usePipeline()
 
-const currentIntent = ref<IntentType>('iteration')
 const currentConfig = computed(() => getConfig(currentIntent.value))
 const showAdvancedPanel = ref(false)
 
@@ -162,7 +165,7 @@ async function send() {
 
   inputText.value = ''
   pendingImages.value = []
-  _send(finalContent, sessionId.value)
+  _send(finalContent, sessionId.value, advancedSettings.buildChatPayload())
 }
 
 function stopStreaming() {
@@ -372,18 +375,7 @@ function removePendingImage(idx: number) {
               <!-- 快捷动作 -->
               <div class="ap-section">
                 <span class="ap-section__label">快捷动作</span>
-                <div class="quick-actions">
-                  <button
-                    v-for="action in currentConfig.quickActions"
-                    :key="action.id"
-                    class="quick-actions__btn"
-                    :class="{ 'quick-actions__btn--highlighted': action.highlighted }"
-                    @click="fillPrompt(action.prompt)"
-                    :title="action.label"
-                  >
-                    <span>{{ action.label }}</span>
-                  </button>
-                </div>
+                <QuickActions :actions="currentConfig.quickActions" @select="fillPrompt" />
               </div>
 
             </div>
@@ -631,80 +623,6 @@ function removePendingImage(idx: number) {
   position: relative;
   padding: 16px 20px 20px;
   border-top: 1px solid #e5e7eb;
-}
-
-// ── 快捷功能区域 ──────────────────────────────────────────────
-.quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-
-  &__btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    border-radius: 6px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    color: #64748b;
-    font-size: 11px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-
-    &:hover {
-      background: #fff;
-      border-color: #cbd5e1;
-      color: #1e293b;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    }
-
-    &--highlighted {
-      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-      border-color: #bfdbfe;
-      color: #1d4ed8;
-      box-shadow: 0 1px 2px rgba(59, 130, 246, 0.1);
-    }
-  }
-
-  &__more {
-    position: relative;
-  }
-
-  &__dropdown {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    margin-bottom: 8px;
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 4px;
-    min-width: 140px;
-    z-index: 100;
-  }
-
-  &__dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 12px;
-    border-radius: 6px;
-    background: transparent;
-    border: none;
-    color: #374151;
-    font-size: 13px;
-    cursor: pointer;
-    text-align: left;
-    transition: background 0.15s;
-
-    &:hover {
-      background: #f3f4f6;
-    }
-  }
 }
 
 .dropdown-enter-active,

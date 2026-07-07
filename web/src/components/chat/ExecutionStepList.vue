@@ -21,17 +21,6 @@ watch(
   },
 )
 
-// 按步骤类型分发渲染组件
-function renderStep(step: import('@/types').ExecutionStep, index: number) {
-  switch (step.type) {
-    case 'thinking':
-      return ThinkingBlock
-    case 'tool_call':
-      return ToolCallCard
-    case 'code_execution':
-      return CodeExecutionCard
-  }
-}
 </script>
 
 <template>
@@ -61,11 +50,9 @@ function renderStep(step: import('@/types').ExecutionStep, index: number) {
           <!-- 连接线：圆点 + 竖线 -->
           <div class="execution-step-list__connector" />
 
-          <!-- 对应卡片组件 -->
-          <component
-            :is="renderStep(step, idx)"
-            :step="step"
-          />
+          <ThinkingBlock v-if="step.type === 'thinking'" :step="step" />
+          <ToolCallCard v-else-if="step.type === 'tool_call'" :step="step" />
+          <CodeExecutionCard v-else-if="step.type === 'code_execution'" :step="step" />
         </div>
       </div>
     </transition>

@@ -6,6 +6,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -46,8 +47,26 @@ class RenameSessionRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
 
 
+class ContextFileItem(BaseModel):
+    type: Literal["branch", "file", "url"]
+    value: str = Field(..., min_length=1, max_length=2000)
+    label: str | None = Field(default=None, max_length=500)
+
+
 class ChatRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=50000, description="用户消息（最多 50000 字符）")
+    intent: Literal["new_feature", "iteration", "ui_adjust", "bug_fix"] | None = Field(
+        default=None,
+        description="用户选择的需求类型",
+    )
+    context_files: list[ContextFileItem] = Field(
+        default_factory=list,
+        description="用户主动指定的上下文线索",
+    )
+    stage_overrides: dict[str, bool] = Field(
+        default_factory=dict,
+        description="执行阶段开关覆盖，false 表示用户显式跳过",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -206,6 +225,7 @@ async def send_message(
             history_messages=history_messages,
             user_id=current_user.id,
             agent_name=agent_name,
+            advanced_context=_build_advanced_context(body),
         )
     )
 
@@ -222,6 +242,20 @@ async def _get_session_or_404(db: AsyncSession, session_id: str, user_id: str) -
     return session
 
 
+def _build_advanced_context(body: ChatRequest) -> dict:
+    """提取高级设置上下文，供 SkillExecutionEngine 注入 system prompt。"""
+    context: dict = {}
+    if body.intent:
+        context["intent"] = body.intent
+    if body.context_files:
+        context["context_files"] = [
+            item.model_dump(exclude_none=True) for item in body.context_files
+        ]
+    if body.stage_overrides:
+        context["stage_overrides"] = body.stage_overrides
+    return context
+
+
 async def _run_task_with_skills(
     task_id: str,
     trace_id: str,
@@ -231,6 +265,7 @@ async def _run_task_with_skills(
     history_messages: list[Message],
     user_id: str | None = None,
     agent_name: str = "CodeSoul",
+    advanced_context: dict | None = None,
 ) -> None:
     from agent_forge.config import settings
     from agent_forge.database import async_session_factory
@@ -329,6 +364,7 @@ async def _run_task_with_skills(
                     sse_publish=sse_publish_and_collect,
                     user_id=user_id,
                     agent_name=agent_name,
+                    advanced_context=advanced_context,
                 )
 
                 async for chunk in async_gen:

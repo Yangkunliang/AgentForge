@@ -16,7 +16,7 @@ from middleware.auth import get_current_user
 
 logger = logging.getLogger("agent_forge.api.memory")
 
-router = APIRouter(prefix="/api/memory", tags=["memory"])
+router = APIRouter(tags=["memory"])
 
 
 # ── Request/Response Schemas ──────────────────────────────

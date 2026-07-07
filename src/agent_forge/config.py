@@ -124,8 +124,11 @@ class CubeSandboxConfig(BaseSettings):
         default="", validation_alias="CUBE_SANDBOX_URL"
     )
 
-    # E2B API Key 直接由 CubeSandboxE2BExecutor 从 E2B_API_KEY 环境变量读取
-    # 不在此处维护副本，避免两个变量不同步
+    # CubeSandbox REST API Bearer Token，仅 cubesandbox_api provider 使用。
+    # E2B 云服务仍由 CubeSandboxE2BExecutor 直接读取 E2B_API_KEY。
+    cube_sandbox_api_key: str = Field(
+        default="", validation_alias="CUBE_SANDBOX_API_KEY"
+    )
 
     # 默认模板 ID（CubeSandbox 模板，包含预装的运行时环境）
     cube_template_id: str = Field(default="", validation_alias="CUBE_TEMPLATE_ID")

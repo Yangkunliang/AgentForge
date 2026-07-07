@@ -83,6 +83,7 @@ docs/
 | TASK-004 | 2026-06-20 | Skill 管理 + Dashboard + 费用统计 + 数据导出 | ✅ 已完成 |
 | TASK-005 | 2026-06-20 | 前端工作台（Vue 3 + Element Plus + SSE） | ✅ 已完成 |
 | TASK-006 | 2026-06-22 | Skill 引擎（ReAct + Thinking 拆分 + Tracing） | ✅ 已完成 |
+| TASK-011 | 2026-07-07 | 高级设置面板真实透传 + 技术风险修正 | ✅ 已实现，验证中 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -99,6 +100,12 @@ docs/
 ### TASK-006 详细信息
 - **目录**：`docs/iterations/2026-06-22-skill-engine/`
 - **核心功能**：Skill 引擎 ReAct 多轮 tool_use 循环、Thinking 流式拆分、@span Tracing 自动采集
+
+### TASK-011 详细信息
+- **目录**：`docs/iterations/2026-07-07-task-011-risk-fixes/`
+- **产物**：
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-07-task-011-risk-fixes/TECHNICAL-DESIGN.md)
+- **核心功能**：高级设置状态持久化、上下文/阶段配置请求透传、system prompt 注入、沙箱配置和 API 路由前缀风险修正
 
 ## 版本号规范
 
