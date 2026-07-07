@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+import httpx
 
 from agent_forge.skills.http_request import HTTP_REQUEST_TOOL, http_request, _check_url_allowed
 
@@ -75,14 +75,24 @@ class TestURLSecurityCheck:
 class TestHTTPRequestExecution:
     """HTTP 请求执行测试"""
 
-    async def test_get_request_success(self):
+    async def test_get_request_success(self, monkeypatch):
+        async def fake_request(self, method, url, **kwargs):
+            request = httpx.Request(method, url)
+            return httpx.Response(200, json={"ok": True}, request=request)
+
+        monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
         result = await http_request("https://httpbin.org/get")
         assert "status_code" in result
         assert result["status_code"] == 200
         assert result["ok"] is True
         assert "body" in result
 
-    async def test_post_request_success(self):
+    async def test_post_request_success(self, monkeypatch):
+        async def fake_request(self, method, url, **kwargs):
+            request = httpx.Request(method, url)
+            return httpx.Response(200, json={"json": kwargs.get("json")}, request=request)
+
+        monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
         result = await http_request(
             "https://httpbin.org/post",
             method="POST",
@@ -91,14 +101,23 @@ class TestHTTPRequestExecution:
         assert result["status_code"] == 200
         assert result["ok"] is True
 
-    async def test_request_with_params(self):
+    async def test_request_with_params(self, monkeypatch):
+        async def fake_request(self, method, url, **kwargs):
+            request = httpx.Request(method, url, params=kwargs.get("params"))
+            return httpx.Response(200, json={"args": kwargs.get("params")}, request=request)
+
+        monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
         result = await http_request(
             "https://httpbin.org/get",
             params={"foo": "bar", "count": "10"},
         )
         assert result["status_code"] == 200
 
-    async def test_request_timeout(self):
+    async def test_request_timeout(self, monkeypatch):
+        async def fake_request(self, method, url, **kwargs):
+            raise httpx.TimeoutException("timeout")
+
+        monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
         result = await http_request(
             "https://httpbin.org/delay/10",
             timeout=1,

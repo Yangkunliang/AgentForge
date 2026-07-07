@@ -20,14 +20,14 @@ import pytest
 
 from agent_forge.sandbox.base import SandboxConfig, SandboxDestroyedError
 from agent_forge.sandbox.manager import SandboxManager
-from agent_forge.sandbox.mock import MockSandboxExecutor
+from tests.sandbox.fakes import InMemorySandboxExecutor, _TEST_SANDBOX_REGISTRY
 
 
 # ── 夹具 ─────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def executor():
-    return MockSandboxExecutor()
+    return InMemorySandboxExecutor()
 
 
 @pytest.fixture
@@ -129,8 +129,7 @@ async def test_context_manager_destroys_on_exit(executor):
 
     assert mgr.is_destroyed
     # 沙箱应已被销毁
-    from agent_forge.sandbox.mock import _MOCK_REGISTRY
-    assert sid not in _MOCK_REGISTRY
+    assert sid not in _TEST_SANDBOX_REGISTRY
 
 
 # ── 属性 ─────────────────────────────────────────────────────────────

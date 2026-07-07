@@ -1,7 +1,7 @@
 """
-tests/sandbox/test_mock_executor.py
-=====================================
-MockSandboxExecutor 单元测试
+tests/sandbox/test_fake_executor.py
+====================================
+测试专用 InMemorySandboxExecutor 单元测试
 
 覆盖场景
 --------
@@ -25,14 +25,14 @@ from agent_forge.sandbox.base import (
     SandboxTimeoutError,
     SandboxState,
 )
-from agent_forge.sandbox.mock import MockSandboxExecutor, _MOCK_REGISTRY
+from tests.sandbox.fakes import InMemorySandboxExecutor, _TEST_SANDBOX_REGISTRY
 
 
 # ── 测试夹具 ──────────────────────────────────────────────────────────
 
 @pytest.fixture
 def executor():
-    return MockSandboxExecutor()
+    return InMemorySandboxExecutor()
 
 
 @pytest.fixture
@@ -45,10 +45,10 @@ def config():
 @pytest.mark.asyncio
 async def test_create_returns_connect_info(executor, config):
     info = await executor.create(config)
-    assert info.sandbox_id.startswith("mock-")
+    assert info.sandbox_id.startswith("test-sandbox-")
     assert info.host == "127.0.0.1"
     assert info.port == 0
-    assert info.sandbox_id in _MOCK_REGISTRY
+    assert info.sandbox_id in _TEST_SANDBOX_REGISTRY
 
 
 @pytest.mark.asyncio
@@ -56,8 +56,8 @@ async def test_create_multiple_sandboxes_are_independent(executor, config):
     info1 = await executor.create(config)
     info2 = await executor.create(config)
     assert info1.sandbox_id != info2.sandbox_id
-    assert info1.sandbox_id in _MOCK_REGISTRY
-    assert info2.sandbox_id in _MOCK_REGISTRY
+    assert info1.sandbox_id in _TEST_SANDBOX_REGISTRY
+    assert info2.sandbox_id in _TEST_SANDBOX_REGISTRY
     # cleanup
     await executor.destroy(info1.sandbox_id)
     await executor.destroy(info2.sandbox_id)
@@ -165,7 +165,7 @@ async def test_pause_blocks_execute(executor, config):
     with pytest.raises(SandboxDestroyedError):
         await executor.execute(info.sandbox_id, "print('hi')")
     # cleanup（直接删注册表，绕过 assert_alive）
-    _MOCK_REGISTRY.pop(info.sandbox_id, None)
+    _TEST_SANDBOX_REGISTRY.pop(info.sandbox_id, None)
 
 
 @pytest.mark.asyncio
@@ -186,7 +186,7 @@ async def test_destroy_is_idempotent(executor, config):
     await executor.destroy(info.sandbox_id)
     # 再次销毁不应抛出异常
     await executor.destroy(info.sandbox_id)
-    assert info.sandbox_id not in _MOCK_REGISTRY
+    assert info.sandbox_id not in _TEST_SANDBOX_REGISTRY
 
 
 # ── TTL 验证 ──────────────────────────────────────────────────────────

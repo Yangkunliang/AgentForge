@@ -86,7 +86,7 @@ class TestMemoryRetrieverVectorSearch:
     @pytest.fixture
     def mock_db(self):
         db = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.fetchall.return_value = [
             ("id-1", "user1", "task-1", "Test Title", "Test content", "code", {}, 0.95),
             ("id-2", "user1", None, "Another", "Other content", "general", {}, 0.80),
@@ -129,7 +129,7 @@ class TestMemoryRetrieverKeywordSearch:
     @pytest.fixture
     def mock_db(self):
         db = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.fetchall.return_value = [
             ("id-1", "user1", "task-1", "T", "content", "code", {}, 0.7),
         ]
@@ -144,7 +144,7 @@ class TestMemoryRetrieverKeywordSearch:
     async def test_returns_keyword_results(self, retriever):
         """全文搜索应返回带 keyword_score 的结果"""
         results = await retriever._keyword_search(
-            "semantic_entries", "user1", limit=5, category=None
+            "content", "semantic_entries", "user1", limit=5, category=None
         )
         assert len(results) == 1
         assert results[0].id == "id-1"
@@ -157,7 +157,7 @@ class TestMemoryRetrieverSearchUserMemories:
     @pytest.fixture
     def mock_db(self):
         db = AsyncMock()
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.fetchall.return_value = [
             ("um-1", "user1", None, "My Preference", "Python > JS", "preference", {}, 0.65),
         ]

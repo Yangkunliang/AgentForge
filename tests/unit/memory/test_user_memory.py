@@ -1,7 +1,7 @@
 """测试用户记忆 CRUD（get_or_create, update, list）"""
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from agent_forge.memory.manager import MemoryManager
 
@@ -25,7 +25,7 @@ class TestUserMemoryCRUD:
     @pytest.mark.asyncio
     async def test_update_user_memory_creates_if_not_exists(self, mgr):
         """更新不存在的用户记忆应创建新记录"""
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -54,7 +54,7 @@ class TestUserMemoryCRUD:
             updated_at=None,
         )
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = existing
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -73,7 +73,7 @@ class TestUserMemoryCRUD:
         """获取用户记忆应返回所有记录"""
         from agent_forge.models import UserMemory
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [
             UserMemory(id="1", user_id="u1", category="preference", content="C1", updated_at=None),
             UserMemory(id="2", user_id="u1", category="tech_stack", content="C2", updated_at=None),
@@ -96,7 +96,7 @@ class TestUserMemoryCRUD:
             content="Existing content",
         )
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = existing
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -114,7 +114,7 @@ class TestUserMemoryCRUD:
         """不存在时应创建新记录"""
         from agent_forge.models import UserMemory
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mgr.db.execute = AsyncMock(return_value=mock_result)
 

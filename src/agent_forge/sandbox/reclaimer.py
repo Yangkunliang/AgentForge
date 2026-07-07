@@ -24,9 +24,8 @@ import logging
 import time
 
 from agent_forge.config import sandbox_settings
-from agent_forge.sandbox.base import SandboxState
+from agent_forge.sandbox.base import SandboxConfig, SandboxExecutor
 from agent_forge.sandbox.factory import SandboxProviderFactory
-from agent_forge.sandbox.manager import SandboxManager
 from agent_forge.sandbox.pool import SandboxPool
 
 logger = logging.getLogger(__name__)
@@ -47,11 +46,15 @@ class SandboxReclaimer:
         *,
         interval: int = 60,
         pause_ttl: int = 120,
+        executor: SandboxExecutor | None = None,
+        pool: SandboxPool | None = None,
     ) -> None:
         """
         Args:
             interval:   扫描间隔（秒）
             pause_ttl:  pause 后存活多久再 destroy
+            executor:   可选注入的沙箱执行器，主要用于测试
+            pool:       可选注入的沙箱池，主要用于测试
         """
         self._interval = interval
         self._pause_ttl = pause_ttl
@@ -59,25 +62,28 @@ class SandboxReclaimer:
         self._task: asyncio.Task | None = None
 
         # 懒初始化 Pool 和 Executor
-        self._executor = None
-        self._pool: SandboxPool | None = None
+        self._executor: SandboxExecutor | None = executor
+        self._pool: SandboxPool | None = pool
 
     async def _ensure_initialized(self) -> None:
         """懒初始化 executor 和 pool。"""
-        if self._executor is not None:
-            return
-        self._executor = SandboxProviderFactory.create(
-            provider=sandbox_settings.cube_sandbox_default_provider,
-            url=sandbox_settings.cube_sandbox_url,
-            api_key=sandbox_settings.cube_sandbox_api_key,
-            template_id=sandbox_settings.cube_template_id,
-        )
-        self._pool = SandboxPool(
-            executor=self._executor,
-            config=None,  # pool 不持 config，由 acquire 按需创建
-            min_size=0,  # reclaimer 不预热，按需冷启动
-            max_size=10,
-        )
+        if self._executor is None:
+            self._executor = SandboxProviderFactory.create(
+                provider=sandbox_settings.cube_sandbox_default_provider,
+                url=sandbox_settings.cube_sandbox_url,
+                api_key=sandbox_settings.cube_sandbox_api_key,
+                template_id=sandbox_settings.cube_template_id,
+            )
+        if self._pool is None:
+            self._pool = SandboxPool(
+                executor=self._executor,
+                config=SandboxConfig(
+                    template_id=sandbox_settings.cube_template_id,
+                    timeout_seconds=sandbox_settings.cube_sandbox_timeout,
+                ),
+                min_size=0,  # reclaimer 不预热，按需冷启动
+                max_size=10,
+            )
         logger.info("SandboxReclaimer: initialized (interval=%ds, pause_ttl=%ds)",
                      self._interval, self._pause_ttl)
 

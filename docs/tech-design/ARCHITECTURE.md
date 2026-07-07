@@ -211,7 +211,7 @@ src/
 │   │   ├── manager.py           # SandboxManager（生命周期 + TTL）
 │   │   ├── pool.py              # SandboxPool（热沙箱池）
 │   │   ├── reclaimer.py         # SandboxReclaimer（TTL 自动回收）
-│   │   ├── mock.py              # MockSandboxExecutor（开发环境）
+│   │   ├── mock.py              # 已移除的 runtime mock 提示文件
 │   │   ├── docker.py            # DockerSandboxExecutor
 │   │   └── cubesandbox/         # CubeSandbox 实现
 │   │       ├── e2b.py           # CubeSandboxE2BExecutor（E2B SDK）
@@ -407,13 +407,14 @@ async def execute(code: str) -> dict:
 ```
 SandboxProviderFactory ──┬── DockerSandboxExecutor
                          ├── CubeSandboxE2BExecutor
-                         ├── CubeSandboxAPIExecutor
-                         └── MockSandboxExecutor
+                         └── CubeSandboxAPIExecutor
 
 SandboxManager ── 沙箱生命周期 + TTL 管理
 SandboxPool    ── 热沙箱池（预置、复用、降级冷启动）
 SandboxReclaimer ── TTL 后台扫描 + 自动回收
 ```
+
+> 单元测试使用 `tests/sandbox/fakes.py` 中的 `InMemorySandboxExecutor`，不再把 mock provider 注册进产品运行时。
 
 ### 8.2 核心组件
 

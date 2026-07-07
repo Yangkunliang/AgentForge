@@ -10,15 +10,15 @@
 
 ## 背景
 
-沙箱执行层的抽象接口、数据类、异常体系和四个执行器（Mock / Docker / CubeSandbox E2B / CubeSandbox API）已完成编码，但尚未与 AgentForge 其他模块打通。本任务完成 Phase 1（基础对接）和 Phase 2（Agent 集成），使沙箱能真实参与任务执行链路。
+沙箱执行层的抽象接口、数据类、异常体系和运行时执行器（Docker / CubeSandbox E2B / CubeSandbox API）已完成编码。本任务完成 Phase 1（基础对接）和 Phase 2（Agent 集成），使沙箱能真实参与任务执行链路。
 
-选型依据见 [SANDBOX-RESEARCH.md](../tech-design/SANDBOX-RESEARCH.md)：采用 Docker（可信代码）+ CubeSandbox（LLM 生成代码）分级策略，MacOS 本地开发走 MockSandboxExecutor。
+选型依据见 [SANDBOX-RESEARCH.md](../tech-design/SANDBOX-RESEARCH.md)：采用 Docker（可信代码）+ CubeSandbox（LLM 生成代码）分级策略。旧版 runtime `MockSandboxExecutor` 已移除，单元测试改用 `tests/sandbox/fakes.py` 中的测试专用 fake。
 
 ---
 
 ## 验收标准
 
-- [ ] 本地开发（macOS）：`CUBE_SANDBOX_DEFAULT_PROVIDER=mock`，`code_executor` Skill 通过 MockSandboxExecutor 执行，单元测试全绿
+- [x] 单元测试：通过测试专用 `InMemorySandboxExecutor` 覆盖本地生命周期行为，产品运行时不注册 mock provider
 - [ ] CI 环境（Linux）：Docker 沙箱可正常创建、执行、销毁
 - [ ] 配置注入：所有沙箱参数通过环境变量 / `CubeSandboxConfig` 读取，无硬编码
 - [ ] REST API：`POST /api/v1/sandboxes/create`、`execute`、`destroy` 端点可用
@@ -36,7 +36,7 @@
 
 ### 1.2 工厂 / 选择器
 
-- [x] 新增 `src/agent_forge/sandbox/factory.py`：`SandboxProviderFactory.create(provider: str) -> SandboxExecutor`，根据 `CUBE_SANDBOX_DEFAULT_PROVIDER` 返回 Mock / Docker / CubeSandboxE2B / CubeSandboxAPI
+- [x] 新增 `src/agent_forge/sandbox/factory.py`：`SandboxProviderFactory.create(provider: str) -> SandboxExecutor`，根据 `CUBE_SANDBOX_DEFAULT_PROVIDER` 返回 Docker / CubeSandboxE2B / CubeSandboxAPI
 
 ### 1.3 Skill 接入（code_executor）
 
@@ -58,7 +58,7 @@
 
 ### 1.5 单元测试
 
-- [x] `tests/sandbox/test_mock_executor.py`：覆盖 MockSandboxExecutor 的 create / execute / destroy / TTL 超时 / 路径隔离
+- [x] `tests/sandbox/test_mock_executor.py`：覆盖测试专用 `InMemorySandboxExecutor` 的 create / execute / destroy / TTL 超时 / 路径隔离
 - [x] `tests/sandbox/test_manager.py`：覆盖 SandboxManager 生命周期（首次创建、续期、TTL 超时重建、destroy 后不可用）
 - [x] `tests/sandbox/test_pool.py`：覆盖 SandboxPool bootstrap / acquire（命中 / 冷启动）/ release（归还 / 满池销毁）/ drain
 
@@ -109,6 +109,6 @@
 
 ## 注意事项
 
-- macOS 本地开发强制使用 `MockSandboxExecutor`，严禁在本地跑 CubeSandbox（KVM 不支持）
+- macOS 本地开发不再使用 runtime mock provider；需要真实沙箱时配置 `E2B_API_KEY`，离线单元测试使用 `tests/sandbox/fakes.py`
 - CubeSandbox 集成测试只在 Linux CI（配备 KVM 的 runner）上运行，通过 `pytest -m cubesandbox` 标记控制
 - `DockerSandboxExecutor` 的 `files_read` / `files_write` 不支持（一次性容器），Coder Agent 需在执行结果中通过 stdout 传递文件内容，或改用 CubeSandbox

@@ -44,7 +44,7 @@ docs/
 | [RABBITMQ.md](tech-design/RABBITMQ.md) | 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理 | ✅ |
 | [DEPLOYMENT.md](tech-design/DEPLOYMENT.md) | 本地开发环境、生产部署、Nginx 配置、数据库迁移 | ✅ |
 | [SANDBOX-RESEARCH.md](tech-design/SANDBOX-RESEARCH.md) | 沙箱机制调研报告（Docker vs CubeSandbox 对比） | ✅ |
-| [INTEGRATION-CUBESANDBOX.md](tech-design/INTEGRATION-CUBESANDBOX.md) | CubeSandbox 集成设计（E2B SDK / REST API、API 设计、分级策略） | ✅ |
+| [INTEGRATION-CUBESANDBOX.md](tech-design/INTEGRATION-CUBESANDBOX.md) | CubeSandbox 集成设计（E2B SDK / REST API、API 设计、分级策略；runtime mock 已移除，测试 fake 独立在 `tests/sandbox/fakes.py`） | ✅ |
 | [DATA-EXPORT.md](tech-design/DATA-EXPORT.md) | 训练数据导出（JSONL）、PII 脱敏策略 | ✅ |
 | [SSE-EXECUTION-VISUALIZATION.md](tech-design/SSE-EXECUTION-VISUALIZATION.md) | SSE 执行可视化方案 | ✅ |
 

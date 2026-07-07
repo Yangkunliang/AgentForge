@@ -19,8 +19,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent_forge.sandbox.base import SandboxDestroyedError
-from agent_forge.sandbox.mock import MockSandboxExecutor
 from agent_forge.sandbox.manager import SandboxManager
+from tests.sandbox.fakes import InMemorySandboxExecutor
 
 # 导入路由模块以注册路由
 from api.routes import sandboxes  # noqa: F401
@@ -31,7 +31,7 @@ from api.routes import sandboxes  # noqa: F401
 @pytest.fixture
 def manager():
     """返回一个干净的 SandboxManager 并替换全局单例。"""
-    mgr = SandboxManager(MockSandboxExecutor(), ttl_seconds=300)
+    mgr = SandboxManager(InMemorySandboxExecutor(), ttl_seconds=300)
     old = sandboxes._global_sandbox
     sandboxes._global_sandbox = mgr
     yield mgr
@@ -163,4 +163,4 @@ def test_execute_on_destroyed_returns_410(client):
         json={"code": "print('hi')"},
     )
     assert resp.status_code == 410
-    assert resp.json()["error"] == "destroyed"
+    assert resp.json()["detail"]["error"] == "destroyed"

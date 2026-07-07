@@ -17,15 +17,15 @@ SandboxPool 单元测试
 import pytest
 
 from agent_forge.sandbox.base import SandboxConfig
-from agent_forge.sandbox.mock import MockSandboxExecutor, _MOCK_REGISTRY
 from agent_forge.sandbox.pool import SandboxPool
+from tests.sandbox.fakes import InMemorySandboxExecutor, _TEST_SANDBOX_REGISTRY
 
 
 # ── 夹具 ─────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def executor():
-    return MockSandboxExecutor()
+    return InMemorySandboxExecutor()
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ async def test_acquire_cold_start_when_pool_empty(executor, config):
     pool = SandboxPool(executor=executor, config=config, min_size=0, max_size=10)
     info = await pool.acquire()
     assert info.sandbox_id is not None
-    assert info.sandbox_id in _MOCK_REGISTRY
+    assert info.sandbox_id in _TEST_SANDBOX_REGISTRY
     await executor.destroy(info.sandbox_id)
 
 
@@ -100,7 +100,7 @@ async def test_release_destroys_sandbox_when_pool_full(executor, config):
     # 放入第二个：池满，应销毁 info2
     await pool.release(info2)
     assert pool.size == 1  # 池大小不变
-    assert info2.sandbox_id not in _MOCK_REGISTRY  # info2 已被销毁
+    assert info2.sandbox_id not in _TEST_SANDBOX_REGISTRY  # info2 已被销毁
 
     await pool.drain()
 
@@ -126,7 +126,7 @@ async def test_drain_empties_pool_and_destroys_sandboxes(executor, config):
 
     # 已 acquire 的沙箱应仍在注册表中（drain 只销毁池内沙箱）
     for sid in pool_ids:
-        assert sid in _MOCK_REGISTRY
+        assert sid in _TEST_SANDBOX_REGISTRY
 
     # 手动销毁已 acquire 的沙箱
     for sid in pool_ids:

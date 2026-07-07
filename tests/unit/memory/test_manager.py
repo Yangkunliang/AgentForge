@@ -46,7 +46,7 @@ class TestMemoryManagerPrepareTaskContext:
         """无 user 输入时返回空字符串"""
         db = AsyncMock()
         # Mock chat_messages query to return empty
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = []
         db.execute.return_value = mock_result
 

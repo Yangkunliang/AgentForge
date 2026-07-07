@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import inspect
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,6 +14,16 @@ from agent_forge.config import settings
 from agent_forge.memory.embedder import embed
 
 logger = logging.getLogger("agent_forge.memory.retriever")
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+async def _fetchall(result):
+    return await _maybe_await(result.fetchall())
 
 
 @dataclass
@@ -121,7 +132,7 @@ class MemoryRetriever:
 
         # 2. 全文搜索
         results.extend(
-            await self._keyword_search("semantic_entries", user_id, limit * 2, category)
+            await self._keyword_search(query, "semantic_entries", user_id, limit * 2, category)
         )
 
         return results[:limit]
@@ -138,7 +149,7 @@ class MemoryRetriever:
 
         # user_memories 通常数据量小，直接用全文搜索即可
         results.extend(
-            await self._keyword_search("user_memories", user_id, limit * 2, category)
+            await self._keyword_search(query, "user_memories", user_id, limit * 2, category)
         )
 
         # 也做向量搜索
@@ -186,7 +197,7 @@ class MemoryRetriever:
         params["lim"] = limit
 
         res = await self.db.execute(query, params)  # type: ignore[no-untyped-call]
-        rows = res.fetchall()
+        rows = await _fetchall(res)
 
         for row in rows:
             results.append(MemoryResult(
@@ -217,6 +228,7 @@ class MemoryRetriever:
 
     async def _keyword_search(
         self,
+        search_query: str,
         table: str,
         user_id: str,
         limit: int,
@@ -224,34 +236,45 @@ class MemoryRetriever:
     ) -> list[MemoryResult]:
         """PostgreSQL 全文搜索"""
         results: list[MemoryResult] = []
+        if table not in {"semantic_entries", "user_memories"}:
+            raise ValueError(f"Unsupported memory table: {table}")
 
-        query = text(f"""
-            SELECT id, user_id, COALESCE(task_id, ''), title, content,
-                   category, COALESCE(metadata, '{{}}'::jsonb),
-                   ts_rank(to_tsvector('english', content || ' ' || title),
-                           plainto_tsquery('english', :query)) AS rank
-            FROM {table}
-            WHERE user_id = :user_id
-        """)
+        if table == "semantic_entries":
+            query_sql = """
+                SELECT id, user_id, COALESCE(task_id, ''), title, content,
+                       category, COALESCE(metadata, '{}'::jsonb),
+                       ts_rank(to_tsvector('english', content || ' ' || title),
+                               plainto_tsquery('english', :query)) AS rank
+                FROM semantic_entries
+                WHERE user_id = :user_id
+                  AND deleted = FALSE
+            """
+        else:
+            query_sql = """
+                SELECT id, user_id, NULL AS task_id, category AS title, content,
+                       category, COALESCE(metadata, '{}'::jsonb),
+                       ts_rank(to_tsvector('english', content || ' ' || category),
+                               plainto_tsquery('english', :query)) AS rank
+                FROM user_memories
+                WHERE user_id = :user_id
+            """
         params: dict[str, Any] = {
             "user_id": user_id,
-            "query": query.replace("'", "''"),
+            "query": search_query,
         }
 
         if category:
-            params_str = " AND category = :cat"
+            query_sql += " AND category = :cat"
             params["cat"] = category
-        else:
-            params_str = ""
 
-        query = text(str(query) + params_str + """
+        query = text(query_sql + """
             ORDER BY rank DESC
             LIMIT :lim
         """)
         params["lim"] = limit
 
         res = await self.db.execute(query, params)  # type: ignore[no-untyped-call]
-        rows = res.fetchall()
+        rows = await _fetchall(res)
 
         for row in rows:
             results.append(MemoryResult(

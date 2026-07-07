@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, MetaData
+from sqlalchemy import DateTime, JSON, MetaData
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # 命名策略:表名用小写复数,字段名用 snake_case
@@ -22,6 +23,9 @@ constraint_naming_convention = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=constraint_naming_convention)
+
+
+JSON_VARIANT = JSON().with_variant(JSONB(), "postgresql")
 
 
 def _now() -> datetime:

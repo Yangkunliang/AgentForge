@@ -4,19 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.types import NullType
 
-from .base import Base
+from .base import Base, JSON_VARIANT
 
-# pgvector 可选依赖:本地开发若未安装则降级为 NullType(不影响启动)
+# pgvector 可选依赖:PostgreSQL 使用 vector,SQLite 测试环境降级为 JSON
 try:
     from pgvector.sqlalchemy import Vector as _Vector
-    _VECTOR_TYPE = _Vector(1536)
+    _VECTOR_TYPE = JSON().with_variant(_Vector(1536), "postgresql")
 except ImportError:
-    _VECTOR_TYPE = NullType()
+    _VECTOR_TYPE = JSON()
 
 
 class SemanticEntry(Base):
@@ -49,7 +47,7 @@ class SemanticEntry(Base):
         # decision, code, design, result, context, preference
     )  # 分类
 
-    extra_data: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)  # 额外数据(映射为 DB 列名 metadata)
+    extra_data: Mapped[dict] = mapped_column("metadata", JSON_VARIANT, nullable=False, default=dict)  # 额外数据(映射为 DB 列名 metadata)
 
     # 向量存储:通过 pgvector extension 的 vector(N) 类型
     # embedding 列在 migration 中定义为 vector(1536)

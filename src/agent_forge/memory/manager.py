@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import inspect
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -21,6 +22,22 @@ from agent_forge.memory.retriever import MemoryRetriever, MemoryResult
 from agent_forge.models import SemanticEntry, UserMemory
 
 logger = logging.getLogger("agent_forge.memory.manager")
+
+
+async def _maybe_await(value):
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+async def _scalar_one_or_none(result):
+    return await _maybe_await(result.scalar_one_or_none())
+
+
+async def _scalars_all(result):
+    scalars = await _maybe_await(result.scalars())
+    rows = await _maybe_await(scalars.all())
+    return list(rows)
 
 
 class MemoryManager:
@@ -74,7 +91,7 @@ class MemoryManager:
             extra_data=metadata or {},
             version=1,
         )
-        self.db.add(entry)
+        await _maybe_await(self.db.add(entry))
         await self.db.commit()
 
         # 生成 embedding（同步）
@@ -118,7 +135,7 @@ class MemoryManager:
                 SemanticEntry.deleted == False,  # noqa: E712
             )
         )
-        entry = result.scalar_one_or_none()
+        entry = await _scalar_one_or_none(result)
         if not entry:
             return None
 
@@ -144,7 +161,7 @@ class MemoryManager:
                 SemanticEntry.deleted == False,  # noqa: E712
             )
         )
-        entry = result.scalar_one_or_none()
+        entry = await _scalar_one_or_none(result)
         if not entry:
             return False
 
@@ -161,7 +178,7 @@ class MemoryManager:
                 SemanticEntry.deleted == False,  # noqa: E712
             )
         )
-        return result.scalar_one_or_none()
+        return await _scalar_one_or_none(result)
 
     async def list_semantic_entries(
         self,
@@ -181,7 +198,7 @@ class MemoryManager:
         query = query.offset(offset).limit(limit)
 
         result = await self.db.execute(query)  # type: ignore[no-untyped-call]
-        return list(result.scalars().all())
+        return await _scalars_all(result)
 
     # ── User Memory CRUD ────────────────────────────────────
 
@@ -198,7 +215,7 @@ class MemoryManager:
                 UserMemory.category == category,
             )
         )
-        entry = result.scalar_one_or_none()
+        entry = await _scalar_one_or_none(result)
 
         if entry:
             return entry
@@ -210,7 +227,7 @@ class MemoryManager:
             category=category,
             content=content,
         )
-        self.db.add(entry)
+        await _maybe_await(self.db.add(entry))
         await self.db.commit()
         await self.db.refresh(entry)
         return entry
@@ -229,7 +246,7 @@ class MemoryManager:
                 UserMemory.category == category,
             )
         )
-        entry = result.scalar_one_or_none()
+        entry = await _scalar_one_or_none(result)
         if not entry:
             import uuid
             entry = UserMemory(
@@ -239,7 +256,7 @@ class MemoryManager:
                 content=content,
                 extra_data=metadata or {},
             )
-            self.db.add(entry)
+            await _maybe_await(self.db.add(entry))
         else:
             entry.content = content
             if metadata:
@@ -256,7 +273,7 @@ class MemoryManager:
             select(UserMemory).where(UserMemory.user_id == user_id)
             .order_by(UserMemory.updated_at.desc())
         )
-        return list(result.scalars().all())
+        return await _scalars_all(result)
 
     # ── Search ──────────────────────────────────────────────
 
@@ -333,5 +350,5 @@ class MemoryManager:
             .order_by(Message.created_at.desc())
             .limit(5)
         )
-        rows = result.scalars().all()
+        rows = await _scalars_all(result)
         return list(reversed(rows))  # 按时间正序

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, TypeVar, Awaitable, Callable
+import inspect
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 import pybreaker
 import tenacity
@@ -56,14 +57,33 @@ class CircuitBreaker:
 
     async def call(self, func: Callable, *args, **kwargs):
         """使用熔断器调用函数"""
+        if self.is_open:
+            logger.warning(f"Circuit breaker '{self.name}' is OPEN, request rejected")
+            self._is_open = True
+            raise pybreaker.CircuitBreakerError("Circuit breaker is OPEN")
+
         try:
-            result = await self.breaker.call_async(func, *args, **kwargs)
+            result = func(*args, **kwargs)
+            if inspect.isawaitable(result):
+                result = await result
+            self.breaker.call(lambda: None)
             return result
         except pybreaker.CircuitBreakerError:
             logger.warning(f"Circuit breaker '{self.name}' is OPEN, request rejected")
             self._is_open = True
             raise
         except Exception as e:
+            def _raise_failure() -> None:
+                raise e
+
+            try:
+                self.breaker.call(_raise_failure)
+            except pybreaker.CircuitBreakerError:
+                logger.warning(f"Circuit breaker '{self.name}' opened after failure")
+                self._is_open = True
+                raise
+            except Exception:
+                pass
             logger.error(f"Circuit breaker '{self.name}' recorded failure: {e}")
             raise
 

@@ -17,8 +17,9 @@ import time
 import pytest
 
 from agent_forge.sandbox.base import SandboxConfig
-from agent_forge.sandbox.mock import MockSandboxExecutor
+from agent_forge.sandbox.pool import SandboxPool
 from agent_forge.sandbox.reclaimer import SandboxReclaimer
+from tests.sandbox.fakes import InMemorySandboxExecutor
 
 
 # ── 夹具 ─────────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ from agent_forge.sandbox.reclaimer import SandboxReclaimer
 
 @pytest.fixture
 def executor():
-    return MockSandboxExecutor()
+    return InMemorySandboxExecutor()
 
 
 @pytest.fixture
@@ -34,13 +35,23 @@ def config():
     return SandboxConfig(timeout_seconds=1)  # 1s TTL，方便测试超时
 
 
+@pytest.fixture
+def reclaimer(executor, config):
+    pool = SandboxPool(executor=executor, config=config, min_size=0, max_size=10)
+    return SandboxReclaimer(
+        interval=1,
+        pause_ttl=1,
+        executor=executor,
+        pool=pool,
+    )
+
+
 # ── start / stop ──────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_reclaimer_start_and_stop():
+async def test_reclaimer_start_and_stop(reclaimer):
     """启动后能正常停止"""
-    reclaimer = SandboxReclaimer(interval=1, pause_ttl=1)
     await reclaimer.start()
     assert reclaimer._running is True
     await reclaimer.stop()
@@ -48,9 +59,8 @@ async def test_reclaimer_start_and_stop():
 
 
 @pytest.mark.asyncio
-async def test_reclaimer_context_manager(executor, config):
+async def test_reclaimer_context_manager(reclaimer):
     """async with 自动 start/stop"""
-    reclaimer = SandboxReclaimer(interval=1)
     async with reclaimer as rc:
         assert rc._running is True
     assert rc._running is False
@@ -60,9 +70,8 @@ async def test_reclaimer_context_manager(executor, config):
 
 
 @pytest.mark.asyncio
-async def test_scan_empty_pool():
+async def test_scan_empty_pool(reclaimer):
     """空池扫描不应报错"""
-    reclaimer = SandboxReclaimer(interval=60)
     await reclaimer._ensure_initialized()
     # scan 空池
     await reclaimer._scan_and_reclaim()

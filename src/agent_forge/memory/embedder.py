@@ -75,8 +75,11 @@ def chunk_text(text: str, max_size: int | None = None) -> list[str]:
     """
     max_size = max_size or settings.embedding_chunk_size
 
-    if not text or len(text) <= max_size:
-        return [text] if text else []
+    if not text or not text.strip():
+        return []
+
+    if len(text) <= max_size:
+        return [text]
 
     # 优先按段落分割
     paragraphs = text.split("\n\n")
@@ -94,8 +97,11 @@ def chunk_text(text: str, max_size: int | None = None) -> list[str]:
         para_len = len(para)
         if para_len > max_size:
             # 单段落超长，递归分块
-            if chunks:
-                chunks.extend(_split_by_chars(para, max_size))
+            if current:
+                chunks.append("\n\n".join(current))
+                current = []
+                current_len = 0
+            chunks.extend(_split_by_chars(para, max_size))
             continue
 
         if current_len + para_len + 2 > max_size and current:
@@ -114,7 +120,7 @@ def chunk_text(text: str, max_size: int | None = None) -> list[str]:
 
 def _split_by_chars(text: str, max_size: int) -> list[str]:
     """按固定字符数截断文本"""
-    overlap = settings.embedding_chunk_overlap
+    overlap = min(settings.embedding_chunk_overlap, max_size - 1) if max_size > 1 else 0
     chunks: list[str] = []
     start = 0
     while start < len(text):

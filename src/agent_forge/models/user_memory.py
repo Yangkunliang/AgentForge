@@ -5,10 +5,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import Index, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base
+from .base import Base, JSON_VARIANT
 
 
 class UserMemory(Base):
@@ -37,7 +36,7 @@ class UserMemory(Base):
 
     content: Mapped[str] = mapped_column(Text, nullable=False)  # 记忆内容
 
-    extra_data: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, default=dict)  # 额外数据
+    extra_data: Mapped[dict] = mapped_column("metadata", JSON_VARIANT, nullable=False, default=dict)  # 额外数据
 
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,

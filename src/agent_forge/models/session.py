@@ -9,10 +9,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base, TimestampMixin
+from .base import Base, JSON_VARIANT, TimestampMixin
 
 if TYPE_CHECKING:
     pass
@@ -78,7 +77,7 @@ class Message(Base, TimestampMixin):
 
     # 执行过程数据:thinking / tool_call / code_execution 步骤,JSONB 列存储
     # 列名用 extra_data 避开 SQLAlchemy 保留属性名 metadata
-    extra_data: list | None = Column("extra_data", JSONB, nullable=True, default=None)  # 执行步骤明细
+    extra_data: list | None = Column("extra_data", JSON_VARIANT, nullable=True, default=None)  # 执行步骤明细
 
     # Relationships
     session = relationship("Session", back_populates="messages")

@@ -4,14 +4,11 @@
 需要运行中的 PostgreSQL + pgvector 环境。
 """
 
-import uuid
-
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from agent_forge.memory.manager import MemoryManager
 from agent_forge.memory.embedder import chunk_text
-from agent_forge.memory.retriever import MemoryRetriever
 
 
 class TestMemoryManagerCreateAndGet:
@@ -36,7 +33,7 @@ class TestMemoryManagerCreateAndGet:
     @pytest.mark.asyncio
     async def test_create_semantic_entry_adds_to_db(self, mgr):
         """创建语义记忆应调用 db.add + db.commit"""
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -55,7 +52,7 @@ class TestMemoryManagerCreateAndGet:
     @pytest.mark.asyncio
     async def test_create_semantic_entry_with_title_truncation(self, mgr):
         """标题过长时应截断为 200 字符"""
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -68,7 +65,7 @@ class TestMemoryManagerCreateAndGet:
 
         assert entry_id is not None
         # 创建后获取应截断标题
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         from agent_forge.models import SemanticEntry
         mock_entry = SemanticEntry(
             id=entry_id,
@@ -95,7 +92,7 @@ class TestMemoryManagerCreateAndGet:
             deleted=False,
         )
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = existing
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -110,7 +107,7 @@ class TestMemoryManagerCreateAndGet:
     @pytest.mark.asyncio
     async def test_delete_nonexistent_returns_false(self, mgr):
         """删除不存在的记忆应返回 False"""
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -148,7 +145,7 @@ class TestMemoryManagerList:
             for i in range(3)
         ]
 
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = entries
         mgr.db.execute = AsyncMock(return_value=mock_result)
 
@@ -176,7 +173,6 @@ def foo():
 
     def test_long_document_chunking(self):
         """长文档场景"""
-        long_doc = "Paragraph " + str(i) + ": " + "x" * 400 + "\n\n" * 2
         long_doc = "\n\n".join([f"Paragraph {i}: {'x' * 400}" for i in range(10)])
         chunks = chunk_text(long_doc, max_size=300)
         assert len(chunks) >= 3

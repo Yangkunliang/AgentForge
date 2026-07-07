@@ -3,8 +3,8 @@ agent_forge.sandbox.base
 ========================
 沙箱抽象层：Protocol 接口、数据类、异常定义。
 
-所有具体执行器（MockSandboxExecutor、DockerSandboxExecutor、
-CubeSandboxE2BExecutor 等）均实现此处的 SandboxExecutor Protocol。
+所有具体执行器（DockerSandboxExecutor、CubeSandboxE2BExecutor、
+CubeSandboxAPIExecutor 等）均实现此处的 SandboxExecutor Protocol。
 """
 
 from __future__ import annotations
