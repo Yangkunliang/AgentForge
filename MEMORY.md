@@ -16,7 +16,7 @@
 - [INTEGRATION-CUBESANDBOX.md](docs/tech-design/INTEGRATION-CUBESANDBOX.md) — CubeSandbox 集成详细设计（抽象层、E2B SDK / REST API 两种对接路径、API 设计、分级策略、实施计划）
 - [LLM-CONFIG.md](docs/tech-design/LLM-CONFIG.md) — LiteLLM 配置、模型路由、Fallback、Cost 追踪
 - [DATA-EXPORT.md](docs/tech-design/DATA-EXPORT.md) — 训练数据导出、PII 脱敏策略
-- [FRONTEND-ARCHITECTURE.md](docs/tech-design/FRONTEND-ARCHITECTURE.md) — Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步）
+- [FRONTEND-ARCHITECTURE.md](docs/tech-design/FRONTEND-ARCHITECTURE.md) — Vue 3 前端架构（Project Store、SSE 方案、Token 策略、权限模型、Store 同步）
 - [RABBITMQ.md](docs/tech-design/RABBITMQ.md) — 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理
 - [DEPLOYMENT.md](docs/tech-design/DEPLOYMENT.md) — 本地开发环境、生产部署、Nginx 配置、数据库迁移
 
@@ -28,7 +28,7 @@
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-019 后续路线图
 - [TASK-012.md](docs/tasks/TASK-012.md) — 核心功能路线图与任务重排，已完成
 - [TASK-013.md](docs/tasks/TASK-013.md) — Project / Mount / Artifact 数据底座，已完成
-- [TASK-014.md](docs/tasks/TASK-014.md) — 项目管理页接真实数据，todo
+- [TASK-014.md](docs/tasks/TASK-014.md) — 项目管理页接真实数据，已完成
 - [TASK-015.md](docs/tasks/TASK-015.md) — PipelineRun / StageState 阶段状态机，todo
 - [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，todo
 - [TASK-017.md](docs/tasks/TASK-017.md) — 人工确认与阶段继续机制，todo

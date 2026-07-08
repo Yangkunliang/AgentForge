@@ -1,56 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useProjectStore } from '@/stores/project'
+import { useSessionStore } from '@/stores/session'
+import type { Project, ProjectMount } from '@/types'
 
 const router = useRouter()
+const projectStore = useProjectStore()
+const sessionStore = useSessionStore()
 
-interface Project {
-  id: string
-  name: string
-  description: string
-  techStacks: string[]
-  connected: boolean
-  lastActive: string
-  sessionCount: number
-  mountType: 'local' | 'github' | 'upload'
-  mountPath: string
-}
+const projects = computed(() => projectStore.projects)
 
-const projects = ref<Project[]>([
-  {
-    id: '1',
-    name: '我的电商后端',
-    description: '基于 FastAPI 的电商订单管理系统',
-    techStacks: ['FastAPI', 'PostgreSQL', 'Redis'],
-    connected: true,
-    lastActive: '2 小时前',
-    sessionCount: 12,
-    mountType: 'local',
-    mountPath: '~/work/shop-api',
-  },
-  {
-    id: '2',
-    name: '客户管理系统',
-    description: 'CRM 客户关系管理平台',
-    techStacks: ['Vue 3', 'Django', 'MySQL'],
-    connected: true,
-    lastActive: '昨天',
-    sessionCount: 5,
-    mountType: 'github',
-    mountPath: 'github.com/me/crm',
-  },
-  {
-    id: '3',
-    name: '数据可视化大屏',
-    description: '实时数据监控展示平台',
-    techStacks: ['React', 'ECharts', 'WebSocket'],
-    connected: false,
-    lastActive: '3 天前',
-    sessionCount: 2,
-    mountType: 'local',
-    mountPath: '~/work/dashboard',
-  },
-])
+onMounted(async () => {
+  const data = await projectStore.fetchProjects()
+  await Promise.all(
+    data.map((project) =>
+      projectStore.fetchProjectMounts(project.id).catch(() => [])
+    )
+  )
+})
 
 // 每种技术栈对应一个语义色（增强对比度）
 const tagColorMap: Record<string, { bg: string; color: string; border: string }> = {
@@ -70,20 +38,45 @@ function tagColor(tag: string) {
 }
 
 // 计算活动热度（基于会话次数和最后活跃时间）
-function getActivityHeat(sessionCount: number, lastActive: string): number {
-  const timeMap: Record<string, number> = {
-    '小时前': 1,
-    '昨天': 0.8,
-    '天前': 0.5,
-  }
-  const timeMultiplier = Object.entries(timeMap).find(([key]) => lastActive.includes(key))?.[1] ?? 0.3
-  return Math.min(sessionCount * timeMultiplier * 0.2, 1)
+function primaryMount(project: Project): ProjectMount | null {
+  return projectStore.primaryMountFor(project.id)
+}
+
+function isConnected(project: Project): boolean {
+  return primaryMount(project)?.status === 'connected'
+}
+
+function mountType(project: Project): string {
+  return primaryMount(project)?.mount_type ?? 'local'
+}
+
+function mountPath(project: Project): string {
+  return primaryMount(project)?.locator ?? '尚未挂载代码库'
+}
+
+function formatRelative(isoStr: string): string {
+  const date = new Date(isoStr)
+  if (Number.isNaN(date.getTime())) return '最近更新'
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 60000) return '刚刚'
+  if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)} 分钟前`
+  if (diffMs < 86400000) return `${Math.floor(diffMs / 3600000)} 小时前`
+  if (diffMs < 172800000) return '昨天'
+  return `${Math.floor(diffMs / 86400000)} 天前`
+}
+
+function getActivityHeat(updatedAt: string): number {
+  const diffDays = Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 86400000)
+  return Math.max(0.2, Math.min(1, 1 - diffDays * 0.18))
 }
 
 function handleNewProject() {
   router.push('/projects/create')
 }
-function handleContinueChat(_project: Project) {
+
+async function handleContinueChat(project: Project) {
+  await projectStore.selectProject(project.id)
+  await sessionStore.fetchSessions(project.id)
   router.push('/chat')
 }
 </script>
@@ -106,7 +99,17 @@ function handleContinueChat(_project: Project) {
     </div>
 
     <!-- 空状态 -->
-    <div v-if="projects.length === 0" class="empty-state">
+    <div v-if="projectStore.loading" class="empty-state">
+      <div class="empty-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-6.2-8.56"/>
+        </svg>
+      </div>
+      <h3 class="empty-title">正在加载项目</h3>
+      <p class="empty-desc">正在同步你的项目列表和代码库挂载状态</p>
+    </div>
+
+    <div v-else-if="projects.length === 0" class="empty-state">
       <div class="empty-icon">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -124,10 +127,10 @@ function handleContinueChat(_project: Project) {
         v-for="project in projects"
         :key="project.id"
         class="project-card"
-        :class="{ 'project-card--disconnected': !project.connected }"
+        :class="{ 'project-card--disconnected': !isConnected(project) }"
       >
         <!-- 左侧彩色竖条 — 已连接绿色，未连接灰色 -->
-        <div class="card-accent" :class="project.connected ? 'card-accent--on' : 'card-accent--off'"></div>
+        <div class="card-accent" :class="isConnected(project) ? 'card-accent--on' : 'card-accent--off'"></div>
 
         <div class="card-inner">
           <!-- 顶部：icon + 名称 + 连接状态 -->
@@ -141,25 +144,26 @@ function handleContinueChat(_project: Project) {
               <h3 class="project-name">{{ project.name }}</h3>
               <p class="project-desc">{{ project.description }}</p>
             </div>
-            <div class="connect-badge" :class="project.connected ? 'connect-badge--on' : 'connect-badge--off'">
+            <div class="connect-badge" :class="isConnected(project) ? 'connect-badge--on' : 'connect-badge--off'">
               <span class="connect-badge__dot"></span>
-              {{ project.connected ? '已连接' : '未连接' }}
+              {{ isConnected(project) ? '已连接' : '待挂载' }}
             </div>
           </div>
 
           <!-- 挂载路径 -->
           <div class="mount-row">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path v-if="project.mountType === 'local'" d="M3 7a2 2 0 0 1 2-2h3l2 2h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-              <path v-else d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              <path v-if="mountType(project) === 'local'" d="M3 7a2 2 0 0 1 2-2h3l2 2h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+              <path v-else-if="mountType(project) === 'github'" d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              <path v-else d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline v-if="mountType(project) !== 'local' && mountType(project) !== 'github'" points="17 8 12 3 7 8"/><line v-if="mountType(project) !== 'local' && mountType(project) !== 'github'" x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <span class="mount-path">{{ project.mountPath }}</span>
+            <span class="mount-path">{{ mountPath(project) }}</span>
           </div>
 
           <!-- 技术栈标签 -->
           <div class="tech-tags">
             <span
-              v-for="tag in project.techStacks"
+              v-for="tag in project.tech_tags"
               :key="tag"
               class="tech-tag"
               :style="{
@@ -175,15 +179,15 @@ function handleContinueChat(_project: Project) {
             <div class="card-meta">
               <span class="meta-item">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ project.lastActive }}
+                {{ formatRelative(project.updated_at) }}
               </span>
               <span class="meta-item">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                {{ project.sessionCount }} 次对话
+                {{ projectStore.currentProjectId === project.id ? '当前项目' : '可切换' }}
               </span>
               <!-- 活动热度指示器 -->
-              <div class="activity-heat" :title="`活动热度: ${Math.round(getActivityHeat(project.sessionCount, project.lastActive) * 100)}%`">
-                <div class="heat-bar" :style="{ width: `${getActivityHeat(project.sessionCount, project.lastActive) * 100}%` }"></div>
+              <div class="activity-heat" :title="`最近活跃度: ${Math.round(getActivityHeat(project.updated_at) * 100)}%`">
+                <div class="heat-bar" :style="{ width: `${getActivityHeat(project.updated_at) * 100}%` }"></div>
               </div>
             </div>
             <div class="card-actions">

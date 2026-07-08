@@ -12,7 +12,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
 |------|------|----------|----------|
-| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型与 API 已实现 | TASK-014 接真实前端 |
+| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API 与前端真实数据流已实现 | TASK-015 接 PipelineRun |
 | Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | 后端占位模型与 API 已实现 | TASK-018 接真实 Bridge |
 | Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、默认项目兼容 | TASK-015 接 PipelineRun |
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 尚无运行时实体 | TASK-015 |
@@ -25,8 +25,8 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 MVP 用户路径按以下顺序落地：
 
 1. 用户创建 Project，填写名称、描述和技术栈。
-2. 用户添加 Mount。MVP 允许手动路径、GitHub 仓库 URL 或上传文件占位，真实 Bridge 在后续接入。
-3. 用户从 Project 进入 Chat，创建归属于 Project 的 Session。
+2. 用户在创建向导中添加 primary Mount。MVP 允许手动路径、GitHub 仓库 URL 或上传文件占位，真实 Bridge 在后续接入。
+3. 用户从 Project 进入 Chat，创建归属于 Project 的 Session；刷新后当前项目从本地选择状态恢复。
 4. 用户选择需求类型，或由规则分类得到 intent。
 5. 系统创建 PipelineRun，并根据 intent 初始化 StageState。
 6. Agent 执行当前阶段，阶段完成后保存 Artifact。

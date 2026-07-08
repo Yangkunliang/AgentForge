@@ -122,7 +122,7 @@
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
-**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；后续从 TASK-014 前端接真实数据、TASK-015 阶段状态机继续推进。
+**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；TASK-014 已完成项目管理页、创建向导、ProjectBar 和 Chat Session 的真实 Project API 接入；后续从 TASK-015 阶段状态机继续推进。
 
 ### 计划技术栈
 

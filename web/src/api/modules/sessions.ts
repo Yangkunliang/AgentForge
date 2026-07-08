@@ -1,10 +1,15 @@
 import request from '@/api/request'
 import type { Session, ChatMessage, ChatAdvancedPayload } from '@/types'
+import { projectsApi } from '@/api/modules/projects'
 
 export const sessionsApi = {
-  list: () => request.get<Session[]>('/sessions'),
+  list: (projectId?: string | null) =>
+    projectId ? projectsApi.listSessions(projectId) : request.get<Session[]>('/sessions'),
 
-  create: () => request.post<Session>('/sessions', {}),
+  create: (projectId?: string | null, intentType?: string | null) =>
+    projectId
+      ? projectsApi.createSession(projectId, { intent_type: intentType ?? null })
+      : request.post<Session>('/sessions', {}),
 
   rename: (id: string, title: string) =>
     request.patch<Session>(`/sessions/${id}`, { title }),

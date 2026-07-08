@@ -287,9 +287,58 @@ export interface SSEEvent {
 // 会话相关
 export interface Session {
   id: string
+  project_id?: string | null
   title: string
+  intent_type?: string | null
+  current_pipeline_run_id?: string | null
   created_at: string
   updated_at: string
+}
+
+// 项目相关
+export type ProjectStatus = 'active' | 'archived'
+export type ProjectMountType = 'local' | 'github' | 'upload'
+export type ProjectMountRole = 'primary' | 'reference' | 'docs'
+export type ProjectMountStatus = 'connected' | 'disconnected' | 'pending' | 'error'
+
+export interface Project {
+  id: string
+  user_id: string
+  name: string
+  display_name: string
+  description?: string | null
+  tech_tags: string[]
+  status: ProjectStatus | string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProjectForm {
+  name: string
+  description?: string | null
+  tech_tags: string[]
+}
+
+export interface ProjectMount {
+  id: string
+  project_id: string
+  mount_type: ProjectMountType | string
+  display_name: string
+  locator: string
+  role: ProjectMountRole | string
+  status: ProjectMountStatus | string
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProjectMountForm {
+  mount_type: ProjectMountType
+  display_name: string
+  locator: string
+  role: ProjectMountRole
+  status: ProjectMountStatus
+  metadata?: Record<string, unknown>
 }
 
 // ToolCall 已迁移为 ExecutionStep，此旧接口仅兼容历史消息

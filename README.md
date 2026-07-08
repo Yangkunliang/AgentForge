@@ -100,7 +100,7 @@ AgentForge/
 | [API 规范](docs/tech-design/API-SPEC.md) | API 端点设计 |
 | [安全设计](docs/tech-design/SECURITY.md) | 认证、授权、限流策略 |
 | [LLM 配置](docs/tech-design/LLM-CONFIG.md) | LLM Provider、模型路由、Cost 追踪 |
-| [前端架构](docs/tech-design/FRONTEND-ARCHITECTURE.md) | 前端架构、SSE 方案、Token 策略 |
+| [前端架构](docs/tech-design/FRONTEND-ARCHITECTURE.md) | 前端架构、Project Store、SSE 方案、Token 策略 |
 | [消息队列](docs/tech-design/RABBITMQ.md) | RabbitMQ 拓扑、Exchange/Queue 设计 |
 | [部署指南](docs/tech-design/DEPLOYMENT.md) | 本地开发、生产部署、Nginx 配置 |
 | [核心开发闭环](docs/architecture/CORE-DEV-WORKFLOW.md) | Project、Mount、Session、PipelineRun、StageState、Artifact、Delivery |

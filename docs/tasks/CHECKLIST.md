@@ -33,7 +33,7 @@ PRODUCT-REQUIREMENTS / PRD
 | 用户故事 | 产品目标 | 覆盖任务 |
 |---|---|---|
 | CDW-01 | Session 归属 Project，项目是会话和产物的一等容器 | [TASK-012](TASK-012.md)、[TASK-013](TASK-013.md)、[TASK-014](TASK-014.md) |
-| CDW-02 | 代码库上下文必须由用户主动授权，不自动扫描目录 | [TASK-012](TASK-012.md)、[TASK-013](TASK-013.md)、[TASK-018](TASK-018.md) |
+| CDW-02 | 代码库上下文必须由用户主动授权，不自动扫描目录 | [TASK-012](TASK-012.md)、[TASK-013](TASK-013.md)、[TASK-014](TASK-014.md)、[TASK-018](TASK-018.md) |
 | CDW-03 | 需求类型生成可检查的阶段计划，而不是只改变 prompt 文案 | [TASK-012](TASK-012.md)、[TASK-015](TASK-015.md) |
 | CDW-04 | 阶段输出沉淀为 Artifact，可查看、复用和追溯 | [TASK-012](TASK-012.md)、[TASK-013](TASK-013.md)、[TASK-016](TASK-016.md) |
 | CDW-05 | PRD、技术选型、影响范围等关键节点必须暂停确认 | [TASK-012](TASK-012.md)、[TASK-017](TASK-017.md) |
@@ -56,7 +56,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-011：高级设置面板功能实现](TASK-011.md) | P2 | US-1、US-2 | TASK-006 | useAdvancedSettings store + ContextChips/StagePreview 改造 + 发送时参数注入 |
 | [x] | [TASK-012：核心功能路线图与任务重排](TASK-012.md) | P0 | CDW-01～CDW-07 | 无 | 明确 Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery 闭环，并拆出后续任务 |
 | [x] | [TASK-013：Project / Mount / Artifact 数据底座](TASK-013.md) | P0 | CDW-01、CDW-02、CDW-04 | TASK-012 | Project/Mount/Artifact 模型、迁移、API 与 Session.project_id 已落地 |
-| [ ] | [TASK-014：项目管理页接真实数据](TASK-014.md) | P0 | CDW-01 | TASK-013 | Projects 页、创建向导、ProjectBar 去 mock 并接入真实 API |
+| [x] | [TASK-014：项目管理页接真实数据](TASK-014.md) | P0 | CDW-01、CDW-02 | TASK-013 | Projects 页、创建向导、ProjectBar 已接入真实 API，Chat 会话按当前项目作用域读取 |
 | [ ] | [TASK-015：PipelineRun / StageState 阶段状态机](TASK-015.md) | P0 | CDW-03 | TASK-013 | intent 生成真实阶段计划，支持阶段状态、跳过和失败 |
 | [ ] | [TASK-016：Artifact 产物归档与查看](TASK-016.md) | P1 | CDW-04 | TASK-015 | 阶段输出保存为 Artifact，可查看、下载、作为上下文复用 |
 | [ ] | [TASK-017：人工确认与阶段继续机制](TASK-017.md) | P1 | CDW-05 | TASK-015、TASK-016 | PRD、技术选型、影响范围确认后继续下一阶段 |

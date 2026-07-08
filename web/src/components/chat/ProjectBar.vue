@@ -1,25 +1,32 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useProjectStore } from '@/stores/project'
+import { useSessionStore } from '@/stores/session'
+import type { Project } from '@/types'
 
 const router = useRouter()
+const projectStore = useProjectStore()
+const sessionStore = useSessionStore()
 
 const dropdownVisible = ref(false)
 
-const currentProject = ref({
-  name: '我的电商后端',
-  techStacks: ['FastAPI', 'Vue 3'],
+const currentProject = computed(() => projectStore.currentProject)
+const projects = computed(() => projectStore.projects)
+
+onMounted(async () => {
+  if (projects.value.length === 0) {
+    await projectStore.fetchProjects()
+  }
 })
 
-const projects = ref([
-  { id: '1', name: '我的电商后端', techStacks: ['FastAPI', 'Vue 3'] },
-  { id: '2', name: '客户管理系统', techStacks: ['Django', 'React'] },
-  { id: '3', name: '数据可视化大屏', techStacks: ['React', 'ECharts'] },
-])
-
-function selectProject(project: typeof projects.value[0]) {
-  currentProject.value = project
+async function selectProject(project: Project) {
+  await projectStore.selectProject(project.id)
+  await sessionStore.fetchSessions(project.id)
   dropdownVisible.value = false
+  if (router.currentRoute.value.path.startsWith('/chat/')) {
+    router.push('/chat')
+  }
 }
 
 function handleManageProjects() {
@@ -37,8 +44,10 @@ function handleManageProjects() {
         </svg>
       </div>
       <div class="project-detail">
-        <span class="project-name">{{ currentProject.name }}</span>
-        <span class="project-tech">{{ currentProject.techStacks.join(' · ') }}</span>
+        <span class="project-name">{{ currentProject?.name ?? '选择项目' }}</span>
+        <span class="project-tech">
+          {{ currentProject?.tech_tags?.length ? currentProject.tech_tags.join(' · ') : '暂无项目上下文' }}
+        </span>
       </div>
       <svg class="arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="6 9 12 15 18 9"/>
@@ -56,7 +65,7 @@ function handleManageProjects() {
             v-for="project in projects"
             :key="project.id"
             class="dropdown-item"
-            :class="{ active: currentProject.name === project.name }"
+            :class="{ active: currentProject?.id === project.id }"
             @click="selectProject(project)"
           >
             <div class="item-icon">
@@ -66,8 +75,11 @@ function handleManageProjects() {
             </div>
             <div class="item-info">
               <span class="item-name">{{ project.name }}</span>
-              <span class="item-tech">{{ project.techStacks.join(', ') }}</span>
+              <span class="item-tech">{{ project.tech_tags.join(', ') || '未标注技术栈' }}</span>
             </div>
+          </div>
+          <div v-if="projects.length === 0" class="dropdown-empty">
+            暂无项目，先创建一个项目
           </div>
         </div>
       </div>
@@ -166,6 +178,12 @@ function handleManageProjects() {
 .dropdown-list {
   max-height: 200px;
   overflow-y: auto;
+}
+
+.dropdown-empty {
+  padding: 14px;
+  font-size: 12px;
+  color: #9ca3af;
 }
 
 .dropdown-item {

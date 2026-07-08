@@ -41,7 +41,7 @@ docs/
 | [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
 | [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
 | [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
-| [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
+| [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（Project Store、SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
 | [RABBITMQ.md](tech-design/RABBITMQ.md) | 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理 | ✅ |
 | [DEPLOYMENT.md](tech-design/DEPLOYMENT.md) | 本地开发环境、生产部署、Nginx 配置、数据库迁移 | ✅ |
 | [SANDBOX-RESEARCH.md](tech-design/SANDBOX-RESEARCH.md) | 沙箱机制调研报告（Docker vs CubeSandbox 对比） | ✅ |
@@ -88,6 +88,7 @@ docs/
 | TASK-011 | 2026-07-07 | 高级设置面板真实透传 + 技术风险修正 | ✅ 已实现，验证中 |
 | TASK-012 | 2026-07-08 | 核心开发闭环路线图与任务重排 | ✅ 已完成 |
 | TASK-013 | 2026-07-08 | Project / Mount / Artifact 数据底座 | ✅ 已完成 |
+| TASK-014 | 2026-07-08 | 项目管理页接真实数据 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -132,6 +133,10 @@ docs/
 ### TASK-013 详细信息
 - **核心功能**：Project、ProjectMount、Artifact SQLAlchemy 模型与 Alembic 迁移；Project/Mount/Artifact CRUD API；项目维度 Session API；旧 `/sessions` 默认项目兼容
 - **验证**：`uv run --extra dev pytest` 通过；FastAPI uvicorn 启动到 `AgentForge startup complete ✓`
+
+### TASK-014 详细信息
+- **核心功能**：`projectsApi` 与 `useProjectStore`；Projects 页读取真实项目和主 Mount；创建向导创建 Project + primary Mount；ProjectBar 真实切换当前项目；Chat 会话按当前项目读取和新建
+- **验证**：`npm run test:e2e -- projects.spec.ts` 通过；`npm run build` 通过
 
 ## 版本号规范
 

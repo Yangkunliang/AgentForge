@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
+import { useProjectStore } from '@/stores/project'
 import type { Session, ChatMessage, ExecutionStep } from '@/types'
 
 export const useSessionStore = defineStore('session', () => {
@@ -9,13 +10,25 @@ export const useSessionStore = defineStore('session', () => {
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
 
-  async function fetchSessions() {
-    const { data } = await sessionsApi.list()
-    sessions.value = data
+  function resolveProjectId(projectId?: string | null) {
+    const projectStore = useProjectStore()
+    return projectId ?? projectStore.currentProjectId ?? null
   }
 
-  async function createSession(): Promise<Session> {
-    const { data } = await sessionsApi.create()
+  async function fetchSessions(projectId?: string | null) {
+    const targetProjectId = resolveProjectId(projectId)
+    const { data } = await sessionsApi.list(targetProjectId)
+    sessions.value = data
+
+    if (currentSession.value && !data.some((session) => session.id === currentSession.value?.id)) {
+      currentSession.value = null
+      messages.value = []
+    }
+  }
+
+  async function createSession(projectId?: string | null, intentType?: string | null): Promise<Session> {
+    const targetProjectId = resolveProjectId(projectId)
+    const { data } = await sessionsApi.create(targetProjectId, intentType)
     sessions.value.unshift(data)
     return data
   }

@@ -14,6 +14,7 @@ import { usePipeline } from '@/composables/usePipeline'
 import { useAdvancedSettingsStore } from '@/stores/advancedSettings'
 import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
 import { useSessionStore } from '@/stores/session'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
@@ -24,6 +25,7 @@ const router = useRouter()
 const sessionStore = useSessionStore()
 const authStore = useAuthStore()
 const agentStore = useAgentStore()
+const projectStore = useProjectStore()
 const advancedSettings = useAdvancedSettingsStore()
 const { intent: currentIntent } = storeToRefs(advancedSettings)
 
@@ -53,7 +55,8 @@ const agentInfo = computed(() => ({
 }))
 
 onMounted(async () => {
-  await sessionStore.fetchSessions()
+  await projectStore.fetchProjects()
+  await sessionStore.fetchSessions(projectStore.currentProjectId)
   await agentStore.fetchMyAgentSettings()
   if (sessionId.value) {
     const session = sessionStore.sessions.find((s) => s.id === sessionId.value)
@@ -132,7 +135,7 @@ async function send() {
   if (!sessionId.value) {
     autoCreating.value = true
     try {
-      const session = await sessionStore.createSession()
+      const session = await sessionStore.createSession(projectStore.currentProjectId, currentIntent.value)
       sessionId.value = session.id
       router.replace(`/chat/${session.id}`)
     } catch {
@@ -211,8 +214,20 @@ watch(
   },
 )
 
+watch(
+  () => projectStore.currentProjectId,
+  async (projectId, oldProjectId) => {
+    if (projectId === oldProjectId) return
+    await sessionStore.fetchSessions(projectId)
+    if (sessionId.value && !sessionStore.sessions.some((session) => session.id === sessionId.value)) {
+      sessionId.value = undefined
+      router.replace('/chat')
+    }
+  },
+)
+
 async function handleNewChat() {
-  const session = await sessionStore.createSession()
+  const session = await sessionStore.createSession(projectStore.currentProjectId, currentIntent.value)
   router.push(`/chat/${session.id}`)
 }
 

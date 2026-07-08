@@ -57,6 +57,7 @@ web/
 │   │       ├── auth.ts
 │   │       ├── tasks.ts
 │   │       ├── agents.ts
+│   │       ├── projects.ts    # Project / Mount / Project Session API
 │   │       ├── skills.ts
 │   │       ├── exports.ts
 │   │       └── dashboard.ts  # 仪表盘聚合数据
@@ -116,6 +117,7 @@ web/
 │   │   ├── index.ts
 │   │   ├── modules/
 │   │   │   ├── auth.ts        # 用户状态 + Token 管理
+│   │   │   ├── project.ts     # 当前项目、项目列表、Mount 缓存
 │   │   │   ├── task.ts        # 任务列表/详情 + SSE 实时更新入口
 │   │   │   ├── agent.ts
 │   │   │   ├── skill.ts
@@ -260,7 +262,47 @@ export const useAuthStore = defineStore('auth', () => {
 }, { persist: { paths: ['accessToken', 'tokenExpiresAt', 'permissions', 'user'] } })
 ```
 
-### 4.2 任务状态 (task.ts)
+### 4.2 项目状态 (project.ts)
+
+TASK-014 后，Project 是前端工作台的首要上下文源，项目列表、当前项目、Mount 缓存统一由 `useProjectStore` 管理。
+
+```typescript
+export const useProjectStore = defineStore('project', () => {
+  const projects = ref<Project[]>([])
+  const currentProjectId = ref<string | null>(localStorage.getItem('agentforge.current_project_id'))
+  const mountsByProject = ref<Record<string, ProjectMount[]>>({})
+
+  const currentProject = computed(() =>
+    projects.value.find(project => project.id === currentProjectId.value) ?? null
+  )
+
+  async function fetchProjects() {
+    const { data } = await projectsApi.list()
+    projects.value = data
+    reconcileCurrentProject()
+  }
+
+  async function selectProject(projectId: string) {
+    currentProjectId.value = projectId
+    localStorage.setItem('agentforge.current_project_id', projectId)
+  }
+
+  async function createProject(form: CreateProjectForm) { ... }
+  async function fetchProjectMounts(projectId: string) { ... }
+  async function createMount(projectId: string, form: CreateProjectMountForm) { ... }
+
+  return { projects, currentProjectId, currentProject, mountsByProject, fetchProjects, selectProject, createProject, fetchProjectMounts, createMount }
+})
+```
+
+规则：
+
+- `/projects`、`/projects/create`、`ProjectBar` 不保留静态 mock 项目。
+- 当前项目 ID 使用 `localStorage: agentforge.current_project_id` 恢复；若对应项目不存在，回退到项目列表第一项。
+- 创建项目时同时创建 primary Mount，记录用户主动授权的本地路径、GitHub URL 或上传占位。
+- `SessionStore` 新建和读取会话时优先使用 `currentProjectId`，调用 `/projects/{project_id}/sessions`。
+
+### 4.3 任务状态 (task.ts)
 
 SSE 收到的实时事件**直接更新 task store**，不另建 stream store，避免双重维护。
 
@@ -317,7 +359,7 @@ export const useTaskStore = defineStore('task', () => {
 })
 ```
 
-### 4.3 Skill 状态 (skill.ts)
+### 4.4 Skill 状态 (skill.ts)
 
 ```typescript
 export const useSkillStore = defineStore('skill', () => {

@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { useProjectStore } from '@/stores/project'
+import type { ProjectMountType } from '@/types'
 
 const router = useRouter()
+const projectStore = useProjectStore()
 
 const currentStep = ref(1)
 const projectName = ref('')
 const projectDescription = ref('')
-const mountMethod = ref('cli')
+const mountMethod = ref<'cli' | 'github' | 'upload'>('cli')
+const mountLocator = ref('')
 const selectedTags = ref<string[]>([])
 const customTag = ref('')
+const submitting = ref(false)
 
 const techTags = [
   'Vue 3', 'React', 'Angular', 'Svelte',
@@ -25,9 +31,39 @@ const steps = [
   { id: 4, label: '完成' },
 ]
 
+const mountOptions: Array<{
+  id: 'cli' | 'github' | 'upload'
+  title: string
+  desc: string
+  icon: 'terminal' | 'github' | 'upload'
+}> = [
+  { id: 'cli', title: '本地目录 CLI', desc: '通过命令行挂载本地代码目录', icon: 'terminal' },
+  { id: 'github', title: 'GitHub OAuth', desc: '连接 GitHub 仓库，自动同步', icon: 'github' },
+  { id: 'upload', title: '手动上传', desc: '上传关键文件供 Agent 分析', icon: 'upload' },
+]
+
 const isStepValid = computed(() => {
   if (currentStep.value === 1) return projectName.value.trim().length > 0
+  if (currentStep.value === 2) return mountLocator.value.trim().length > 0
   return true
+})
+
+const mountLocatorLabel = computed(() => {
+  if (mountMethod.value === 'github') return 'GitHub 仓库地址'
+  if (mountMethod.value === 'upload') return '上传文件标识'
+  return '本地目录路径'
+})
+
+const mountLocatorPlaceholder = computed(() => {
+  if (mountMethod.value === 'github') return '例如：https://github.com/acme/payment-service'
+  if (mountMethod.value === 'upload') return '例如：payment-service.zip'
+  return '例如：/Users/me/work/payment-service'
+})
+
+const mountLocatorHint = computed(() => {
+  if (mountMethod.value === 'github') return '后续接入 OAuth 后可自动同步，这里先记录用户主动授权的仓库定位。'
+  if (mountMethod.value === 'upload') return '上传解析将在后续任务实现，这里先保存手动上传的上下文入口。'
+  return 'AgentForge 不会自动扫描本机目录，只会使用你明确授权的路径。'
 })
 
 function selectTag(tag: string) {
@@ -47,7 +83,42 @@ function addCustomTag() {
   }
 }
 
-function nextStep() {
+function toMountType(): ProjectMountType {
+  if (mountMethod.value === 'cli') return 'local'
+  return mountMethod.value
+}
+
+async function submitProject() {
+  if (submitting.value) return
+  submitting.value = true
+  try {
+    const project = await projectStore.createProject({
+      name: projectName.value,
+      description: projectDescription.value,
+      tech_tags: selectedTags.value,
+    })
+    await projectStore.createMount(project.id, {
+      mount_type: toMountType(),
+      display_name: '主代码库',
+      locator: mountLocator.value,
+      role: 'primary',
+      status: 'connected',
+      metadata: {
+        created_from: 'project_create_wizard',
+      },
+    })
+    currentStep.value = 4
+    ElMessage.success('项目已创建')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function nextStep() {
+  if (currentStep.value === 3) {
+    await submitProject()
+    return
+  }
   if (currentStep.value < 4) {
     currentStep.value++
   }
@@ -121,11 +192,7 @@ function finish() {
 
             <div class="mount-options">
               <div
-                v-for="option in [
-                  { id: 'cli', title: '本地目录 CLI', desc: '通过命令行挂载本地代码目录', icon: 'terminal' },
-                  { id: 'github', title: 'GitHub OAuth', desc: '连接 GitHub 仓库，自动同步', icon: 'github' },
-                  { id: 'upload', title: '手动上传', desc: '上传关键文件供 Agent 分析', icon: 'upload' },
-                ]"
+                v-for="option in mountOptions"
                 :key="option.id"
                 class="mount-option"
                 :class="{ active: mountMethod === option.id }"
@@ -153,8 +220,19 @@ function finish() {
             </div>
 
             <div v-if="mountMethod === 'cli'" class="cli-example">
-              <pre class="cli-code"><code>$ agentforge mount ~/workspace/my-project</code></pre>
+              <pre class="cli-code"><code>$ agentforge mount {{ mountLocator || '/Users/me/work/payment-service' }}</code></pre>
               <p class="cli-hint">复制命令到终端执行，将本地目录挂载到平台</p>
+            </div>
+
+            <div class="form-group mount-locator-group">
+              <label class="form-label">{{ mountLocatorLabel }} <span class="required">*</span></label>
+              <input
+                v-model="mountLocator"
+                type="text"
+                class="form-input"
+                :placeholder="mountLocatorPlaceholder"
+              />
+              <p class="mount-locator-hint">{{ mountLocatorHint }}</p>
             </div>
           </div>
 
@@ -216,8 +294,8 @@ function finish() {
         <button class="btn-secondary" @click="prevStep" :disabled="currentStep === 1">
           <span>上一步</span>
         </button>
-        <button class="btn-primary" @click="nextStep" :disabled="!isStepValid">
-          <span>{{ currentStep === 3 ? '完成' : '下一步' }}</span>
+        <button class="btn-primary" @click="nextStep" :disabled="!isStepValid || submitting">
+          <span>{{ submitting ? '创建中...' : currentStep === 3 ? '完成' : '下一步' }}</span>
         </button>
       </div>
     </div>
@@ -481,6 +559,17 @@ function finish() {
   margin: 8px 0 0;
   font-size: 12px;
   color: #9ca3af;
+}
+
+.mount-locator-group {
+  margin-top: 16px;
+}
+
+.mount-locator-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
 }
 
 .tags-grid {
