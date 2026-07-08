@@ -13,13 +13,20 @@ const props = defineProps<{
   artifactId: string
 }>()
 
+type DeliveryMode = 'local' | 'github'
+
 const router = useRouter()
 const artifactStore = useArtifactStore()
 const advancedSettings = useAdvancedSettingsStore()
 const projectStore = useProjectStore()
 
+const deliveryMode = ref<DeliveryMode>('local')
 const selectedMountId = ref('')
 const targetPath = ref('')
+const githubBaseBranch = ref('main')
+const githubTargetBranch = ref('')
+const githubPrTitle = ref('')
+const githubCommitMessage = ref('')
 const deliveryPreview = ref<DeliveryResponse | null>(null)
 const deliveryLoading = ref(false)
 const deliveryError = ref('')
@@ -38,6 +45,15 @@ const projectMounts = computed(() => {
 const connectedLocalMounts = computed(() =>
   projectMounts.value.filter((mount) => mount.mount_type === 'local' && mount.status === 'connected')
 )
+const connectedGitHubMounts = computed(() =>
+  projectMounts.value.filter((mount) => mount.mount_type === 'github' && mount.status === 'connected')
+)
+const deliveryMounts = computed(() =>
+  deliveryMode.value === 'github' ? connectedGitHubMounts.value : connectedLocalMounts.value
+)
+const selectedGitHubMount = computed(() =>
+  connectedGitHubMounts.value.find((mount) => mount.id === selectedMountId.value) ?? null
+)
 const activeDeliveryReport = computed(() =>
   deliveryPreview.value?.report ?? artifact.value?.delivery_report ?? null
 )
@@ -51,22 +67,45 @@ const deliveryStatusLabel = computed(() => {
   return '待交付'
 })
 const canPreviewDelivery = computed(() =>
-  Boolean(artifact.value && selectedMountId.value && targetPath.value.trim() && !deliveryLoading.value)
+  Boolean(
+    artifact.value
+      && selectedMountId.value
+      && targetPath.value.trim()
+      && (deliveryMode.value === 'local' || githubTargetBranch.value.trim())
+      && !deliveryLoading.value
+  )
 )
 const canApplyDelivery = computed(() =>
-  Boolean(deliveryPreview.value && selectedMountId.value && targetPath.value.trim() && !deliveryLoading.value)
+  Boolean(
+    deliveryPreview.value
+      && selectedMountId.value
+      && targetPath.value.trim()
+      && (deliveryMode.value === 'local' || previewBaseSha())
+      && !deliveryLoading.value
+  )
 )
 const canExportDelivery = computed(() =>
   artifact.value?.delivery_status === 'delivered' || deliveryPreview.value?.status === 'delivered'
+)
+const previewButtonLabel = computed(() =>
+  deliveryMode.value === 'github' ? '预览 PR Diff' : '预览 Diff'
+)
+const applyButtonLabel = computed(() =>
+  deliveryMode.value === 'github' ? '创建 PR' : '确认写入'
 )
 
 async function loadArtifact() {
   const loaded = await artifactStore.fetchArtifact(props.artifactId)
   await projectStore.fetchProjectMounts(loaded.project_id)
+  deliveryMode.value = artifact.value?.delivery_report?.delivery_channel === 'github_pr' ? 'github' : 'local'
   selectedMountId.value = artifact.value?.delivery_report?.mount_id as string
-    || connectedLocalMounts.value[0]?.id
+    || deliveryMounts.value[0]?.id
     || ''
   targetPath.value = artifact.value?.delivery_target_path || artifact.value?.name || ''
+  if (deliveryMode.value === 'github') {
+    targetPath.value = githubTargetPath(targetPath.value)
+  }
+  resetGitHubDefaults(true)
   deliveryPreview.value = null
   deliveryError.value = ''
 }
@@ -86,10 +125,18 @@ async function previewDelivery() {
   deliveryLoading.value = true
   deliveryError.value = ''
   try {
-    const { data } = await artifactsApi.previewDelivery(artifact.value.id, {
-      mount_id: selectedMountId.value,
-      target_path: targetPath.value.trim(),
-    })
+    const { data } = deliveryMode.value === 'github'
+      ? await artifactsApi.previewGitHubDelivery(artifact.value.id, {
+          mount_id: selectedMountId.value,
+          target_path: targetPath.value.trim(),
+          base_branch: githubBaseBranch.value.trim(),
+          target_branch: githubTargetBranch.value.trim(),
+          pr_title: githubPrTitle.value.trim(),
+        })
+      : await artifactsApi.previewDelivery(artifact.value.id, {
+          mount_id: selectedMountId.value,
+          target_path: targetPath.value.trim(),
+        })
     deliveryPreview.value = data
     targetPath.value = data.target_path
   } catch (error) {
@@ -104,12 +151,23 @@ async function applyDelivery() {
   deliveryLoading.value = true
   deliveryError.value = ''
   try {
-    const { data } = await artifactsApi.applyDelivery(artifact.value.id, {
-      mount_id: selectedMountId.value,
-      target_path: targetPath.value.trim(),
-      confirm_write: true,
-      expected_target_hash: previewTargetHash(),
-    })
+    const { data } = deliveryMode.value === 'github'
+      ? await artifactsApi.applyGitHubDelivery(artifact.value.id, {
+          mount_id: selectedMountId.value,
+          target_path: targetPath.value.trim(),
+          base_branch: githubBaseBranch.value.trim(),
+          target_branch: githubTargetBranch.value.trim(),
+          pr_title: githubPrTitle.value.trim(),
+          commit_message: githubCommitMessage.value.trim(),
+          confirm_write: true,
+          expected_base_sha: previewBaseSha() ?? '',
+        })
+      : await artifactsApi.applyDelivery(artifact.value.id, {
+          mount_id: selectedMountId.value,
+          target_path: targetPath.value.trim(),
+          confirm_write: true,
+          expected_target_hash: previewTargetHash(),
+        })
     deliveryPreview.value = data
     targetPath.value = data.target_path
     await artifactStore.fetchArtifact(artifact.value.id)
@@ -154,6 +212,50 @@ function previewTargetHash(): string | null | undefined {
   return typeof hash === 'string' || hash === null ? hash : undefined
 }
 
+function previewBaseSha(): string | undefined {
+  const baseSha = deliveryPreview.value?.report?.base_sha
+  return typeof baseSha === 'string' && baseSha ? baseSha : undefined
+}
+
+function reportText(key: string): string {
+  const value = activeDeliveryReport.value?.[key]
+  if (typeof value === 'string' || typeof value === 'number') {
+    return String(value)
+  }
+  return ''
+}
+
+function selectDeliveryMode(mode: DeliveryMode) {
+  if (deliveryMode.value === mode) return
+  deliveryMode.value = mode
+}
+
+function resetSelectedMountForMode() {
+  selectedMountId.value = deliveryMounts.value[0]?.id || ''
+  deliveryPreview.value = null
+  deliveryError.value = ''
+  resetGitHubDefaults(true)
+}
+
+function resetGitHubDefaults(force = false) {
+  if (!artifact.value) return
+  const defaultBranch = selectedGitHubMount.value?.metadata?.default_branch
+  githubBaseBranch.value = typeof defaultBranch === 'string' && defaultBranch ? defaultBranch : 'main'
+  if (force || !githubTargetBranch.value) {
+    githubTargetBranch.value = `agentforge/${artifact.value.id.slice(0, 8)}`
+  }
+  if (force || !githubPrTitle.value) {
+    githubPrTitle.value = `Deliver ${artifact.value.name}`
+  }
+  if (force || !githubCommitMessage.value) {
+    githubCommitMessage.value = `Deliver ${artifact.value.name}`
+  }
+}
+
+function githubTargetPath(value: string): string {
+  return value.startsWith('github://') ? value.split('/').slice(4).join('/') : value
+}
+
 onMounted(loadArtifact)
 
 watch(
@@ -162,6 +264,15 @@ watch(
     void loadArtifact()
   },
 )
+
+watch(deliveryMode, resetSelectedMountForMode)
+
+watch(selectedMountId, () => {
+  if (deliveryMode.value === 'github') {
+    deliveryPreview.value = null
+    resetGitHubDefaults()
+  }
+})
 </script>
 
 <template>
@@ -212,17 +323,36 @@ watch(
           </span>
         </div>
 
+        <div class="artifact-viewer__delivery-mode" role="tablist" aria-label="交付方式">
+          <button
+            :class="{ 'is-active': deliveryMode === 'local' }"
+            :disabled="deliveryLoading || connectedLocalMounts.length === 0"
+            type="button"
+            @click="selectDeliveryMode('local')"
+          >
+            本地写回
+          </button>
+          <button
+            :class="{ 'is-active': deliveryMode === 'github' }"
+            :disabled="deliveryLoading || connectedGitHubMounts.length === 0"
+            type="button"
+            @click="selectDeliveryMode('github')"
+          >
+            GitHub PR
+          </button>
+        </div>
+
         <div class="artifact-viewer__delivery-form">
           <label class="artifact-viewer__field" for="delivery-mount">
             <span>目标代码库</span>
             <select
               id="delivery-mount"
               v-model="selectedMountId"
-              :disabled="deliveryLoading || connectedLocalMounts.length === 0"
+              :disabled="deliveryLoading || deliveryMounts.length === 0"
             >
               <option value="" disabled>选择代码库</option>
               <option
-                v-for="mount in connectedLocalMounts"
+                v-for="mount in deliveryMounts"
                 :key="mount.id"
                 :value="mount.id"
               >
@@ -242,20 +372,65 @@ watch(
             >
           </label>
 
+          <label
+            v-if="deliveryMode === 'github'"
+            class="artifact-viewer__field"
+            for="github-base-branch"
+          >
+            <span>Base</span>
+            <input
+              id="github-base-branch"
+              v-model="githubBaseBranch"
+              type="text"
+              :disabled="deliveryLoading"
+              placeholder="main"
+            >
+          </label>
+
+          <label
+            v-if="deliveryMode === 'github'"
+            class="artifact-viewer__field"
+            for="github-target-branch"
+          >
+            <span>交付分支</span>
+            <input
+              id="github-target-branch"
+              v-model="githubTargetBranch"
+              type="text"
+              :disabled="deliveryLoading"
+              placeholder="agentforge/task"
+            >
+          </label>
+
+          <label
+            v-if="deliveryMode === 'github'"
+            class="artifact-viewer__field artifact-viewer__field--wide"
+            for="github-pr-title"
+          >
+            <span>PR 标题</span>
+            <input
+              id="github-pr-title"
+              v-model="githubPrTitle"
+              type="text"
+              :disabled="deliveryLoading"
+              placeholder="Deliver artifact"
+            >
+          </label>
+
           <div class="artifact-viewer__delivery-actions">
             <button
               class="artifact-viewer__secondary"
               :disabled="!canPreviewDelivery"
               @click="previewDelivery"
             >
-              预览 Diff
+              {{ previewButtonLabel }}
             </button>
             <button
               class="artifact-viewer__danger"
               :disabled="!canApplyDelivery"
               @click="applyDelivery"
             >
-              确认写入
+              {{ applyButtonLabel }}
             </button>
             <button
               class="artifact-viewer__secondary"
@@ -280,9 +455,21 @@ watch(
           v-if="activeDeliveryReport"
           class="artifact-viewer__delivery-report"
         >
-          <span v-if="activeDeliveryReport.target_path">目标：{{ activeDeliveryReport.target_path }}</span>
-          <span v-if="activeDeliveryReport.backup_path">备份：{{ activeDeliveryReport.backup_path }}</span>
-          <span v-if="activeDeliveryReport.bytes_written">写入：{{ activeDeliveryReport.bytes_written }} bytes</span>
+          <span v-if="reportText('target_path')">目标：{{ reportText('target_path') }}</span>
+          <span v-if="reportText('repo_full_name')">仓库：{{ reportText('repo_full_name') }}</span>
+          <span v-if="reportText('base_branch')">Base：{{ reportText('base_branch') }}</span>
+          <span v-if="reportText('target_branch')">分支：{{ reportText('target_branch') }}</span>
+          <span v-if="reportText('backup_path')">备份：{{ reportText('backup_path') }}</span>
+          <span v-if="reportText('bytes_written')">写入：{{ reportText('bytes_written') }} bytes</span>
+          <a
+            v-if="reportText('pr_url')"
+            :href="reportText('pr_url')"
+            target="_blank"
+            rel="noreferrer"
+          >
+            PR：{{ reportText('pr_url') }}
+          </a>
+          <span v-if="reportText('commit_sha')">Commit：{{ reportText('commit_sha') }}</span>
         </div>
       </section>
 
@@ -447,9 +634,42 @@ watch(
   }
 }
 
+.artifact-viewer__delivery-mode {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  padding: 3px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #e2e8f0;
+
+  button {
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+
+    &.is-active {
+      background: #fff;
+      color: #0f172a;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+  }
+}
+
 .artifact-viewer__delivery-form {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(220px, 1fr) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: end;
   gap: 12px;
 }
@@ -492,8 +712,13 @@ watch(
   }
 }
 
+.artifact-viewer__field--wide {
+  grid-column: span 2;
+}
+
 .artifact-viewer__delivery-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -559,13 +784,23 @@ watch(
   gap: 8px;
   margin-top: 12px;
 
-  span {
+  span,
+  a {
     padding: 3px 8px;
     border-radius: 6px;
     background: #fff;
     color: #475569;
     font-size: 12px;
     font-weight: 650;
+    text-decoration: none;
+  }
+
+  a {
+    color: #1d4ed8;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 
@@ -605,8 +840,13 @@ watch(
     grid-template-columns: 1fr;
   }
 
+  .artifact-viewer__field--wide {
+    grid-column: auto;
+  }
+
   .artifact-viewer__delivery-actions {
     flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 </style>

@@ -1,8 +1,8 @@
 # 核心能力增强迭代复盘
 
 **日期**：2026-07-08
-**当前完成任务**：TASK-020、TASK-021、TASK-022、TASK-023
-**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计和 GitHub OAuth Mount 授权底座已完成，下一步进入 TASK-024 GitHub PR Delivery。
+**当前完成任务**：TASK-020、TASK-021、TASK-022、TASK-023、TASK-024
+**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计、GitHub OAuth Mount 授权底座和 GitHub PR Delivery 已完成，下一步进入 TASK-025 zip Delivery Package。
 
 ## 完成内容
 
@@ -41,6 +41,15 @@
 - 删除 GitHub Mount 时标记关联 credential revoked，并写入 `github_mount.revoked` 审计。
 - Project 创建向导选择 GitHub OAuth 时调用 OAuth start，完成页展示授权状态和授权链接，不再创建普通 GitHub Mount。
 
+### TASK-024
+
+- 新增 GitHub PR Delivery preview/apply API，复用 Artifact Delivery 的两段式确认语义。
+- preview 读取 GitHub base branch sha 和目标文件内容，返回 unified diff、`base_sha`、目标分支和 PR 摘要，不创建远程状态。
+- apply 必须带 `confirm_write=true` 与 `expected_base_sha`；base sha 变化时返回 409，Artifact 保存 `github_base_changed` 失败报告，不创建 branch、commit 或 PR。
+- 成功 apply 后依次创建 branch、commit 和 PR，Delivery report 保存 `pr_url`、`commit_sha`、base/target branch 和恢复提示。
+- GitHub client 通过 fake client 覆盖后端测试，单元测试不访问真实 GitHub API。
+- Artifact Viewer 新增“本地写回 / GitHub PR”交付方式切换，GitHub 模式提交 `expected_base_sha` 并展示 PR URL / commit sha。
+
 ## 发现并修正的风险
 
 | 风险 | 修正 |
@@ -56,6 +65,8 @@
 | 用户删除 GitHub Mount 后服务端凭据仍可能被后续 PR Delivery 误用 | DELETE Mount 标记 `OAuthCredential.revoked_at`，TASK-024 必须拒绝已撤销凭据 |
 | GitHub OAuth callback 是浏览器重定向，真实请求通常没有 Authorization header | callback 改为通过一次性 state 找回 user_id/project_id，start 仍必须登录 |
 | 客户端可控 redirect_uri 可能把 OAuth code 带到外部域名 | start API 只接受当前 Project 的 AgentForge callback path |
+| GitHub 远程 base branch 在 preview 后变化可能导致覆盖或错 PR | apply 强制提交 `expected_base_sha` 并二次读取 base sha，变化时拒绝交付 |
+| GitHub token 可能被错误写进交付报告或审计 | token 只在服务端解密后传给 client，测试断言响应和 AuditLog details 不包含明文 token |
 
 ## 验证结果
 
@@ -69,9 +80,11 @@
 - `git diff --check`：TASK-022 文档变更通过
 - `uv run --extra dev pytest tests/api/test_github_mount.py`：6 passed
 - `npm run test:e2e -- projects.spec.ts --project=chromium`：4 passed
+- `uv run --extra dev pytest tests/api/test_github_delivery.py`：4 passed
+- `uv run --extra dev pytest tests/api/test_delivery.py tests/api/test_github_delivery.py tests/api/test_github_mount.py`：15 passed
+- `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium`：4 passed
 
 ## 下一步
 
-- TASK-024：在 TASK-023 之后实现 GitHub PR Delivery。
 - TASK-025：实现 zip Delivery Package。
 - TASK-026：实现 Upload Mount 上下文兜底。

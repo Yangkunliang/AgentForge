@@ -133,7 +133,7 @@ github_mount.revoked
 
 ### 4.2 GitHub PR Delivery
 
-PR Delivery 复用 Delivery 的 preview/apply 两段式确认，但目标不是本地文件，而是 GitHub remote ref：
+TASK-024 已实现 PR Delivery。它复用 Delivery 的 preview/apply 两段式确认，但目标不是本地文件，而是 GitHub remote ref：
 
 ```text
 Artifact -> GitHubDelivery.preview -> user confirm -> GitHubDelivery.apply
@@ -147,30 +147,28 @@ artifact_id
 mount_id
 base_branch
 target_branch
-files[]
+target_path
 pr_title
-pr_body
 ```
 
 preview 输出：
 
 ```text
-base_ref
+base_sha
 target_branch
-files[]
+target_path
 unified_diff
-commit_message
 pr_title
-pr_body
-expected_base_sha
+target_file_sha
 ```
 
 apply 必须带 `expected_base_sha`。如果 base branch 当前 sha 与 preview 时不同，返回 409，保存失败报告，不创建 commit。
 
-branch 命名建议：
+当前 API：
 
 ```text
-agentforge/<project-slug>/<artifact-short-id>
+POST /api/v1/artifacts/{artifact_id}/delivery/github/preview
+POST /api/v1/artifacts/{artifact_id}/delivery/github/apply
 ```
 
 失败处理：
@@ -185,14 +183,40 @@ agentforge/<project-slug>/<artifact-short-id>
 审计事件：
 
 ```text
-delivery.github_pr.preview.succeeded
-delivery.github_pr.apply.denied
-delivery.github_pr.branch.created
-delivery.github_pr.commit.created
-delivery.github_pr.pr.created
-delivery.github_pr.conflict
-delivery.github_pr.failed
+delivery.github.preview.succeeded
+delivery.github.preview.failed
+delivery.github.apply.denied
+delivery.github.apply.branch_created
+delivery.github.apply.commit_created
+delivery.github.apply.pr_created
+delivery.github.apply.conflict
+delivery.github.apply.failed
+delivery.github.apply.succeeded
 ```
+
+Delivery report 字段：
+
+```text
+delivery_channel=github_pr
+repo_full_name
+target_path
+delivery_target_path
+base_branch
+target_branch
+base_sha
+target_file_sha
+pr_url
+pr_number
+commit_sha
+commit_url
+recovery_hint
+```
+
+安全约束：
+
+- GitHub token 只从 `OAuthCredential` 服务端解密后传给 client。
+- API 响应、Delivery report、AuditLog details 不记录明文 token 或 Artifact 正文。
+- Artifact Viewer 在 preview 后从 `report.base_sha` 读取 expected base sha，确认创建 PR 时带回服务端。
 
 ### 4.3 zip Delivery Package
 

@@ -98,7 +98,7 @@ docs/
 | TASK-021 | 2026-07-08 | 核心交互设计复盘与关键入口优化 | ✅ 已完成 |
 | TASK-022 | 2026-07-08 | 交付能力扩展设计与实现 | ✅ 已完成 |
 | TASK-023 | 2026-07-08 | GitHub OAuth Mount 授权底座 | ✅ 已完成 |
-| TASK-024 | 2026-07-08 | GitHub PR Delivery | ⏳ 待开始 |
+| TASK-024 | 2026-07-08 | GitHub PR Delivery | ✅ 已完成 |
 | TASK-025 | 2026-07-08 | zip Delivery Package | ⏳ 待开始 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ⏳ 待开始 |
 
@@ -179,7 +179,7 @@ docs/
   - [UI-REVIEW.md](iterations/2026-07-08-core-strengthening/UI-REVIEW.md)
   - [TEST-PLAN.md](iterations/2026-07-08-core-strengthening/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md)
-- **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再让 Project、Chat、Stage、Artifact 的下一步动作可见；然后设计 GitHub PR、zip、upload 等交付扩展，并已落地 TASK-023 GitHub OAuth Mount 授权底座，后续继续 TASK-024～TASK-026。
+- **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再让 Project、Chat、Stage、Artifact 的下一步动作可见；然后设计 GitHub PR、zip、upload 等交付扩展，并已落地 TASK-023 GitHub OAuth Mount 授权底座和 TASK-024 GitHub PR Delivery，后续继续 TASK-025～TASK-026。
 
 ## 版本号规范
 

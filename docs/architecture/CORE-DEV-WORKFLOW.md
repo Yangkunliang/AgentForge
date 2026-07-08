@@ -18,7 +18,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | 可继续增强 Delivery 自动编排 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
-| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；TASK-020 已巩固一致性、失败落库和审计；TASK-022 已完成 GitHub PR / zip / upload 扩展设计；TASK-023 已提供 PR Delivery 所需 GitHub Mount 凭据引用 | TASK-024 扩展 GitHub PR Delivery，TASK-025 扩展 zip Delivery |
+| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计 | TASK-025 扩展 zip Delivery |
 
 ## 2. 用户路径
 
@@ -33,7 +33,7 @@ MVP 用户路径按以下顺序落地：
 7. Agent 执行当前阶段，阶段完成后保存 Artifact。
 8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
 9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
-10. 用户在 Artifact Viewer 中选择 connected local Mount 和目标路径，先预览 unified diff，再确认写回本地目录，并导出 Markdown Delivery report。
+10. 用户在 Artifact Viewer 中选择本地写回或 GitHub PR Delivery：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR，并导出 Markdown Delivery report。
 
 ## 3. 设计原则
 
@@ -72,11 +72,11 @@ TASK-012 路线图和状态纠偏
 ## 5. MVP 非目标
 
 - 不做多人协作。
-- 不做完整 GitHub App PR 流程；TASK-024 前远程仓库只完成授权 Mount，不创建 commit 或 PR。
+- 不做完整 GitHub App PR 流程；当前远程交付基于用户显式授权的 GitHub OAuth Mount 创建单仓库 PR，不自动 merge。
 - 不在 TASK-013 中实现真实本地文件读取；TASK-018 已实现用户选中文件的只读读取。
 - 不要求 Agent 自动完成完整 8 步流水线；当前阶段状态机已支持运行态推进、产物归档与人工确认暂停。
 - 不把用户选择的文件路径当作已读取内容，真实读取必须经过 Mount/Bridge 授权。
-- 不在 TASK-024 完成前扩展远程 PR 写入，避免绕过用户确认或使用已撤销凭据。
+- 不支持跨 repo 批量 PR；远程写入必须先 preview、再确认，并拒绝已撤销凭据。
 
 ## 6. 完成定义
 
@@ -85,7 +85,7 @@ TASK-012 路线图和状态纠偏
 ```text
 创建项目 -> 创建会话 -> 选择需求类型 -> 生成阶段计划
 -> 完成一个阶段 -> 保存产物 -> 人工确认 -> 进入下一阶段
--> 查看产物 -> 将结果交付到本地或导出
+-> 查看产物 -> 将结果交付到本地、GitHub PR 或导出
 ```
 
 Delivery 不能绕过用户确认；只有在用户明确确认写入后，Artifact 内容才能写回授权 Mount。

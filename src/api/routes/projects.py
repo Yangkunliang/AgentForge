@@ -18,10 +18,15 @@ from agent_forge.config import settings
 from agent_forge.database import get_async_session
 from agent_forge.delivery import (
     DeliveryConsistencyError,
+    GitHubDeliveryConsistencyError,
+    GitHubDeliveryError,
     apply_artifact_delivery,
+    apply_github_pr_delivery,
     build_delivery_report_markdown,
+    create_github_delivery_client,
     mark_artifact_delivery_failed,
     preview_artifact_delivery,
+    preview_github_pr_delivery,
 )
 from agent_forge.integrations.github import (
     GitHubOAuthError,
@@ -31,7 +36,7 @@ from agent_forge.integrations.github import (
 )
 from agent_forge.models import Artifact, AuditLog, OAuthCredential, OAuthState, Project, ProjectMount, User
 from agent_forge.models.session import Session
-from agent_forge.security.credentials import encrypt_secret
+from agent_forge.security.credentials import decrypt_secret, encrypt_secret
 from agent_forge.tracing import get_trace_id
 from middleware.auth import get_current_user
 
@@ -218,6 +223,20 @@ class DeliveryPreviewRequest(BaseModel):
 class DeliveryApplyRequest(DeliveryPreviewRequest):
     confirm_write: bool = False
     expected_target_hash: str | None = Field(default=None, max_length=64)
+
+
+class GitHubDeliveryPreviewRequest(BaseModel):
+    mount_id: str = Field(..., min_length=1, max_length=50)
+    target_path: str = Field(..., min_length=1, max_length=2000)
+    base_branch: str | None = Field(default=None, min_length=1, max_length=200)
+    target_branch: str | None = Field(default=None, min_length=1, max_length=200)
+    pr_title: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class GitHubDeliveryApplyRequest(GitHubDeliveryPreviewRequest):
+    confirm_write: bool = False
+    expected_base_sha: str = Field(..., min_length=6, max_length=120)
+    commit_message: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class DeliveryResponse(BaseModel):
@@ -1014,6 +1033,42 @@ async def _get_delivery_mount_or_404(
     return mount
 
 
+async def _get_github_delivery_mount_or_404(
+    db: AsyncSession,
+    artifact: Artifact,
+    mount_id: str,
+    user_id: str,
+) -> ProjectMount:
+    mount = await _get_mount_or_404(db, artifact.project_id, mount_id, user_id)
+    if mount.mount_type != "github":
+        raise HTTPException(status_code=400, detail="Only GitHub mounts support PR delivery")
+    if mount.status != "connected":
+        raise HTTPException(status_code=409, detail="GitHub mount is not connected")
+    return mount
+
+
+async def _github_mount_access_token(db: AsyncSession, mount: ProjectMount, user_id: str) -> str:
+    credential_id = str((mount.metadata_json or {}).get("credential_id") or "").strip()
+    if not credential_id:
+        raise HTTPException(status_code=409, detail="GitHub mount is missing credential")
+
+    result = await db.execute(
+        select(OAuthCredential).where(
+            OAuthCredential.id == credential_id,
+            OAuthCredential.user_id == user_id,
+            OAuthCredential.provider == "github",
+            OAuthCredential.revoked_at.is_(None),
+        )
+    )
+    credential = result.scalar_one_or_none()
+    if credential is None:
+        raise HTTPException(status_code=409, detail="GitHub credential is unavailable")
+    try:
+        return decrypt_secret(credential.encrypted_access_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="GitHub credential cannot be decrypted") from exc
+
+
 @artifact_router.get("/{artifact_id}", response_model=ArtifactResponse)
 async def get_artifact(
     artifact_id: str,
@@ -1171,6 +1226,168 @@ async def apply_artifact_delivery_api(
     )
     await db.commit()
     await db.refresh(artifact)
+    return delivery
+
+
+@artifact_router.post("/{artifact_id}/delivery/github/preview", response_model=DeliveryResponse)
+async def preview_github_pr_delivery_api(
+    artifact_id: str,
+    body: GitHubDeliveryPreviewRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    mount = await _get_github_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
+    access_token = await _github_mount_access_token(db, mount, current_user.id)
+    client = create_github_delivery_client(access_token)
+    try:
+        delivery = await preview_github_pr_delivery(
+            artifact,
+            mount,
+            client,
+            target_path=body.target_path,
+            base_branch=body.base_branch,
+            target_branch=body.target_branch,
+            pr_title=body.pr_title,
+        )
+    except GitHubDeliveryError as exc:
+        _add_delivery_audit(
+            db,
+            action="delivery.github.preview.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details={"error_code": exc.error_code, "error_message": exc.detail, "phase": exc.phase},
+        )
+        await db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    report = delivery["report"]
+    _add_delivery_audit(
+        db,
+        action="delivery.github.preview.succeeded",
+        status_value="success",
+        user_id=current_user.id,
+        artifact=artifact,
+        mount=mount,
+        target_path=delivery["target_path"],
+        details={
+            "repo_full_name": report.get("repo_full_name"),
+            "base_branch": report.get("base_branch"),
+            "target_branch": report.get("target_branch"),
+            "base_sha": report.get("base_sha"),
+            "target_file_sha": report.get("target_file_sha"),
+            "has_changes": delivery["has_changes"],
+        },
+    )
+    await db.commit()
+    return delivery
+
+
+@artifact_router.post("/{artifact_id}/delivery/github/apply", response_model=DeliveryResponse)
+async def apply_github_pr_delivery_api(
+    artifact_id: str,
+    body: GitHubDeliveryApplyRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    mount = await _get_github_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
+    if not body.confirm_write:
+        _add_delivery_audit(
+            db,
+            action="delivery.github.apply.denied",
+            status_value="denied",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details={"reason": "missing_confirmation"},
+        )
+        await db.commit()
+        raise HTTPException(status_code=409, detail="Write confirmation is required before GitHub PR delivery")
+
+    access_token = await _github_mount_access_token(db, mount, current_user.id)
+    client = create_github_delivery_client(access_token)
+    try:
+        delivery = await apply_github_pr_delivery(
+            db,
+            artifact,
+            mount,
+            client,
+            target_path=body.target_path,
+            base_branch=body.base_branch,
+            target_branch=body.target_branch,
+            pr_title=body.pr_title,
+            commit_message=body.commit_message,
+            expected_base_sha=body.expected_base_sha,
+        )
+    except GitHubDeliveryConsistencyError as exc:
+        _add_delivery_audit(
+            db,
+            action="delivery.github.apply.conflict",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details=exc.report,
+        )
+        await db.commit()
+        raise HTTPException(status_code=409, detail=exc.detail) from exc
+    except GitHubDeliveryError as exc:
+        details = exc.report or {
+            "error_code": exc.error_code,
+            "error_message": exc.detail,
+            "phase": exc.phase,
+        }
+        _add_delivery_audit(
+            db,
+            action="delivery.github.apply.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details=details,
+        )
+        await db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    for event in delivery.get("_audit_events", []):
+        _add_delivery_audit(
+            db,
+            action=event["action"],
+            status_value="success",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=delivery["target_path"],
+            details=event.get("details"),
+        )
+    _add_delivery_audit(
+        db,
+        action="delivery.github.apply.succeeded",
+        status_value="success",
+        user_id=current_user.id,
+        artifact=artifact,
+        mount=mount,
+        target_path=delivery["target_path"],
+        details={
+            "repo_full_name": delivery["report"].get("repo_full_name"),
+            "base_branch": delivery["report"].get("base_branch"),
+            "target_branch": delivery["report"].get("target_branch"),
+            "base_sha": delivery["report"].get("base_sha"),
+            "commit_sha": delivery["report"].get("commit_sha"),
+            "pr_url": delivery["report"].get("pr_url"),
+            "pr_number": delivery["report"].get("pr_number"),
+        },
+    )
+    await db.commit()
+    await db.refresh(artifact)
+    delivery.pop("_audit_events", None)
     return delivery
 
 

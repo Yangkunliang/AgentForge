@@ -83,7 +83,8 @@ async function login(page: Page) {
 
 async function mockArtifactApi(page: Page) {
   const applyRequests: Array<Record<string, unknown>> = []
-  let delivered = false
+  const githubApplyRequests: Array<Record<string, unknown>> = []
+  let deliveredArtifact: Artifact | null = null
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
@@ -115,6 +116,21 @@ async function mockArtifactApi(page: Page) {
           created_at: now,
           updated_at: now,
         },
+        {
+          id: 'mount-github',
+          project_id: project.id,
+          mount_type: 'github',
+          display_name: 'GitHub acme/shop-api',
+          locator: 'github://acme/shop-api',
+          role: 'primary',
+          status: 'connected',
+          metadata: {
+            repo_full_name: 'acme/shop-api',
+            default_branch: 'main',
+          },
+          created_at: now,
+          updated_at: now,
+        },
       ]))
       return
     }
@@ -125,20 +141,7 @@ async function mockArtifactApi(page: Page) {
     }
 
     if (method === 'GET' && path === `/api/v1/artifacts/${artifact.id}`) {
-      await route.fulfill(json(delivered
-        ? {
-            ...artifact,
-            delivery_status: 'delivered',
-            delivery_target_path: 'docs/architecture.md',
-            delivered_at: now,
-            delivery_report: {
-              mount_id: 'mount-api',
-              target_path: 'docs/architecture.md',
-              backup_path: 'docs/architecture.md.agentforge.bak',
-              bytes_written: 48,
-            },
-          }
-        : artifact))
+      await route.fulfill(json(deliveredArtifact ?? artifact))
       return
     }
 
@@ -163,7 +166,18 @@ async function mockArtifactApi(page: Page) {
     if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/apply`) {
       const payload = request.postDataJSON() as Record<string, unknown>
       applyRequests.push(payload)
-      delivered = true
+      deliveredArtifact = {
+        ...artifact,
+        delivery_status: 'delivered',
+        delivery_target_path: 'docs/architecture.md',
+        delivered_at: now,
+        delivery_report: {
+          mount_id: 'mount-api',
+          target_path: 'docs/architecture.md',
+          backup_path: 'docs/architecture.md.agentforge.bak',
+          bytes_written: 48,
+        },
+      }
       await route.fulfill(json({
         artifact_id: artifact.id,
         project_id: project.id,
@@ -178,6 +192,61 @@ async function mockArtifactApi(page: Page) {
           backup_path: 'docs/architecture.md.agentforge.bak',
           bytes_written: 48,
         },
+      }))
+      return
+    }
+
+    if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/github/preview`) {
+      await route.fulfill(json({
+        artifact_id: artifact.id,
+        project_id: project.id,
+        mount_id: 'mount-github',
+        target_path: 'docs/architecture.md',
+        status: 'previewed',
+        has_changes: true,
+        unified_diff: '--- a/docs/architecture.md\n+++ b/docs/architecture.md\n@@ -1 +1 @@\n-旧架构\n+GitHub 新架构\n',
+        report: {
+          delivery_channel: 'github_pr',
+          mount_id: 'mount-github',
+          repo_full_name: 'acme/shop-api',
+          target_path: 'docs/architecture.md',
+          base_branch: 'main',
+          target_branch: 'agentforge/artifact',
+          base_sha: 'base-sha-1',
+          target_file_sha: 'file-sha-1',
+        },
+      }))
+      return
+    }
+
+    if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/github/apply`) {
+      const payload = request.postDataJSON() as Record<string, unknown>
+      githubApplyRequests.push(payload)
+      deliveredArtifact = {
+        ...artifact,
+        delivery_status: 'delivered',
+        delivery_target_path: 'github://acme/shop-api/docs/architecture.md',
+        delivered_at: now,
+        delivery_report: {
+          delivery_channel: 'github_pr',
+          mount_id: 'mount-github',
+          repo_full_name: 'acme/shop-api',
+          target_path: 'docs/architecture.md',
+          base_branch: 'main',
+          target_branch: 'agentforge/artifact',
+          pr_url: 'https://github.com/acme/shop-api/pull/42',
+          commit_sha: 'commit-sha-1',
+        },
+      }
+      await route.fulfill(json({
+        artifact_id: artifact.id,
+        project_id: project.id,
+        mount_id: 'mount-github',
+        target_path: 'docs/architecture.md',
+        status: 'delivered',
+        has_changes: true,
+        unified_diff: '--- a/docs/architecture.md\n+++ b/docs/architecture.md\n@@ -1 +1 @@\n-旧架构\n+GitHub 新架构\n',
+        report: deliveredArtifact.delivery_report,
       }))
       return
     }
@@ -224,7 +293,7 @@ async function mockArtifactApi(page: Page) {
     await route.fulfill(json({ detail: `Unhandled ${method} ${path}` }, 404))
   })
 
-  return { applyRequests }
+  return { applyRequests, githubApplyRequests }
 }
 
 test.describe('TASK-016 artifact viewer', () => {
@@ -234,7 +303,7 @@ test.describe('TASK-016 artifact viewer', () => {
 
     await page.goto('/projects')
 
-    await expect(page.getByText('最近产物')).toBeVisible()
+    await expect(page.getByText('最近产物', { exact: true })).toBeVisible()
     await expect(page.getByText('架构设计.md')).toBeVisible()
 
     await page.getByRole('link', { name: /架构设计\.md/ }).click()
@@ -287,5 +356,38 @@ test.describe('TASK-016 artifact viewer', () => {
     await page.getByRole('button', { name: '导出报告' }).click()
     const download = await downloadPromise
     expect(download.suggestedFilename()).toBe('架构设计.md.delivery.md')
+  })
+
+  test('previews GitHub PR delivery before creating pull request', async ({ page }) => {
+    await login(page)
+    const api = await mockArtifactApi(page)
+
+    await page.goto('/artifacts/artifact-design')
+
+    await page.getByRole('button', { name: 'GitHub PR' }).click()
+    await page.getByLabel('目标代码库').selectOption('mount-github')
+    await page.getByLabel('写入路径').fill('docs/architecture.md')
+    await page.getByLabel('交付分支').fill('agentforge/artifact')
+    await page.getByLabel('PR 标题').fill('Update architecture artifact')
+    await page.getByRole('button', { name: '预览 PR Diff' }).click()
+
+    await expect(page.locator('.artifact-viewer__diff')).toContainText('+GitHub 新架构')
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('acme/shop-api')
+    expect(api.githubApplyRequests).toHaveLength(0)
+
+    await page.getByRole('button', { name: '创建 PR' }).click()
+
+    expect(api.githubApplyRequests).toHaveLength(1)
+    expect(api.githubApplyRequests[0]).toMatchObject({
+      mount_id: 'mount-github',
+      target_path: 'docs/architecture.md',
+      base_branch: 'main',
+      target_branch: 'agentforge/artifact',
+      pr_title: 'Update architecture artifact',
+      confirm_write: true,
+      expected_base_sha: 'base-sha-1',
+    })
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('已交付')
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('https://github.com/acme/shop-api/pull/42')
   })
 })

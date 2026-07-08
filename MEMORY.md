@@ -38,7 +38,7 @@
 - [TASK-021.md](docs/tasks/TASK-021.md) — 核心交互设计复盘与关键入口优化，已完成
 - [TASK-022.md](docs/tasks/TASK-022.md) — 交付能力扩展设计与实现，已完成
 - [TASK-023.md](docs/tasks/TASK-023.md) — GitHub OAuth Mount 授权底座，已完成
-- [TASK-024.md](docs/tasks/TASK-024.md) — GitHub PR Delivery，待开始
+- [TASK-024.md](docs/tasks/TASK-024.md) — GitHub PR Delivery，已完成
 - [TASK-025.md](docs/tasks/TASK-025.md) — zip Delivery Package，待开始
 - [TASK-026.md](docs/tasks/TASK-026.md) — Upload Mount 上下文兜底，待开始
 
@@ -90,7 +90,8 @@
 - TASK-020 已完成：Delivery preview/apply 一致性校验、失败报告、`AuditLog.resource=artifact_delivery` 审计、默认不预热远程 E2B 沙箱。
 - TASK-021 已完成：Project 页按 Mount、PipelineRun、Artifact 聚合下一步动作；Chat 空状态展示当前项目和代码库连接状态；StagePreview 展示当前阶段摘要；ConfirmCard 增加“查看产物并交付”；ArtifactCard 展示交付状态。
 - TASK-022 已完成：GitHub OAuth Mount、GitHub PR Delivery、zip Delivery、Upload Mount 的授权边界、数据流、失败状态和审计点已写入技术设计，并拆出 TASK-023～TASK-026。
-- TASK-023 已完成：GitHub OAuth start/callback、`oauth_credentials`/`oauth_states`、服务端加密凭据、connected GitHub Mount 创建、删除撤销 credential、Project 创建向导 OAuth 授权入口已落地；callback 通过一次性 state 找回用户和项目，不依赖浏览器重定向携带 JWT header；下一步从 TASK-024 GitHub PR Delivery 开始。
+- TASK-023 已完成：GitHub OAuth start/callback、`oauth_credentials`/`oauth_states`、服务端加密凭据、connected GitHub Mount 创建、删除撤销 credential、Project 创建向导 OAuth 授权入口已落地；callback 通过一次性 state 找回用户和项目，不依赖浏览器重定向携带 JWT header。
+- TASK-024 已完成：GitHub PR Delivery preview/apply API、`expected_base_sha` 二次校验、branch/commit/PR 创建、失败报告、`delivery.github.*` 审计事件和 Artifact Viewer GitHub PR 模式已落地；下一步从 TASK-025 zip Delivery Package 开始。
 
 ---
 

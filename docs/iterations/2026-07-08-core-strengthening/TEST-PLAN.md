@@ -1,7 +1,7 @@
 # 核心能力增强测试计划
 
 **日期**：2026-07-08
-**范围**：TASK-020 至 TASK-023
+**范围**：TASK-020 至 TASK-024
 
 ## TASK-020 服务端可信交付
 
@@ -47,6 +47,18 @@
 | Project 创建向导选择 GitHub 时调用 OAuth start 而非普通 mount | `npm run test:e2e -- projects.spec.ts --project=chromium` |
 | 迁移 smoke | `DATABASE_URL=postgresql+asyncpg://agent:agent@localhost:15432/agentforge uv run --extra dev alembic -c migrations/alembic.ini upgrade head` |
 | FastAPI 启动 | `PYTHONPATH=/Users/yangkl/AgentForge/src uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18086` |
+
+## TASK-024 GitHub PR Delivery
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| GitHub PR preview 返回 diff、base sha、目标分支和 PR 摘要 | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
+| apply 未确认时返回 409 且不创建 branch/commit/PR | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
+| base sha 变化时返回 409，Artifact 保存 failed report | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
+| apply 成功创建 branch、commit、PR，并保存 PR URL / commit sha | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
+| GitHub token 不进入响应或 AuditLog details | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
+| Artifact Viewer 可切换到 GitHub PR Delivery 并提交 expected_base_sha | `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium` |
+| 前端构建 | `npm run build` |
 
 ## 非目标
 

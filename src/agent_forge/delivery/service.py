@@ -138,6 +138,31 @@ async def mark_artifact_delivery_failed(
 def build_delivery_report_markdown(artifact: Artifact) -> str:
     """Render a delivered Artifact report as Markdown."""
     report = artifact.delivery_report_json or {}
+    if report.get("delivery_channel") == "github_pr":
+        delivered_at = artifact.delivered_at.isoformat() if artifact.delivered_at else report.get("delivered_at", "未记录")
+        return "\n".join(
+            [
+                f"# Delivery Report: {artifact.name}",
+                "",
+                f"- Artifact ID: {artifact.id}",
+                f"- Project ID: {artifact.project_id}",
+                f"- Status: {artifact.delivery_status}",
+                f"- Channel: GitHub Pull Request",
+                f"- Repository: {report.get('repo_full_name') or '未记录'}",
+                f"- Target Path: {artifact.delivery_target_path or report.get('delivery_target_path') or '未记录'}",
+                f"- Base Branch: {report.get('base_branch') or '未记录'}",
+                f"- Delivery Branch: {report.get('target_branch') or '未记录'}",
+                f"- PR URL: {report.get('pr_url') or '未记录'}",
+                f"- Commit SHA: {report.get('commit_sha') or '未记录'}",
+                f"- Delivered At: {delivered_at}",
+                "",
+                "## Recovery",
+                "",
+                report.get("recovery_hint") or "未记录",
+                "",
+            ]
+        )
+
     target_path = artifact.delivery_target_path or report.get("target_path") or "未记录"
     backup_path = report.get("backup_path") or "无"
     bytes_written = report.get("bytes_written") or 0

@@ -500,6 +500,18 @@ export interface DeliveryApplyPayload extends DeliveryTargetPayload {
   expected_target_hash?: string | null
 }
 
+export interface GitHubDeliveryTargetPayload extends DeliveryTargetPayload {
+  base_branch?: string | null
+  target_branch?: string | null
+  pr_title?: string | null
+}
+
+export interface GitHubDeliveryApplyPayload extends GitHubDeliveryTargetPayload {
+  confirm_write: boolean
+  expected_base_sha: string
+  commit_message?: string | null
+}
+
 export interface DeliveryResponse {
   artifact_id: string
   project_id: string
