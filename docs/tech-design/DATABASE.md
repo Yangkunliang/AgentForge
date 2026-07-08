@@ -137,11 +137,40 @@
 |------|------|------|
 | project_id | UUID | 外键 → Project(id) ON DELETE SET NULL；新会话应归属项目 |
 | intent_type | String | new_feature/iteration/ui_adjust/bug_fix |
-| current_pipeline_run_id | UUID | 当前 PipelineRun 预留字段，TASK-015 接入 |
+| current_pipeline_run_id | UUID | 当前运行中的 PipelineRun |
 
 历史无 `project_id` 的会话由 `0010` 迁移为每个用户创建“默认项目”并回填。
 
-### 1.13 产物 (Artifact)
+### 1.13 PipelineRun
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| project_id | UUID | 外键 → Project(id) ON DELETE CASCADE |
+| session_id | UUID | 外键 → Session(id) ON DELETE CASCADE |
+| intent_type | String | new_feature/iteration/ui_adjust/bug_fix |
+| status | String | planned/running/completed/failed |
+| current_stage_id | String | 当前待执行或运行中的 stage_id |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+### 1.14 PipelineStageState
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| pipeline_run_id | UUID | 外键 → PipelineRun(id) ON DELETE CASCADE |
+| stage_id | String | 稳定阶段标识，如 `diff`、`backend_dev` |
+| stage_name | String | 展示名称，如“需求 Diff” |
+| order_index | Int | 阶段顺序 |
+| required | Boolean | 是否必需阶段；仅可选阶段支持 skip/restore |
+| status | String | pending/running/waiting_confirmation/completed/skipped/failed |
+| skip_reason | String | user_override/user_skipped 等跳过原因 |
+| confirmation_required | Boolean | 是否需要人工确认，TASK-017 完整接入 |
+| started_at | DateTime | 开始时间 |
+| completed_at | DateTime | 完成或跳过时间 |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+### 1.15 产物 (Artifact)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | UUID | 主键 |
@@ -165,8 +194,11 @@ User 1───n Task
 User 1───n Project
 Project 1───n ProjectMount
 Project 1───n Session
+Project 1───n PipelineRun
 Project 1───n Artifact
+Session 1───n PipelineRun
 Session 1───n Artifact
+PipelineRun 1───n PipelineStageState
 Task 1───n SubTask
 Task 1───n TaskExecution
 Task 1───n Conversation
@@ -213,6 +245,12 @@ CREATE INDEX ix_sessions_project_id ON sessions(project_id);
 CREATE INDEX ix_artifacts_project_id ON artifacts(project_id);
 CREATE INDEX ix_artifacts_session_id ON artifacts(session_id);
 CREATE INDEX ix_artifacts_pipeline_run_id ON artifacts(pipeline_run_id);
+CREATE INDEX ix_pipeline_runs_project_id ON pipeline_runs(project_id);
+CREATE INDEX ix_pipeline_runs_session_id ON pipeline_runs(session_id);
+CREATE INDEX ix_pipeline_runs_status ON pipeline_runs(status);
+CREATE INDEX ix_pipeline_stage_states_pipeline_run_id ON pipeline_stage_states(pipeline_run_id);
+CREATE INDEX ix_pipeline_stage_states_stage_id ON pipeline_stage_states(stage_id);
+CREATE INDEX ix_pipeline_stage_states_status ON pipeline_stage_states(status);
 ```
 
 ## 5. 记忆系统表

@@ -6,6 +6,8 @@
 **关联 Epic**：EPIC-CORE-DEV-WORKFLOW
 **依赖**：TASK-015
 
+**依赖状态**：TASK-015 已完成，PipelineRun / StageState / StageRuntime 可作为 Artifact 归档触发点。
+
 ## 目标
 
 让每个阶段输出保存为可查看、可复用、可作为上下文的 Artifact，而不是只存在于聊天消息中。

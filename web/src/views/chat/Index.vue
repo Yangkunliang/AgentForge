@@ -15,7 +15,9 @@ import { useAdvancedSettingsStore } from '@/stores/advancedSettings'
 import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
+import { usePipelineStore } from '@/stores/pipeline'
 import { useSessionStore } from '@/stores/session'
+import type { ChatIntentType, Session } from '@/types'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -26,6 +28,7 @@ const sessionStore = useSessionStore()
 const authStore = useAuthStore()
 const agentStore = useAgentStore()
 const projectStore = useProjectStore()
+const pipelineStore = usePipelineStore()
 const advancedSettings = useAdvancedSettingsStore()
 const { intent: currentIntent } = storeToRefs(advancedSettings)
 
@@ -48,6 +51,35 @@ const sessionId = ref(route.params.sessionId as string | undefined)
 
 const { sending, sendMessage: _send, abort: abortStream } = useChat()
 
+function isChatIntentType(value: string | null | undefined): value is ChatIntentType {
+  return value === 'new_feature'
+    || value === 'iteration'
+    || value === 'ui_adjust'
+    || value === 'bug_fix'
+}
+
+async function syncPipelineForSession(session: Session | null | undefined) {
+  if (!session) {
+    pipelineStore.clearRun()
+    return
+  }
+
+  if (isChatIntentType(session.intent_type) && currentIntent.value !== session.intent_type) {
+    advancedSettings.setIntent(session.intent_type)
+  }
+
+  if (session.current_pipeline_run_id) {
+    await pipelineStore.fetchRun(session.current_pipeline_run_id)
+  } else {
+    pipelineStore.clearRun()
+  }
+}
+
+async function selectSessionWithPipeline(session: Session) {
+  await sessionStore.selectSession(session)
+  await syncPipelineForSession(sessionStore.currentSession ?? session)
+}
+
 // AI 助手信息（来自 store）
 const agentInfo = computed(() => ({
   name: agentStore.myAgentSettings.agent_name,
@@ -61,9 +93,10 @@ onMounted(async () => {
   if (sessionId.value) {
     const session = sessionStore.sessions.find((s) => s.id === sessionId.value)
     if (session) {
-      await sessionStore.selectSession(session)
+      await selectSessionWithPipeline(session)
     } else {
       sessionId.value = undefined
+      pipelineStore.clearRun()
       router.replace('/chat')
     }
   }
@@ -208,7 +241,9 @@ watch(
     sessionId.value = id as string | undefined
     if (id) {
       const session = sessionStore.sessions.find((s) => s.id === id)
-      if (session) await sessionStore.selectSession(session)
+      if (session) await selectSessionWithPipeline(session)
+    } else {
+      pipelineStore.clearRun()
     }
     sessionDrawerVisible.value = false
   },
@@ -221,6 +256,7 @@ watch(
     await sessionStore.fetchSessions(projectId)
     if (sessionId.value && !sessionStore.sessions.some((session) => session.id === sessionId.value)) {
       sessionId.value = undefined
+      pipelineStore.clearRun()
       router.replace('/chat')
     }
   },
@@ -228,6 +264,7 @@ watch(
 
 async function handleNewChat() {
   const session = await sessionStore.createSession(projectStore.currentProjectId, currentIntent.value)
+  pipelineStore.clearRun()
   router.push(`/chat/${session.id}`)
 }
 
@@ -382,7 +419,7 @@ function removePendingImage(idx: number) {
               <!-- 执行流程 -->
               <div class="ap-section">
                 <span class="ap-section__label">执行阶段</span>
-                <StagePreview :intent="currentIntent" />
+                <StagePreview :intent="currentIntent" :pipeline-run="pipelineStore.currentRun" />
               </div>
 
               <div class="ap-divider" />

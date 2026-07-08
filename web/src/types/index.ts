@@ -255,6 +255,49 @@ export interface ChatAdvancedPayload {
   stage_overrides?: Record<string, boolean>
 }
 
+// Pipeline 运行态（TASK-015）
+export type PipelineStageStatus =
+  | 'pending'
+  | 'running'
+  | 'waiting_confirmation'
+  | 'completed'
+  | 'skipped'
+  | 'failed'
+
+export interface PipelineStageState {
+  id: string
+  pipeline_run_id: string
+  stage_id: string
+  stage_name: string
+  order_index: number
+  required: boolean
+  status: PipelineStageStatus
+  skip_reason?: string | null
+  confirmation_required: boolean
+  started_at?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PipelineRun {
+  id: string
+  project_id: string
+  session_id: string
+  intent_type: ChatIntentType
+  status: 'planned' | 'running' | 'completed' | 'failed' | string
+  current_stage_id?: string | null
+  created_at: string
+  updated_at: string
+  stages: PipelineStageState[]
+}
+
+export interface ChatResponse {
+  message_id: string
+  task_id: string
+  pipeline_run_id?: string | null
+}
+
 // SSE 事件
 export type SSEEventType =
   | 'task_started'
@@ -276,6 +319,10 @@ export type SSEEventType =
   | 'sandbox_executing'
   | 'sandbox_completed'
   | 'sandbox_timeout'
+  | 'pipeline_started'
+  | 'stage_started'
+  | 'stage_completed'
+  | 'stage_skipped'
   | 'session_title_updated'
   | 'heartbeat'
 

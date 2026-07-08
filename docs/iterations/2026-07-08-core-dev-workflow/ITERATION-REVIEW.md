@@ -4,6 +4,8 @@
 **任务**：TASK-012
 **结论**：本迭代只完成路线图与任务拆分，不实现业务代码。
 
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015 已完成；Project 真实数据流和 PipelineRun / StageState 状态机已可用。后续提醒从 TASK-016 Artifact 归档查看继续。
+
 ## 完成内容
 
 - 新增 `docs/architecture/CORE-DEV-WORKFLOW.md`，定义 Project、Mount、Session、PipelineRun、StageState、Artifact、Delivery 的产品和技术边界。
@@ -22,7 +24,7 @@
 
 ## 后续提醒
 
-- TASK-013 完成前，不要继续把 Project mock 当作真实项目管理。
-- TASK-015 完成前，不要声称需求类型已经驱动真实流水线。
+- TASK-013、TASK-014 已完成，Project mock 已被真实项目数据流替换。
+- TASK-015 已完成，需求类型已经生成可持久化 PipelineRun / StageState；但完整开发闭环仍依赖 Artifact 和确认机制。
 - TASK-016 完成前，不要声称阶段产物可复用。
 - TASK-018 完成前，不要声称 Agent 已经能读取用户真实代码库。

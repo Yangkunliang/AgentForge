@@ -58,6 +58,7 @@ web/
 │   │       ├── tasks.ts
 │   │       ├── agents.ts
 │   │       ├── projects.ts    # Project / Mount / Project Session API
+│   │       ├── pipelineRuns.ts # PipelineRun / StageState API
 │   │       ├── skills.ts
 │   │       ├── exports.ts
 │   │       └── dashboard.ts  # 仪表盘聚合数据
@@ -118,6 +119,7 @@ web/
 │   │   ├── modules/
 │   │   │   ├── auth.ts        # 用户状态 + Token 管理
 │   │   │   ├── project.ts     # 当前项目、项目列表、Mount 缓存
+│   │   │   ├── pipeline.ts    # 当前 PipelineRun、StageState mutation
 │   │   │   ├── task.ts        # 任务列表/详情 + SSE 实时更新入口
 │   │   │   ├── agent.ts
 │   │   │   ├── skill.ts
@@ -302,7 +304,36 @@ export const useProjectStore = defineStore('project', () => {
 - 创建项目时同时创建 primary Mount，记录用户主动授权的本地路径、GitHub URL 或上传占位。
 - `SessionStore` 新建和读取会话时优先使用 `currentProjectId`，调用 `/projects/{project_id}/sessions`。
 
-### 4.3 任务状态 (task.ts)
+### 4.3 Pipeline 状态 (pipeline.ts)
+
+TASK-015 后，阶段预览不再只依赖前端静态配置。`usePipelineStore` 持有当前会话的 `PipelineRun`，并通过后端 API 进行阶段状态变更。
+
+```typescript
+export const usePipelineStore = defineStore('pipeline', () => {
+  const currentRun = ref<PipelineRun | null>(null)
+  const loading = ref(false)
+  const mutatingStageId = ref<string | null>(null)
+
+  async function fetchRun(runId: string) { ... }
+  async function createForSession(sessionId: string, intentType?: ChatIntentType | null, stageOverrides?: Record<string, boolean>) { ... }
+  async function skipStage(stageId: string) { ... }
+  async function restoreStage(stageId: string) { ... }
+  async function startStage(stageId: string) { ... }
+  async function completeStage(stageId: string) { ... }
+
+  return { currentRun, loading, mutatingStageId, fetchRun, createForSession, skipStage, restoreStage, startStage, completeStage }
+})
+```
+
+规则：
+
+- Chat 进入已有 Session 时，如果 `current_pipeline_run_id` 存在，立即拉取 `GET /pipeline-runs/{run_id}`。
+- `POST /sessions/{id}/chat` 响应中的 `pipeline_run_id` 会同步回 SessionStore 并拉取当前 run。
+- StagePreview 在有 `PipelineRun` 时以 `PipelineStageState` 为唯一状态源；没有 run 时才使用 `usePipeline.ts` 做发送前预览。
+- optional 阶段的 skip/restore 通过后端 API 落库，刷新页面后状态不丢。
+- `pipeline_started`、`stage_started`、`stage_completed`、`stage_skipped` SSE 事件触发 `fetchRun()`，保持阶段条与运行态同步。
+
+### 4.4 任务状态 (task.ts)
 
 SSE 收到的实时事件**直接更新 task store**，不另建 stream store，避免双重维护。
 
@@ -359,7 +390,7 @@ export const useTaskStore = defineStore('task', () => {
 })
 ```
 
-### 4.4 Skill 状态 (skill.ts)
+### 4.5 Skill 状态 (skill.ts)
 
 ```typescript
 export const useSkillStore = defineStore('skill', () => {

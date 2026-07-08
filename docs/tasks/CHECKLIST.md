@@ -57,7 +57,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-012：核心功能路线图与任务重排](TASK-012.md) | P0 | CDW-01～CDW-07 | 无 | 明确 Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery 闭环，并拆出后续任务 |
 | [x] | [TASK-013：Project / Mount / Artifact 数据底座](TASK-013.md) | P0 | CDW-01、CDW-02、CDW-04 | TASK-012 | Project/Mount/Artifact 模型、迁移、API 与 Session.project_id 已落地 |
 | [x] | [TASK-014：项目管理页接真实数据](TASK-014.md) | P0 | CDW-01、CDW-02 | TASK-013 | Projects 页、创建向导、ProjectBar 已接入真实 API，Chat 会话按当前项目作用域读取 |
-| [ ] | [TASK-015：PipelineRun / StageState 阶段状态机](TASK-015.md) | P0 | CDW-03 | TASK-013 | intent 生成真实阶段计划，支持阶段状态、跳过和失败 |
+| [x] | [TASK-015：PipelineRun / StageState 阶段状态机](TASK-015.md) | P0 | CDW-03 | TASK-013 | intent 生成真实阶段计划，StageRuntime 推进当前阶段，StagePreview 读取后端状态 |
 | [ ] | [TASK-016：Artifact 产物归档与查看](TASK-016.md) | P1 | CDW-04 | TASK-015 | 阶段输出保存为 Artifact，可查看、下载、作为上下文复用 |
 | [ ] | [TASK-017：人工确认与阶段继续机制](TASK-017.md) | P1 | CDW-05 | TASK-015、TASK-016 | PRD、技术选型、影响范围确认后继续下一阶段 |
 | [ ] | [TASK-018：Agent Bridge / 真实代码库读取](TASK-018.md) | P1 | CDW-02、CDW-06 | TASK-013、TASK-017 | 本地 mount、连接状态、授权范围和只读文件读取 |

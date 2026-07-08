@@ -18,10 +18,12 @@ import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
 import { useSessionStore } from '@/stores/session'
 import { useAuthStore } from '@/stores/auth'
+import { usePipelineStore } from '@/stores/pipeline'
 import type { ChatAdvancedPayload, SSEEvent } from '@/types'
 
 export function useChat(sessionId?: string) {
   const sessionStore = useSessionStore()
+  const pipelineStore = usePipelineStore()
   const sending = ref(false)
   let currentController: AbortController | null = null
 
@@ -50,6 +52,10 @@ export function useChat(sessionId?: string) {
       // 发送到后端，获取 task_id
       const { data } = await sessionsApi.chat(targetId, content, advancedPayload)
       const taskId = data.task_id
+      if (data.pipeline_run_id) {
+        sessionStore.updateCurrentPipelineRunId(data.pipeline_run_id, targetId)
+        await pipelineStore.fetchRun(data.pipeline_run_id)
+      }
 
       // 订阅 SSE，监听执行过程
       currentController = await _subscribeSSE(taskId, localId)
@@ -167,6 +173,7 @@ async function _typeReply(
 
 async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<AbortController> {
   const sessionStore = useSessionStore()
+  const pipelineStore = usePipelineStore()
   const token = localStorage.getItem('access_token')
   if (!token) {
     return new AbortController()
@@ -208,6 +215,19 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
             console.log('[SSE] event:', event.event, 'data:', JSON.stringify(event.data))
 
             switch (event.event) {
+              // ── Pipeline 阶段状态 ─────────────────────────────────
+              case 'pipeline_started':
+              case 'stage_started':
+              case 'stage_completed':
+              case 'stage_skipped': {
+                const runId = event.data.pipeline_run_id as string | undefined
+                if (runId) {
+                  sessionStore.updateCurrentPipelineRunId(runId, event.data.session_id as string | undefined)
+                  void pipelineStore.fetchRun(runId)
+                }
+                break
+              }
+
               // ── Thinking ───────────────────────────────────────────
               case 'thinking_start': {
                 sessionStore.startThinkingStep(localAssistantId)

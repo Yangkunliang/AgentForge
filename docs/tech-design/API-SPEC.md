@@ -183,6 +183,8 @@ GET  /api/v1/projects/{project_id}/sessions
 
 响应字段包含 `project_id`、`intent_type`、`current_pipeline_run_id`。旧入口 `POST /api/v1/sessions` 仍保留，但会自动创建或复用当前用户的“默认项目”。
 
+`POST /api/v1/sessions/{session_id}/chat` 首次发送消息时会根据请求中的 `intent` 和 `stage_overrides` 创建 `PipelineRun`；响应在原有 `message_id`、`task_id` 基础上增加 `pipeline_run_id`，前端据此拉取阶段运行态。
+
 ### ProjectMount
 
 ```http
@@ -229,6 +231,87 @@ DELETE /api/v1/artifacts/{artifact_id}
 ```
 
 MVP 阶段 Artifact 正文保存在数据库 `content` 字段；对象存储、Artifact Viewer 和 use-as-context 在 TASK-016 继续完善。
+
+---
+
+## PipelineRun / StageState API
+
+PipelineRun 是一次 Session 内按需求类型生成的阶段计划；PipelineStageState 是每个阶段的运行时状态。所有接口按当前登录用户隔离，访问其他用户的 run 返回 404。
+
+### 创建会话 PipelineRun
+
+```http
+POST /api/v1/sessions/{session_id}/pipeline-runs
+Authorization: Bearer <token>
+
+{
+  "intent_type": "iteration",
+  "stage_overrides": {
+    "impact": false,
+    "frontend_dev": false
+  }
+}
+```
+
+**响应 201**:
+```json
+{
+  "id": "run-001",
+  "project_id": "project-001",
+  "session_id": "session-001",
+  "intent_type": "iteration",
+  "status": "planned",
+  "current_stage_id": "diff",
+  "created_at": "2026-07-08T10:00:00Z",
+  "updated_at": "2026-07-08T10:00:00Z",
+  "stages": [
+    {
+      "id": "stage-001",
+      "pipeline_run_id": "run-001",
+      "stage_id": "diff",
+      "stage_name": "需求 Diff",
+      "order_index": 0,
+      "required": true,
+      "status": "pending",
+      "skip_reason": null,
+      "confirmation_required": true,
+      "started_at": null,
+      "completed_at": null,
+      "created_at": "2026-07-08T10:00:00Z",
+      "updated_at": "2026-07-08T10:00:00Z"
+    }
+  ]
+}
+```
+
+`intent_type` 支持 `new_feature`、`iteration`、`ui_adjust`、`bug_fix`。`stage_overrides` 仅允许跳过可选阶段，必需阶段无法跳过。
+
+### 查询 PipelineRun
+
+```http
+GET /api/v1/pipeline-runs/{run_id}
+Authorization: Bearer <token>
+```
+
+响应结构同创建接口。
+
+### 阶段状态操作
+
+```http
+POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/skip
+POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/restore
+POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/start
+POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/complete
+POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
+```
+
+- `skip` 仅支持 `required=false` 且未 completed/running 的阶段，成功后 `status=skipped`。
+- `restore` 将 skipped 的可选阶段恢复为 `pending`。
+- `start` 将 pending/waiting_confirmation 阶段置为 `running`，并设置 run 的 `current_stage_id`。
+- `complete` 将当前阶段置为 `completed`，并推进到下一个未 completed/skipped 阶段；没有下一阶段时 run 变为 `completed`。
+- `fail` 将阶段与 run 置为 `failed`。
+
+StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；Artifact 创建与人工确认继续在 TASK-016/TASK-017 落地。
 
 ---
 

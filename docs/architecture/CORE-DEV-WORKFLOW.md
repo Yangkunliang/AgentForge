@@ -12,11 +12,11 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
 |------|------|----------|----------|
-| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API 与前端真实数据流已实现 | TASK-015 接 PipelineRun |
+| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API 与前端真实数据流已实现 | TASK-016 接 Artifact 查看 |
 | Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | 后端占位模型与 API 已实现 | TASK-018 接真实 Bridge |
-| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、默认项目兼容 | TASK-015 接 PipelineRun |
-| PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 尚无运行时实体 | TASK-015 |
-| StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 仅前端展示 | TASK-015、TASK-017 |
+| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id` | TASK-016 接 Artifact |
+| PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建和 StageRuntime 已实现 | TASK-016 接 Artifact 输出 |
+| StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/completed/skipped/failed 与 StagePreview 后端渲染 | TASK-017 接人工确认 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | 后端基础模型与 CRUD API 已实现 | TASK-016 接查看与复用 |
 | Delivery | 将产物写回本地项目、生成 diff 或 PR | 尚无闭环 | TASK-019 |
 
@@ -62,7 +62,7 @@ TASK-012 路线图和状态纠偏
 - 不做多人协作。
 - 不做完整 GitHub App PR 流程，TASK-019 只保留可扩展接口。
 - 不在 TASK-013 中实现真实本地文件读取。
-- 不要求 Agent 自动完成完整 8 步流水线，阶段状态机先支持人工确认和产物归档。
+- 不要求 Agent 自动完成完整 8 步流水线；当前阶段状态机已支持运行态推进，人工确认和产物归档在 TASK-017/TASK-016 继续完善。
 - 不把用户选择的文件路径当作已读取内容，真实读取必须经过 Mount/Bridge 授权。
 
 ## 6. 完成定义
@@ -75,4 +75,4 @@ TASK-012 路线图和状态纠偏
 -> 查看产物 -> 将结果交付到本地或导出
 ```
 
-只要 PipelineRun、StageState、确认机制或 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。
+只要 Artifact、确认机制或 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。

@@ -292,6 +292,19 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  function updateCurrentPipelineRunId(runId: string | null, sessionId?: string | null) {
+    const targetSessionId = sessionId ?? currentSession.value?.id ?? null
+
+    if (currentSession.value && (!targetSessionId || currentSession.value.id === targetSessionId)) {
+      currentSession.value = { ...currentSession.value, current_pipeline_run_id: runId }
+    }
+
+    const idx = sessions.value.findIndex((session) => session.id === targetSessionId)
+    if (idx !== -1) {
+      sessions.value[idx] = { ...sessions.value[idx], current_pipeline_run_id: runId }
+    }
+  }
+
   return {
     sessions,
     currentSession,
@@ -318,5 +331,6 @@ export const useSessionStore = defineStore('session', () => {
     // Legacy
     appendToolCall,
     bumpCurrentSession,
+    updateCurrentPipelineRunId,
   }
 })

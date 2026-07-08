@@ -22,7 +22,7 @@
 | done | TASK-012：核心功能路线图与任务重排 | P0 | 明确核心闭环、修正状态漂移、拆出后续任务 | 无 |
 | done | TASK-013：Project / Mount / Artifact 数据底座 | P0 | 建立核心实体、API 和 Session.project_id | TASK-012 |
 | done | TASK-014：项目管理页接真实数据 | P0 | 去掉项目 mock，ProjectBar、Projects 页和创建向导接真实 API | TASK-013 |
-| todo | TASK-015：PipelineRun / StageState 阶段状态机 | P0 | intent 生成真实阶段计划和状态流转 | TASK-013 |
+| done | TASK-015：PipelineRun / StageState 阶段状态机 | P0 | intent 生成真实阶段计划和状态流转 | TASK-013 |
 | todo | TASK-016：Artifact 产物归档与查看 | P1 | 阶段输出保存、查看、作为上下文复用 | TASK-015 |
 | todo | TASK-017：人工确认与阶段继续机制 | P1 | PRD/技术选型/影响范围暂停确认后继续 | TASK-015、TASK-016 |
 | todo | TASK-018：Agent Bridge / 真实代码库读取 | P1 | 本地 mount、连接状态、授权文件读取 | TASK-013、TASK-017 |
@@ -43,8 +43,8 @@ TASK-012
 
 ## 防遗忘机制
 
-- `docs/tasks/CHECKLIST.md` 必须保留 TASK-015 至 TASK-019 的 todo 状态。
+- `docs/tasks/CHECKLIST.md` 必须保留 TASK-016 至 TASK-019 的 todo 状态。
 - 每个任务有独立 `docs/tasks/TASK-NNN.md`，不得只存在于本迭代目录。
 - 每完成一个任务，只能标记该任务 done，不得顺手标记后续任务。
-- TASK-013、TASK-014 已完成；TASK-015 的依赖状态说明必须保持可见。
-- TASK-015 完成后必须检查 TASK-016 和 TASK-017 是否仍在任务索引中。
+- TASK-013、TASK-014、TASK-015 已完成；TASK-016 的依赖状态说明必须保持可见。
+- TASK-015 完成后已检查 TASK-016 和 TASK-017 仍在任务索引中。

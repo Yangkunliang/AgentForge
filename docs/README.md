@@ -37,8 +37,8 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 | ✅ |
-| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、Artifact、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
-| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
+| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
+| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
 | [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
 | [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
 | [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（Project Store、SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
@@ -89,6 +89,7 @@ docs/
 | TASK-012 | 2026-07-08 | 核心开发闭环路线图与任务重排 | ✅ 已完成 |
 | TASK-013 | 2026-07-08 | Project / Mount / Artifact 数据底座 | ✅ 已完成 |
 | TASK-014 | 2026-07-08 | 项目管理页接真实数据 | ✅ 已完成 |
+| TASK-015 | 2026-07-08 | PipelineRun / StageState 阶段状态机 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -137,6 +138,10 @@ docs/
 ### TASK-014 详细信息
 - **核心功能**：`projectsApi` 与 `useProjectStore`；Projects 页读取真实项目和主 Mount；创建向导创建 Project + primary Mount；ProjectBar 真实切换当前项目；Chat 会话按当前项目读取和新建
 - **验证**：`npm run test:e2e -- projects.spec.ts` 通过；`npm run build` 通过
+
+### TASK-015 详细信息
+- **核心功能**：`PipelineRun` / `PipelineStageState` 模型与迁移；intent 到阶段配置；会话首次 chat 自动创建 PipelineRun；阶段 skip/restore/start/complete/fail API；StageRuntime 调用 SkillExecutionEngine 前后推进阶段；StagePreview 从后端 StageState 渲染
+- **验证**：`uv run --extra dev pytest tests/api/test_pipeline_runs.py tests/pipeline/test_runtime.py` 通过；`npm run test:e2e -- pipeline-stage-state.spec.ts` 通过；`npm run build` 通过
 
 ## 版本号规范
 

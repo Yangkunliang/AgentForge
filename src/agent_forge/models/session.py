@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, JSON_VARIANT, TimestampMixin
 
 if TYPE_CHECKING:
+    from .pipeline import PipelineRun
     from .project import Artifact, Project
 
 
@@ -50,6 +51,11 @@ class Session(Base, TimestampMixin):
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="Message.created_at",
+    )
+    pipeline_runs: Mapped[list[PipelineRun]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="PipelineRun.created_at",
     )
     artifacts: Mapped[list[Artifact]] = relationship(back_populates="session")
 

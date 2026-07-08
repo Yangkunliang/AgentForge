@@ -66,6 +66,10 @@
 | `llm_response` | 用户感知 ⭐ | 追加到主文本气泡 |
 | `task_completed` | 状态辅助 | 标记完成，隐藏进度条 |
 | `task_failed` | 用户感知 ⭐ | 显示全局错误提示 |
+| `pipeline_started` | 状态辅助 | 更新当前 Session 的 `pipeline_run_id` 并刷新 PipelineRun |
+| `stage_started` | 状态辅助 | 刷新 PipelineRun，StagePreview 显示 running/current |
+| `stage_completed` | 状态辅助 | 刷新 PipelineRun，StagePreview 推进到下一阶段 |
+| `stage_skipped` | 状态辅助 | 刷新 PipelineRun，StagePreview 显示 skipped |
 | `sandbox_created` | 内部 | 忽略 |
 | `sandbox_connected` | 内部 | 忽略 |
 | `sandbox_paused` | 内部 | 忽略 |
@@ -372,6 +376,10 @@ THINKING_START = "thinking_start"
 THINKING_DELTA = "thinking_delta"
 THINKING_END   = "thinking_end"
 SANDBOX_EXECUTING = "sandbox_executing"   # 替代 SANDBOX_CODE_EXECUTING，语义更简洁
+PIPELINE_STARTED = "pipeline_started"
+STAGE_STARTED    = "stage_started"
+STAGE_COMPLETED  = "stage_completed"
+STAGE_SKIPPED    = "stage_skipped"
 ```
 
 新增对应的 emit 函数：
@@ -380,7 +388,13 @@ async def emit_thinking_start(task_id: str) -> None: ...
 async def emit_thinking_delta(task_id: str, delta: str) -> None: ...
 async def emit_thinking_end(task_id: str, duration_ms: int) -> None: ...
 async def emit_sandbox_executing(task_id: str, code: str) -> None: ...
+async def emit_pipeline_started(task_id: str, project_id: str, session_id: str, pipeline_run_id: str, intent_type: str) -> None: ...
+async def emit_stage_started(task_id: str, project_id: str, session_id: str, pipeline_run_id: str, stage_id: str) -> None: ...
+async def emit_stage_completed(task_id: str, project_id: str, session_id: str, pipeline_run_id: str, stage_id: str) -> None: ...
+async def emit_stage_skipped(task_id: str, project_id: str, session_id: str, pipeline_run_id: str, stage_id: str, reason: str) -> None: ...
 ```
+
+TASK-015 后，StageRuntime 在调用 `SkillExecutionEngine` 前后发射 `pipeline_started`、`stage_started`、`stage_completed`；用户手动跳过可选阶段时后端状态持久化为 `skipped`，前端通过 PipelineRun API 刷新 StagePreview。`stage_skipped` 事件类型已预留给后续异步阶段跳过场景。
 
 ### 6.2 LLM Provider 流式输出拆分
 
@@ -460,6 +474,13 @@ case 'sandbox_completed': {
 }
 case 'sandbox_timeout': {
   sessionStore.failCodeExecution(localId, 'timeout')
+  break
+}
+case 'pipeline_started':
+case 'stage_started':
+case 'stage_completed':
+case 'stage_skipped': {
+  pipelineStore.fetchRun(event.data.pipeline_run_id as string)
   break
 }
 ```

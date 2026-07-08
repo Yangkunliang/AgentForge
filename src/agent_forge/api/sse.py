@@ -60,6 +60,12 @@ class SSEEventTypes:
     SANDBOX_COMPLETED = "sandbox_completed"
     SANDBOX_TIMEOUT   = "sandbox_timeout"
 
+    # ── Pipeline 阶段状态（状态辅助）───────────────────────────
+    PIPELINE_STARTED = "pipeline_started"
+    STAGE_STARTED    = "stage_started"
+    STAGE_COMPLETED  = "stage_completed"
+    STAGE_SKIPPED    = "stage_skipped"
+
     # ── 沙箱生命周期（内部，不透出给用户）────────────────────
     SANDBOX_CREATED   = "sandbox_created"
     SANDBOX_CONNECTED = "sandbox_connected"
@@ -205,6 +211,88 @@ async def emit_task_failed(task_id: str, error: str) -> None:
     await get_sse_manager().publish(
         task_id, SSEEventTypes.TASK_FAILED,
         {"task_id": task_id, "error": error},
+    )
+
+
+async def emit_pipeline_started(
+    task_id: str,
+    project_id: str,
+    session_id: str,
+    pipeline_run_id: str,
+    intent_type: str,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.PIPELINE_STARTED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "intent_type": intent_type,
+        },
+    )
+
+
+async def emit_stage_started(
+    task_id: str,
+    project_id: str,
+    session_id: str,
+    pipeline_run_id: str,
+    stage_id: str,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.STAGE_STARTED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+        },
+    )
+
+
+async def emit_stage_completed(
+    task_id: str,
+    project_id: str,
+    session_id: str,
+    pipeline_run_id: str,
+    stage_id: str,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.STAGE_COMPLETED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+        },
+    )
+
+
+async def emit_stage_skipped(
+    task_id: str,
+    project_id: str,
+    session_id: str,
+    pipeline_run_id: str,
+    stage_id: str,
+    reason: str,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.STAGE_SKIPPED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+            "reason": reason,
+        },
     )
 
 

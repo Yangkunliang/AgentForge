@@ -18,6 +18,7 @@ from agent_forge.api.sse import emit_task_started, get_sse_manager
 from agent_forge.database import get_async_session
 from agent_forge.models import Project, Task, TaskStatus, User
 from agent_forge.models.session import Message, Session
+from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.models.user_agent_settings import UserAgentSettings
 from agent_forge.tracing import get_trace_id, get_tracer
 from middleware.auth import get_current_user
@@ -76,6 +77,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     message_id: str
     task_id: str
+    pipeline_run_id: str | None = None
 
 
 @router.get("", response_model=list[SessionResponse])
@@ -166,6 +168,16 @@ async def send_message(
         # 保持默认占位，避免中间状态显示截断前缀
         session.title = "新对话"
 
+    pipeline_run_id = session.current_pipeline_run_id
+    if not pipeline_run_id:
+        run = await create_pipeline_run_for_session(
+            db,
+            session=session,
+            intent_type=body.intent,
+            stage_overrides=body.stage_overrides,
+        )
+        pipeline_run_id = run.id
+
     task_id = str(uuid.uuid4())
     trace_id = get_trace_id() or task_id
 
@@ -235,11 +247,12 @@ async def send_message(
             history_messages=history_messages,
             user_id=current_user.id,
             agent_name=agent_name,
+            pipeline_run_id=pipeline_run_id,
             advanced_context=_build_advanced_context(body),
         )
     )
 
-    return {"message_id": user_msg.id, "task_id": task_id}
+    return {"message_id": user_msg.id, "task_id": task_id, "pipeline_run_id": pipeline_run_id}
 
 
 async def _get_session_or_404(db: AsyncSession, session_id: str, user_id: str) -> Session:
@@ -300,14 +313,14 @@ async def _run_task_with_skills(
     history_messages: list[Message],
     user_id: str | None = None,
     agent_name: str = "CodeSoul",
+    pipeline_run_id: str | None = None,
     advanced_context: dict | None = None,
 ) -> None:
     from agent_forge.api.sse import emit_task_completed, emit_task_failed, get_sse_manager
     from agent_forge.config import settings
     from agent_forge.database import async_session_factory
     from agent_forge.llm.provider import LLMConfig, get_llm_provider
-    from agent_forge.skills.dispatcher import SkillDispatcher
-    from agent_forge.skills.engine import SkillExecutionEngine
+    from agent_forge.pipeline.runtime import StageRuntime
     from agent_forge.skills.registry import get_skill_registry
     from agent_forge.tracing import get_tracer, start_task_trace
 
@@ -340,8 +353,7 @@ async def _run_task_with_skills(
                     if msg.role in ("user", "assistant") and msg.content:
                         conversation_history.append({"role": msg.role, "content": msg.content})
 
-                dispatcher = SkillDispatcher()
-                engine = SkillExecutionEngine(dispatcher)
+                runtime = StageRuntime(session_factory=async_session_factory)
 
                 full_content = ""
                 execution_step_collector = ExecutionStepCollector()
@@ -350,7 +362,10 @@ async def _run_task_with_skills(
                     """SSE 发射同时收集 execution_steps 事件。"""
                     await sse.publish(task_id, event_type, data)
                     execution_step_collector.collect(event_type, data)
-                async_gen = await engine.run(
+
+                async_gen = runtime.run_current_stage(
+                    task_id=task_id,
+                    pipeline_run_id=pipeline_run_id,
                     user_message=user_message,
                     conversation_history=conversation_history,
                     tools=tools,

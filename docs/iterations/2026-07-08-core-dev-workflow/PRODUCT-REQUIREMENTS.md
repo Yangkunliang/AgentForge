@@ -5,11 +5,13 @@
 **关联架构**：`docs/architecture/CORE-DEV-WORKFLOW.md`
 **状态**：路线图设计中
 
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机已落地；TASK-016 起继续推进 Artifact 查看复用、人工确认、Bridge 与 Delivery。
+
 ## 1. 背景
 
 AgentForge 已经具备 Chat UI、SSE 执行可视化、Skill Engine、沙箱执行和高级设置透传能力。但这些能力仍偏向框架支撑，尚未形成面向全栈开发工程师的核心产品闭环。
 
-当前主要问题：
+路线图制定时的主要问题：
 
 - Project / Mount / Artifact 仍停留在 PRD 和前端 mock。
 - Session 未归属 Project，用户多项目上下文无法真实隔离。

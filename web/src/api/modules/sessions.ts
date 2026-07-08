@@ -1,5 +1,5 @@
 import request from '@/api/request'
-import type { Session, ChatMessage, ChatAdvancedPayload } from '@/types'
+import type { Session, ChatMessage, ChatAdvancedPayload, ChatResponse } from '@/types'
 import { projectsApi } from '@/api/modules/projects'
 
 export const sessionsApi = {
@@ -19,7 +19,7 @@ export const sessionsApi = {
   messages: (id: string) => request.get<ChatMessage[]>(`/sessions/${id}/messages`),
 
   chat: (id: string, content: string, advanced?: ChatAdvancedPayload) =>
-    request.post<{ message_id: string; task_id: string }>(`/sessions/${id}/chat`, {
+    request.post<ChatResponse>(`/sessions/${id}/chat`, {
       content,
       ...advanced,
     }),
