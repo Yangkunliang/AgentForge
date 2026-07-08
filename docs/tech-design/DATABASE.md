@@ -148,7 +148,7 @@
 | project_id | UUID | 外键 → Project(id) ON DELETE CASCADE |
 | session_id | UUID | 外键 → Session(id) ON DELETE CASCADE |
 | intent_type | String | new_feature/iteration/ui_adjust/bug_fix |
-| status | String | planned/running/completed/failed |
+| status | String | planned/running/waiting_confirmation/completed/failed/cancelled |
 | current_stage_id | String | 当前待执行或运行中的 stage_id |
 | created_at | DateTime | 创建时间 |
 | updated_at | DateTime | 更新时间 |
@@ -164,7 +164,10 @@
 | required | Boolean | 是否必需阶段；仅可选阶段支持 skip/restore |
 | status | String | pending/running/waiting_confirmation/completed/skipped/failed |
 | skip_reason | String | user_override/user_skipped 等跳过原因 |
-| confirmation_required | Boolean | 是否需要人工确认，TASK-017 完整接入 |
+| confirmation_required | Boolean | 是否需要人工确认 |
+| confirmation_action | String | 最近一次确认动作：approve/revise/cancel |
+| confirmation_feedback | Text | 用户修改意见，下一次同阶段执行会注入上下文 |
+| confirmation_resolved_at | DateTime | 最近一次确认处理时间 |
 | started_at | DateTime | 开始时间 |
 | completed_at | DateTime | 完成或跳过时间 |
 | created_at | DateTime | 创建时间 |
@@ -187,7 +190,7 @@
 | created_at | DateTime | 创建时间 |
 | updated_at | DateTime | 更新时间 |
 
-TASK-016 后，StageRuntime 会在阶段完成时根据 `stage_id` 映射 `artifact_type` 并写入 Artifact；`source_message_id` 指向本次 assistant 消息，供 Chat 消息列表回带 ArtifactCard。
+TASK-016 后，StageRuntime 会在阶段完成时根据 `stage_id` 映射 `artifact_type` 并写入 Artifact；`source_message_id` 指向本次 assistant 消息，供 Chat 消息列表回带 ArtifactCard。TASK-017 后，若阶段需要确认，Artifact 会作为 ConfirmCard 的待确认对象，直到用户 approve/revise/cancel。
 
 ## 2. 关系图
 

@@ -3,9 +3,9 @@
 **日期**：2026-07-08
 **关联 Epic**：EPIC-CORE-DEV-WORKFLOW
 **关联架构**：`docs/architecture/CORE-DEV-WORKFLOW.md`
-**状态**：路线图设计中
+**状态**：阶段实施中
 
-> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用已落地；TASK-017 起继续推进人工确认、Bridge 与 Delivery。
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016、TASK-017 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用、人工确认与阶段继续已落地；TASK-018 起继续推进 Bridge 与 Delivery。
 
 ## 1. 背景
 

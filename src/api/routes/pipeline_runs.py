@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.api.sse import emit_confirm_resolved
 from agent_forge.database import get_async_session
-from agent_forge.models import User
+from agent_forge.models import Artifact, AuditLog, PipelineRun, PipelineStageState, User
 from agent_forge.pipeline.service import (
     complete_stage,
     create_pipeline_run_for_session,
@@ -19,9 +22,11 @@ from agent_forge.pipeline.service import (
     get_session_for_pipeline_or_404,
     pipeline_run_to_dict,
     restore_stage,
+    resolve_stage_confirmation,
     skip_stage,
     start_stage,
 )
+from agent_forge.tracing import get_trace_id
 from middleware.auth import get_current_user
 
 router = APIRouter()
@@ -45,6 +50,9 @@ class PipelineStageStateResponse(BaseModel):
     status: str
     skip_reason: str | None
     confirmation_required: bool
+    confirmation_action: str | None
+    confirmation_feedback: str | None
+    confirmation_resolved_at: datetime | None
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
@@ -61,6 +69,11 @@ class PipelineRunResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     stages: list[PipelineStageStateResponse]
+
+
+class StageConfirmationRequest(BaseModel):
+    action: Literal["approve", "revise", "cancel"]
+    feedback: str | None = Field(default=None, max_length=2000)
 
 
 @session_router.post(
@@ -152,6 +165,35 @@ async def complete_pipeline_stage(
     return pipeline_run_to_dict(run)
 
 
+@router.post("/{run_id}/stages/{stage_id}/confirm", response_model=PipelineRunResponse)
+async def confirm_pipeline_stage(
+    run_id: str,
+    stage_id: str,
+    body: StageConfirmationRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    run = await get_pipeline_run_for_user_or_404(db, run_id, current_user.id)
+    stage = _stage_or_none(run, stage_id)
+    resolve_stage_confirmation(run, stage_id, body.action, body.feedback)
+    _add_confirmation_audit(db, current_user.id, run, stage_id, body)
+    task_id = await _confirmation_task_id(db, stage)
+    await db.commit()
+    await db.refresh(run, attribute_names=["stages"])
+
+    if task_id:
+        await emit_confirm_resolved(
+            task_id=task_id,
+            project_id=run.project_id,
+            session_id=run.session_id,
+            pipeline_run_id=run.id,
+            stage_id=stage_id,
+            action=body.action,
+        )
+
+    return pipeline_run_to_dict(run)
+
+
 @router.post("/{run_id}/stages/{stage_id}/fail", response_model=PipelineRunResponse)
 async def fail_pipeline_stage(
     run_id: str,
@@ -164,3 +206,50 @@ async def fail_pipeline_stage(
     await db.commit()
     await db.refresh(run, attribute_names=["stages"])
     return pipeline_run_to_dict(run)
+
+
+def _stage_or_none(run: PipelineRun, stage_id: str) -> PipelineStageState | None:
+    return next((stage for stage in run.stages if stage.stage_id == stage_id), None)
+
+
+def _add_confirmation_audit(
+    db: AsyncSession,
+    user_id: str,
+    run: PipelineRun,
+    stage_id: str,
+    body: StageConfirmationRequest,
+) -> None:
+    db.add(
+        AuditLog(
+            id=str(uuid.uuid4()),
+            action=f"pipeline.confirm.{body.action}",
+            resource="pipeline_stage_state",
+            user_id=user_id,
+            trace_id=get_trace_id() or run.id,
+            status="success",
+            degraded=False,
+            details={
+                "pipeline_run_id": run.id,
+                "project_id": run.project_id,
+                "session_id": run.session_id,
+                "stage_id": stage_id,
+                "feedback": body.feedback,
+            },
+        )
+    )
+
+
+async def _confirmation_task_id(
+    db: AsyncSession,
+    stage: PipelineStageState | None,
+) -> str | None:
+    if not stage:
+        return None
+    result = await db.execute(
+        select(Artifact)
+        .where(Artifact.stage_state_id == stage.id)
+        .order_by(Artifact.created_at.desc())
+    )
+    artifact = result.scalars().first()
+    task_id = (artifact.metadata_json or {}).get("task_id") if artifact else None
+    return task_id if isinstance(task_id, str) and task_id else None

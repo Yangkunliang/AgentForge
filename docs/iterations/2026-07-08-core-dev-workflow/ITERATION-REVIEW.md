@@ -4,7 +4,7 @@
 **任务**：TASK-012
 **结论**：本迭代只完成路线图与任务拆分，不实现业务代码。
 
-> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016 已完成；Project 真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用已可用。后续提醒从 TASK-017 人工确认继续。
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016、TASK-017 已完成；Project 真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用、人工确认与阶段继续已可用。后续提醒从 TASK-018 Bridge 继续。
 
 ## 完成内容
 
@@ -27,4 +27,5 @@
 - TASK-013、TASK-014 已完成，Project mock 已被真实项目数据流替换。
 - TASK-015 已完成，需求类型已经生成可持久化 PipelineRun / StageState。
 - TASK-016 已完成，阶段输出已成为可查看、可复用、可作为上下文引用的 Artifact；但完整开发闭环仍依赖确认机制、Bridge 和 Delivery。
+- TASK-017 已完成，关键阶段可以进入 `waiting_confirmation`，用户确认后继续、提出修改意见后回到同阶段重新执行、取消后终止 run。
 - TASK-018 完成前，不要声称 Agent 已经能读取用户真实代码库。

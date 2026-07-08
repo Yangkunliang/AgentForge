@@ -274,18 +274,23 @@ export interface PipelineStageState {
   status: PipelineStageStatus
   skip_reason?: string | null
   confirmation_required: boolean
+  confirmation_action?: StageConfirmationAction | null
+  confirmation_feedback?: string | null
+  confirmation_resolved_at?: string | null
   started_at?: string | null
   completed_at?: string | null
   created_at: string
   updated_at: string
 }
 
+export type StageConfirmationAction = 'approve' | 'revise' | 'cancel'
+
 export interface PipelineRun {
   id: string
   project_id: string
   session_id: string
   intent_type: ChatIntentType
-  status: 'planned' | 'running' | 'completed' | 'failed' | string
+  status: 'planned' | 'running' | 'waiting_confirmation' | 'completed' | 'failed' | 'cancelled' | string
   current_stage_id?: string | null
   created_at: string
   updated_at: string
@@ -324,6 +329,8 @@ export type SSEEventType =
   | 'stage_completed'
   | 'stage_skipped'
   | 'artifact_created'
+  | 'confirm_required'
+  | 'confirm_resolved'
   | 'session_title_updated'
   | 'heartbeat'
 

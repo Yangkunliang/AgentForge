@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { pipelineRunsApi } from '@/api/modules/pipelineRuns'
-import type { ChatIntentType, PipelineRun } from '@/types'
+import type { ChatIntentType, PipelineRun, StageConfirmationAction } from '@/types'
 
 export const usePipelineStore = defineStore('pipeline', () => {
   const currentRun = ref<PipelineRun | null>(null)
@@ -84,6 +84,25 @@ export const usePipelineStore = defineStore('pipeline', () => {
     return data
   }
 
+  async function confirmStage(
+    stageId: string,
+    action: StageConfirmationAction,
+    feedback?: string | null,
+  ) {
+    if (!currentRun.value) return null
+    mutatingStageId.value = stageId
+    try {
+      const { data } = await pipelineRunsApi.confirmStage(currentRun.value.id, stageId, {
+        action,
+        feedback: feedback ?? null,
+      })
+      currentRun.value = data
+      return data
+    } finally {
+      mutatingStageId.value = null
+    }
+  }
+
   async function failStage(stageId: string) {
     if (!currentRun.value) return null
     const { data } = await pipelineRunsApi.failStage(currentRun.value.id, stageId)
@@ -103,6 +122,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
     restoreStage,
     startStage,
     completeStage,
+    confirmStage,
     failStage,
   }
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { uploadApi } from '@/api/modules/sessions'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
+import ConfirmCard from '@/components/chat/ConfirmCard.vue'
 import ContextChips from '@/components/chat/ContextChips.vue'
 import IntentSelector from '@/components/chat/IntentSelector.vue'
 import ProjectBar from '@/components/chat/ProjectBar.vue'
@@ -13,6 +14,7 @@ import { useChat } from '@/composables/useChat'
 import { usePipeline } from '@/composables/usePipeline'
 import { useAdvancedSettingsStore } from '@/stores/advancedSettings'
 import { useAgentStore } from '@/stores/agent'
+import { useArtifactStore } from '@/stores/artifact'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { usePipelineStore } from '@/stores/pipeline'
@@ -29,6 +31,7 @@ const authStore = useAuthStore()
 const agentStore = useAgentStore()
 const projectStore = useProjectStore()
 const pipelineStore = usePipelineStore()
+const artifactStore = useArtifactStore()
 const advancedSettings = useAdvancedSettingsStore()
 const { intent: currentIntent } = storeToRefs(advancedSettings)
 
@@ -36,6 +39,24 @@ const { getConfig, intentLabels } = usePipeline()
 
 const currentConfig = computed(() => getConfig(currentIntent.value))
 const showAdvancedPanel = ref(false)
+
+const waitingConfirmationStage = computed(() =>
+  pipelineStore.currentRun?.stages.find((stage) => stage.status === 'waiting_confirmation') ?? null
+)
+
+const waitingConfirmationArtifact = computed(() => {
+  const run = pipelineStore.currentRun
+  const stage = waitingConfirmationStage.value
+  if (!run || !stage) return null
+
+  return artifactStore.artifactsForProject(run.project_id).find((artifact) =>
+    artifact.pipeline_run_id === run.id
+    && (
+      artifact.stage_state_id === stage.id
+      || artifact.metadata?.stage_id === stage.stage_id
+    )
+  ) ?? null
+})
 
 const userName = computed(() => authStore.displayName)
 const userAvatarUrl = computed(() => authStore.avatarUrl)
@@ -72,6 +93,11 @@ async function syncPipelineForSession(session: Session | null | undefined) {
     await pipelineStore.fetchRun(session.current_pipeline_run_id)
   } else {
     pipelineStore.clearRun()
+  }
+
+  const projectId = session.project_id ?? projectStore.currentProjectId
+  if (projectId) {
+    await artifactStore.fetchProjectArtifacts(projectId).catch(() => undefined)
   }
 }
 
@@ -268,6 +294,11 @@ async function handleNewChat() {
   router.push(`/chat/${session.id}`)
 }
 
+async function handleConfirmationResolved() {
+  const runId = pipelineStore.currentRun?.id
+  if (runId) await pipelineStore.fetchRun(runId)
+}
+
 // ── 图片上传 ──────────────────────────────────────────────────
 const pendingImages = ref<{ url: string; file: File }[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -381,6 +412,14 @@ function removePendingImage(idx: number) {
           </div>
           <AssistantMessage v-else :message="msg" :agent-name="agentInfo.name" :agent-avatar-url="agentInfo.avatarUrl" />
         </template>
+
+        <ConfirmCard
+          v-if="pipelineStore.currentRun && waitingConfirmationStage"
+          :pipeline-run="pipelineStore.currentRun"
+          :stage="waitingConfirmationStage"
+          :artifact="waitingConfirmationArtifact"
+          @resolved="handleConfirmationResolved"
+        />
       </div>
 
       <!-- 输入区 -->

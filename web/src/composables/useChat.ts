@@ -221,11 +221,17 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
               case 'pipeline_started':
               case 'stage_started':
               case 'stage_completed':
-              case 'stage_skipped': {
+              case 'stage_skipped':
+              case 'confirm_required':
+              case 'confirm_resolved': {
                 const runId = event.data.pipeline_run_id as string | undefined
                 if (runId) {
                   sessionStore.updateCurrentPipelineRunId(runId, event.data.session_id as string | undefined)
                   void pipelineStore.fetchRun(runId)
+                }
+                const artifactId = event.data.artifact_id as string | undefined
+                if (artifactId) {
+                  void artifactStore.fetchArtifact(artifactId)
                 }
                 break
               }

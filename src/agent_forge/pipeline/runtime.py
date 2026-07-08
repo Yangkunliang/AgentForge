@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agent_forge.artifacts.service import create_stage_artifact
 from agent_forge.api.sse import (
     emit_artifact_created,
+    emit_confirm_required,
     emit_pipeline_started,
     emit_stage_completed,
     emit_stage_started,
@@ -56,13 +57,19 @@ class StageRuntime:
         source_message_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         active_stage_id: str | None = None
+        confirmation_context: dict | None = None
+        blocked_reason: str | None = None
         stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
-            active_stage_id = await self._start_current_stage(
+            active_stage_id, confirmation_context, blocked_reason = await self._start_current_stage(
                 task_id=task_id,
                 pipeline_run_id=pipeline_run_id,
                 user_id=user_id,
             )
+
+        if blocked_reason == "waiting_confirmation":
+            yield "当前阶段正在等待确认，请先确认或提出修改意见。"
+            return
 
         try:
             async_gen = await self.engine.run(
@@ -74,7 +81,7 @@ class StageRuntime:
                 sse_publish=sse_publish,
                 user_id=user_id,
                 agent_name=agent_name,
-                advanced_context=advanced_context,
+                advanced_context=_merge_confirmation_context(advanced_context, confirmation_context),
             )
 
             async for chunk in async_gen:
@@ -102,7 +109,7 @@ class StageRuntime:
         task_id: str,
         pipeline_run_id: str,
         user_id: str,
-    ) -> str | None:
+    ) -> tuple[str | None, dict | None, str | None]:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
             await emit_pipeline_started(
@@ -115,10 +122,14 @@ class StageRuntime:
 
             stage_id = run.current_stage_id
             if not stage_id:
-                return None
+                return None, None, None
 
             stage = _find_stage(run, stage_id)
-            if stage and stage.status in {"pending", "waiting_confirmation"}:
+            if stage and stage.status == "waiting_confirmation":
+                return None, None, "waiting_confirmation"
+
+            confirmation_context = _confirmation_context(stage)
+            if stage and stage.status == "pending":
                 start_stage(run, stage_id)
                 await db.commit()
 
@@ -129,7 +140,7 @@ class StageRuntime:
                 pipeline_run_id=run.id,
                 stage_id=stage_id,
             )
-            return stage_id
+            return stage_id, confirmation_context, None
 
     async def _complete_stage(
         self,
@@ -165,15 +176,28 @@ class StageRuntime:
                 "artifact_type": artifact.artifact_type,
                 "name": artifact.name,
             }
+            requires_confirmation = stage.status == "waiting_confirmation"
             await db.commit()
-            await emit_stage_completed(
-                task_id=task_id,
-                project_id=run.project_id,
-                session_id=run.session_id,
-                pipeline_run_id=run.id,
-                stage_id=stage_id,
-            )
             await emit_artifact_created(task_id=task_id, **artifact_payload)
+            if requires_confirmation:
+                await emit_confirm_required(
+                    task_id=task_id,
+                    project_id=run.project_id,
+                    session_id=run.session_id,
+                    pipeline_run_id=run.id,
+                    stage_id=stage_id,
+                    stage_name=stage.stage_name,
+                    artifact_id=artifact.id,
+                    artifact_name=artifact.name,
+                )
+            else:
+                await emit_stage_completed(
+                    task_id=task_id,
+                    project_id=run.project_id,
+                    session_id=run.session_id,
+                    pipeline_run_id=run.id,
+                    stage_id=stage_id,
+                )
 
     async def _fail_stage(self, pipeline_run_id: str, user_id: str, stage_id: str) -> None:
         async with self.session_factory() as db:
@@ -188,3 +212,22 @@ class StageRuntime:
 
 def _find_stage(run: PipelineRun, stage_id: str) -> PipelineStageState | None:
     return next((stage for stage in run.stages if stage.stage_id == stage_id), None)
+
+
+def _confirmation_context(stage: PipelineStageState | None) -> dict | None:
+    if not stage or not stage.confirmation_feedback:
+        return None
+    return {
+        "stage_id": stage.stage_id,
+        "stage_name": stage.stage_name,
+        "feedback": stage.confirmation_feedback,
+        "action": stage.confirmation_action,
+    }
+
+
+def _merge_confirmation_context(base: dict | None, confirmation: dict | None) -> dict | None:
+    if not confirmation:
+        return base
+    merged = dict(base or {})
+    merged["confirmation_feedback"] = confirmation
+    return merged

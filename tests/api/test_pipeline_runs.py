@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.auth.jwt import create_access_token
-from agent_forge.models import User
+from agent_forge.models import AuditLog, User
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -187,6 +189,100 @@ def test_start_and_complete_stage_advances_current_stage(
     stage_by_id = {stage["stage_id"]: stage for stage in completed["stages"]}
     assert stage_by_id["locate"]["status"] == "completed"
     assert stage_by_id["impact_scope"]["status"] == "pending"
+
+
+async def test_confirmation_api_approves_or_revises_waiting_stage(
+    async_client: TestClient,
+    fake_user: User,
+    db_session: AsyncSession,
+):
+    project = _create_project(async_client, fake_user)
+    session = _create_project_session(async_client, fake_user, project["id"], "new_feature")
+    run = async_client.post(
+        f"/api/v1/sessions/{session['id']}/pipeline-runs",
+        json={"intent_type": "new_feature"},
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    start_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/start",
+        headers=_auth_headers(fake_user),
+    )
+    assert start_resp.status_code == 200
+
+    complete_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/complete",
+        headers=_auth_headers(fake_user),
+    )
+    assert complete_resp.status_code == 200
+    waiting = complete_resp.json()
+    stage_by_id = {stage["stage_id"]: stage for stage in waiting["stages"]}
+    assert waiting["status"] == "waiting_confirmation"
+    assert waiting["current_stage_id"] == "analysis"
+    assert stage_by_id["analysis"]["status"] == "waiting_confirmation"
+
+    direct_start_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/start",
+        headers=_auth_headers(fake_user),
+    )
+    assert direct_start_resp.status_code == 400
+
+    direct_complete_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/complete",
+        headers=_auth_headers(fake_user),
+    )
+    assert direct_complete_resp.status_code == 400
+
+    revise_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/confirm",
+        json={"action": "revise", "feedback": "补充异常场景"},
+        headers=_auth_headers(fake_user),
+    )
+    assert revise_resp.status_code == 200
+    revised = revise_resp.json()
+    stage_by_id = {stage["stage_id"]: stage for stage in revised["stages"]}
+    assert revised["status"] == "planned"
+    assert revised["current_stage_id"] == "analysis"
+    assert stage_by_id["analysis"]["status"] == "pending"
+    assert stage_by_id["analysis"]["confirmation_feedback"] == "补充异常场景"
+    assert stage_by_id["analysis"]["confirmation_action"] == "revise"
+
+    start_again_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/start",
+        headers=_auth_headers(fake_user),
+    )
+    assert start_again_resp.status_code == 200
+    complete_again_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/complete",
+        headers=_auth_headers(fake_user),
+    )
+    assert complete_again_resp.status_code == 200
+
+    approve_resp = async_client.post(
+        f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/confirm",
+        json={"action": "approve"},
+        headers=_auth_headers(fake_user),
+    )
+    assert approve_resp.status_code == 200
+    approved = approve_resp.json()
+    stage_by_id = {stage["stage_id"]: stage for stage in approved["stages"]}
+    assert approved["status"] == "running"
+    assert approved["current_stage_id"] == "design"
+    assert stage_by_id["analysis"]["status"] == "completed"
+    assert stage_by_id["analysis"]["confirmation_action"] == "approve"
+    assert stage_by_id["analysis"]["confirmation_resolved_at"] is not None
+
+    audit_result = await db_session.execute(
+        select(AuditLog.action, AuditLog.details)
+        .where(AuditLog.resource == "pipeline_stage_state")
+        .order_by(AuditLog.created_at.asc())
+    )
+    audits = audit_result.all()
+    assert [row.action for row in audits] == [
+        "pipeline.confirm.revise",
+        "pipeline.confirm.approve",
+    ]
+    assert audits[0].details["feedback"] == "补充异常场景"
 
 
 def test_chat_first_message_creates_pipeline_run(

@@ -1,5 +1,5 @@
 import request from '@/api/request'
-import type { ChatIntentType, PipelineRun } from '@/types'
+import type { ChatIntentType, PipelineRun, StageConfirmationAction } from '@/types'
 
 export const pipelineRunsApi = {
   createForSession: (
@@ -24,6 +24,16 @@ export const pipelineRunsApi = {
 
   completeStage: (runId: string, stageId: string) =>
     request.post<PipelineRun>(`/pipeline-runs/${runId}/stages/${stageId}/complete`, {}),
+
+  confirmStage: (
+    runId: string,
+    stageId: string,
+    data: { action: StageConfirmationAction; feedback?: string | null },
+  ) =>
+    request.post<PipelineRun>(`/pipeline-runs/${runId}/stages/${stageId}/confirm`, {
+      action: data.action,
+      feedback: data.feedback ?? null,
+    }),
 
   failStage: (runId: string, stageId: string) =>
     request.post<PipelineRun>(`/pipeline-runs/${runId}/stages/${stageId}/fail`, {}),

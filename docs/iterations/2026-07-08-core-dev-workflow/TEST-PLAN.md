@@ -21,7 +21,7 @@
 | TASK-014 | 前端 build、API mock 测试 | Project 列表、创建、切换项目 | FRONTEND-ARCHITECTURE 更新 |
 | TASK-015 | pytest 覆盖 PipelineRun 状态机 | 阶段条真实状态变化 | SSE/API 事件更新 |
 | TASK-016 | pytest 覆盖 Artifact CRUD | Artifact Viewer 可查看 | Artifact 类型说明 |
-| TASK-017 | pytest 覆盖 confirm_required/confirm_resolved | 确认卡片暂停和继续 | 人工介入点更新 |
+| TASK-017 | pytest 覆盖 confirm_required/confirm_resolved、确认 API、等待态防绕过 | `human-confirmation.spec.ts` 覆盖确认继续和提交修改意见 | 人工介入点更新 |
 | TASK-018 | Bridge 单测和权限测试 | Mount 连接状态、文件读取 | 安全文档更新 |
 | TASK-019 | Delivery service 单测 | diff/导出/写回操作确认 | 交付边界更新 |
 

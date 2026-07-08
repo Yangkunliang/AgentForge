@@ -168,3 +168,64 @@ async def test_stage_runtime_creates_artifact_for_completed_stage(
         "task_id": "task-artifact",
         "origin": "stage_runtime",
     }
+
+
+@pytest.mark.asyncio
+async def test_stage_runtime_blocks_waiting_confirmation_stage(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+):
+    user_id = fake_user.id
+    project = Project(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="confirmation-runtime-test",
+        tech_tags=["FastAPI"],
+        status="active",
+    )
+    session = Session(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        project_id=project.id,
+        title="确认节点会话",
+        intent_type="new_feature",
+    )
+    db_session.add_all([project, session])
+    await db_session.commit()
+
+    run = await create_pipeline_run_for_session(db_session, session, "new_feature")
+    run_id = run.id
+    run.stages[0].status = "waiting_confirmation"
+    run.status = "waiting_confirmation"
+    run.current_stage_id = "analysis"
+    await db_session.commit()
+
+    fake_engine = FakeSkillEngine()
+    runtime = StageRuntime(engine=fake_engine, session_factory=test_session_factory)
+
+    chunks = []
+    async for chunk in runtime.run_current_stage(
+        task_id="task-confirmation-block",
+        pipeline_run_id=run.id,
+        user_id=user_id,
+        user_message="继续执行",
+        conversation_history=[],
+        tools=[],
+        llm=object(),
+        config=object(),
+        sse_publish=lambda _event_type, _data: None,
+        agent_name="CodeSoul",
+        advanced_context={"intent": "new_feature"},
+    ):
+        chunks.append(chunk)
+
+    assert fake_engine.called is False
+    assert chunks == ["当前阶段正在等待确认，请先确认或提出修改意见。"]
+
+    db_session.expire_all()
+    refreshed = await get_pipeline_run_for_user_or_404(db_session, run_id, user_id)
+    stage_by_id = {stage.stage_id: stage for stage in refreshed.stages}
+    assert refreshed.status == "waiting_confirmation"
+    assert refreshed.current_stage_id == "analysis"
+    assert stage_by_id["analysis"].status == "waiting_confirmation"

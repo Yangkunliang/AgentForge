@@ -91,6 +91,7 @@ docs/
 | TASK-014 | 2026-07-08 | 项目管理页接真实数据 | ✅ 已完成 |
 | TASK-015 | 2026-07-08 | PipelineRun / StageState 阶段状态机 | ✅ 已完成 |
 | TASK-016 | 2026-07-08 | Artifact 产物归档与查看 | ✅ 已完成 |
+| TASK-017 | 2026-07-08 | 人工确认与阶段继续机制 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -147,6 +148,10 @@ docs/
 ### TASK-016 详细信息
 - **核心功能**：StageRuntime 阶段完成后创建 Artifact；`artifact_created` SSE；会话消息回带关联 Artifact；Artifact Viewer；Chat ArtifactCard；Project 最近产物列表；Artifact 可加入下一轮上下文
 - **验证**：`uv run --extra dev pytest tests/api/test_projects.py tests/api/test_pipeline_runs.py tests/pipeline/test_runtime.py` 通过；`npm run test:e2e -- artifact-viewer.spec.ts` 通过；`npm run build` 通过
+
+### TASK-017 详细信息
+- **核心功能**：`PipelineStageState` 确认字段与迁移；`waiting_confirmation` 状态；`confirm_required` / `confirm_resolved` SSE；确认 API 支持 approve/revise/cancel；StageRuntime 等待确认时停止推进；Chat ConfirmCard 可确认继续、提交修改意见或终止需求；确认操作写入审计日志
+- **验证**：`uv run --extra dev pytest tests/api/test_pipeline_runs.py::test_confirmation_api_approves_or_revises_waiting_stage` 通过；`uv run --extra dev pytest tests/pipeline/test_runtime.py::test_stage_runtime_blocks_waiting_confirmation_stage` 通过；`npm run test:e2e -- human-confirmation.spec.ts` 通过；`npm run build` 通过
 
 ## 版本号规范
 

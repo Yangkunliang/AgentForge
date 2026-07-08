@@ -285,6 +285,9 @@ Authorization: Bearer <token>
       "status": "pending",
       "skip_reason": null,
       "confirmation_required": true,
+      "confirmation_action": null,
+      "confirmation_feedback": null,
+      "confirmation_resolved_at": null,
       "started_at": null,
       "completed_at": null,
       "created_at": "2026-07-08T10:00:00Z",
@@ -312,16 +315,29 @@ POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/skip
 POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/restore
 POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/start
 POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/complete
+POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/confirm
 POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
 ```
 
 - `skip` 仅支持 `required=false` 且未 completed/running 的阶段，成功后 `status=skipped`。
 - `restore` 将 skipped 的可选阶段恢复为 `pending`。
-- `start` 将 pending/waiting_confirmation 阶段置为 `running`，并设置 run 的 `current_stage_id`。
-- `complete` 将当前阶段置为 `completed`，并推进到下一个未 completed/skipped 阶段；没有下一阶段时 run 变为 `completed`。
+- `start` 仅将 `pending` 阶段置为 `running`，并设置 run 的 `current_stage_id`；`waiting_confirmation` 不允许通过 `start` 绕过确认。
+- `complete` 将非确认阶段置为 `completed` 并推进到下一个未 completed/skipped 阶段；若阶段 `confirmation_required=true`，则进入 `waiting_confirmation`，等待 `confirm`。
+- `confirm` 是等待态的唯一出口，支持 `approve`、`revise`、`cancel`。
 - `fail` 将阶段与 run 置为 `failed`。
 
-StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；TASK-016 已补充阶段完成后的 Artifact 创建和 `artifact_created` SSE，人工确认继续在 TASK-017 落地。
+确认请求：
+
+```json
+{
+  "action": "revise",
+  "feedback": "补充异常场景和验收标准"
+}
+```
+
+`action=approve` 会把当前阶段置为 `completed` 并推进到下一阶段；`action=revise` 会把当前阶段回到 `pending`，`feedback` 注入下一次同阶段执行上下文；`action=cancel` 会把阶段置为 `failed`、run 置为 `cancelled`。每次确认会写入 `AuditLog.action=pipeline.confirm.{action}`。
+
+StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。
 
 ---
 

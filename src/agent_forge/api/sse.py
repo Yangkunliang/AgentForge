@@ -66,6 +66,8 @@ class SSEEventTypes:
     STAGE_COMPLETED  = "stage_completed"
     STAGE_SKIPPED    = "stage_skipped"
     ARTIFACT_CREATED = "artifact_created"
+    CONFIRM_REQUIRED = "confirm_required"
+    CONFIRM_RESOLVED = "confirm_resolved"
 
     # ── 沙箱生命周期（内部，不透出给用户）────────────────────
     SANDBOX_CREATED   = "sandbox_created"
@@ -320,6 +322,56 @@ async def emit_artifact_created(
             "artifact_id": artifact_id,
             "artifact_type": artifact_type,
             "name": name,
+        },
+    )
+
+
+async def emit_confirm_required(
+    task_id: str,
+    *,
+    project_id: str,
+    session_id: str,
+    pipeline_run_id: str,
+    stage_id: str,
+    stage_name: str,
+    artifact_id: str | None,
+    artifact_name: str | None,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.CONFIRM_REQUIRED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "artifact_id": artifact_id,
+            "artifact_name": artifact_name,
+        },
+    )
+
+
+async def emit_confirm_resolved(
+    task_id: str,
+    *,
+    project_id: str,
+    session_id: str,
+    pipeline_run_id: str,
+    stage_id: str,
+    action: str,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.CONFIRM_RESOLVED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+            "action": action,
         },
     )
 

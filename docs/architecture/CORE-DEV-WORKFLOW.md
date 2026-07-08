@@ -14,9 +14,9 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 |------|------|----------|----------|
 | Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API、前端真实数据流与项目产物列表已实现 | TASK-018 接真实 Bridge |
 | Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | 后端占位模型与 API 已实现 | TASK-018 接真实 Bridge |
-| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact | TASK-017 接确认卡片 |
-| PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime 与 Artifact 输出已实现 | TASK-017 接确认暂停 |
-| StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/completed/skipped/failed 与 StagePreview 后端渲染 | TASK-017 接人工确认 |
+| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片 | TASK-018 接 Bridge 上下文 |
+| PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出与人工确认暂停已实现 | TASK-018 加载代码库上下文 |
+| StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈与 StagePreview 后端渲染 | TASK-018 接真实上下文 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文 | TASK-019 接 Delivery |
 | Delivery | 将产物写回本地项目、生成 diff 或 PR | 尚无闭环 | TASK-019 |
 
@@ -30,8 +30,8 @@ MVP 用户路径按以下顺序落地：
 4. 用户选择需求类型，或由规则分类得到 intent。
 5. 系统创建 PipelineRun，并根据 intent 初始化 StageState。
 6. Agent 执行当前阶段，阶段完成后保存 Artifact。
-7. 如阶段需要人工确认，系统暂停并等待用户确认。
-8. 用户确认后进入下一阶段，直到生成可交付结果。
+7. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
+8. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
 9. 后续 Delivery 阶段把产物写回本地目录、生成 diff、测试报告或 PR。
 
 ## 3. 设计原则
@@ -62,7 +62,7 @@ TASK-012 路线图和状态纠偏
 - 不做多人协作。
 - 不做完整 GitHub App PR 流程，TASK-019 只保留可扩展接口。
 - 不在 TASK-013 中实现真实本地文件读取。
-- 不要求 Agent 自动完成完整 8 步流水线；当前阶段状态机已支持运行态推进与产物归档，人工确认在 TASK-017 继续完善。
+- 不要求 Agent 自动完成完整 8 步流水线；当前阶段状态机已支持运行态推进、产物归档与人工确认暂停。
 - 不把用户选择的文件路径当作已读取内容，真实读取必须经过 Mount/Bridge 授权。
 
 ## 6. 完成定义
@@ -75,4 +75,4 @@ TASK-012 路线图和状态纠偏
 -> 查看产物 -> 将结果交付到本地或导出
 ```
 
-只要确认机制、Bridge 或 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。
+只要 Bridge 或 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。

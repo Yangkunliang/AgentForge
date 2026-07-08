@@ -43,6 +43,9 @@ def pipeline_run_to_dict(run: PipelineRun) -> dict:
                 "status": stage.status,
                 "skip_reason": stage.skip_reason,
                 "confirmation_required": stage.confirmation_required,
+                "confirmation_action": stage.confirmation_action,
+                "confirmation_feedback": stage.confirmation_feedback,
+                "confirmation_resolved_at": stage.confirmation_resolved_at,
                 "started_at": stage.started_at,
                 "completed_at": stage.completed_at,
                 "created_at": stage.created_at,
@@ -159,7 +162,7 @@ def restore_stage(run: PipelineRun, stage_id: str) -> PipelineRun:
 
 def start_stage(run: PipelineRun, stage_id: str) -> PipelineRun:
     stage = _stage_or_404(run, stage_id)
-    if stage.status not in {"pending", "waiting_confirmation"}:
+    if stage.status != "pending":
         raise HTTPException(status_code=400, detail="Stage cannot be started from current status")
 
     stage.status = "running"
@@ -171,14 +174,61 @@ def start_stage(run: PipelineRun, stage_id: str) -> PipelineRun:
 
 def complete_stage(run: PipelineRun, stage_id: str) -> PipelineRun:
     stage = _stage_or_404(run, stage_id)
-    if stage.status not in {"running", "pending", "waiting_confirmation"}:
+    if stage.status not in {"running", "pending"}:
         raise HTTPException(status_code=400, detail="Stage cannot be completed from current status")
+
+    if stage.confirmation_required and stage.status != "waiting_confirmation":
+        stage.status = "waiting_confirmation"
+        stage.completed_at = _now()
+        if not stage.started_at:
+            stage.started_at = stage.completed_at
+        run.status = "waiting_confirmation"
+        run.current_stage_id = stage.stage_id
+        return run
 
     stage.status = "completed"
     stage.completed_at = _now()
     if not stage.started_at:
         stage.started_at = stage.completed_at
     _refresh_run_pointer(run)
+    return run
+
+
+def resolve_stage_confirmation(
+    run: PipelineRun,
+    stage_id: str,
+    action: str,
+    feedback: str | None = None,
+) -> PipelineRun:
+    stage = _stage_or_404(run, stage_id)
+    if stage.status != "waiting_confirmation":
+        raise HTTPException(status_code=400, detail="Stage is not waiting for confirmation")
+    if action not in {"approve", "revise", "cancel"}:
+        raise HTTPException(status_code=400, detail="Unsupported confirmation action")
+
+    normalized_feedback = feedback.strip()[:2000] if feedback else None
+    stage.confirmation_action = action
+    stage.confirmation_feedback = normalized_feedback
+    stage.confirmation_resolved_at = _now()
+
+    if action == "approve":
+        stage.status = "completed"
+        _refresh_run_pointer(run)
+        if run.current_stage_id is not None:
+            run.status = "running"
+        return run
+
+    if action == "revise":
+        stage.status = "pending"
+        stage.started_at = None
+        stage.completed_at = None
+        run.status = "planned"
+        run.current_stage_id = stage.stage_id
+        return run
+
+    stage.status = "failed"
+    run.status = "cancelled"
+    run.current_stage_id = stage.stage_id
     return run
 
 
@@ -211,5 +261,5 @@ def _refresh_run_pointer(run: PipelineRun) -> None:
     run.current_stage_id = next_stage_id
     if next_stage_id is None:
         run.status = "completed"
-    elif run.status in {"planned", "completed"}:
+    elif run.status in {"planned", "completed", "waiting_confirmation"}:
         run.status = "planned"

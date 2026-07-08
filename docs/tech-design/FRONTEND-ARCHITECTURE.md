@@ -158,6 +158,14 @@ TASK-016 已补充：
 - `web/src/api/modules/artifacts.ts`：独立 Artifact 详情接口。
 - `web/src/views/projects/Index.vue`：项目卡片展示最近产物列表。
 
+TASK-017 已补充：
+
+- `web/src/components/chat/ConfirmCard.vue`：聊天消息区内的人工确认节点，支持确认继续、提交修改意见、终止需求。
+- `web/src/api/modules/pipelineRuns.ts`：新增 `confirmStage(runId, stageId, { action, feedback })`。
+- `web/src/stores/pipeline.ts`：新增 `confirmStage` action，并复用 `mutatingStageId` 标记确认请求中的阶段。
+- `web/src/composables/useChat.ts`：处理 `confirm_required` / `confirm_resolved` SSE，刷新 PipelineRun 和待确认 Artifact。
+- `web/src/views/chat/Index.vue`：按当前 `PipelineRun.stages[].status=waiting_confirmation` 渲染 ConfirmCard，并从 Project Artifact 缓存匹配待确认产物。
+
 ---
 
 ## 3. 路由设计

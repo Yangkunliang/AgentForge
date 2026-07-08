@@ -65,6 +65,9 @@ class PipelineStageState(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
     skip_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     confirmation_required: Mapped[bool] = mapped_column(nullable=False, default=False)
+    confirmation_action: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    confirmation_feedback: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    confirmation_resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
