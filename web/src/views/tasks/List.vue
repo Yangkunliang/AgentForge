@@ -5,10 +5,11 @@ import { useTaskStore } from '@/stores/task'
 
 const router = useRouter()
 const taskStore = useTaskStore()
+const ALL_FILTER_VALUE = '__all__'
 
 const filterForm = reactive({
-  status: '',
-  priority: '',
+  status: ALL_FILTER_VALUE,
+  priority: ALL_FILTER_VALUE,
 })
 
 onMounted(() => {
@@ -17,8 +18,8 @@ onMounted(() => {
 
 function handleFilter() {
   taskStore.fetchTasks({
-    status: filterForm.status || undefined,
-    priority: filterForm.priority || undefined,
+    status: filterForm.status === ALL_FILTER_VALUE ? undefined : filterForm.status,
+    priority: filterForm.priority === ALL_FILTER_VALUE ? undefined : filterForm.priority,
   })
 }
 
@@ -66,7 +67,7 @@ function formatDate(dateStr: string): string {
       <el-form :inline="true" :model="filterForm" class="filter-form">
         <el-form-item label="状态">
           <el-select v-model="filterForm.status" @change="handleFilter">
-            <el-option label="全部" value="" />
+            <el-option label="全部" :value="ALL_FILTER_VALUE" />
             <el-option label="待处理" value="pending" />
             <el-option label="进行中" value="processing" />
             <el-option label="已完成" value="completed" />
@@ -75,7 +76,7 @@ function formatDate(dateStr: string): string {
         </el-form-item>
         <el-form-item label="优先级">
           <el-select v-model="filterForm.priority" @change="handleFilter">
-            <el-option label="全部" value="" />
+            <el-option label="全部" :value="ALL_FILTER_VALUE" />
             <el-option label="低" value="low" />
             <el-option label="中" value="medium" />
             <el-option label="高" value="high" />
