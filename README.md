@@ -6,7 +6,7 @@
 
 **当前落地场景**：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态**：Phase 1 — 记忆系统已实现。详见 [docs/tasks/CHECKLIST.md](docs/tasks/CHECKLIST.md)。
+**当前状态**：Phase 1 — 记忆系统已实现；核心开发闭环已完成路线图拆分。详见 [docs/tasks/CHECKLIST.md](docs/tasks/CHECKLIST.md) 和 [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md)。
 
 ---
 
@@ -61,6 +61,7 @@ AgentForge/
 
 - **六层 Harness 架构**：Validator（输入校验）→ Router（任务路由）→ Registry（Agent/Skill 注册）→ Governance（重试/熔断）→ Executor（执行编排）→ Memory（4 层记忆）
 - **需求类型路由**：根据意图分类动态组合流水线阶段，不强制走完整流程
+- **核心开发闭环**：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery，把对话、阶段、产物和交付结果绑定到用户自己的项目
 - **Skill 插件系统**：支持热加载的 Skill 扩展机制（`skill.md` + `executor.py` 格式）
 - **4 层记忆系统**：Working / Episodic / Semantic / User 记忆，持久化到 PostgreSQL
 - **全链路追踪**：端到端的 trace_id 审计与监控
@@ -102,6 +103,7 @@ AgentForge/
 | [前端架构](docs/tech-design/FRONTEND-ARCHITECTURE.md) | 前端架构、SSE 方案、Token 策略 |
 | [消息队列](docs/tech-design/RABBITMQ.md) | RabbitMQ 拓扑、Exchange/Queue 设计 |
 | [部署指南](docs/tech-design/DEPLOYMENT.md) | 本地开发、生产部署、Nginx 配置 |
+| [核心开发闭环](docs/architecture/CORE-DEV-WORKFLOW.md) | Project、Mount、Session、PipelineRun、StageState、Artifact、Delivery |
 
 ## 参考
 

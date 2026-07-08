@@ -10,7 +10,7 @@
 
 > 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态：Phase 1 — 记忆系统已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。详见 `docs/tech-design/DATABASE.md` 第 5 节记忆系统表设计。
+**当前状态：Phase 1 — 记忆系统已实现；核心开发闭环已完成路线图拆分。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
 
 ---
 
@@ -34,6 +34,7 @@
 | **代码库上下文** | 用户通过 CLI 工具（`agentforge mount`）或桌面客户端授权 Agent 访问其本地目录，或通过 GitHub OAuth 连接远程仓库。 |
 | **对话（Session）** | 归属于某个项目，历史产物（PRD、代码、测试报告）与项目绑定，可跨会话继续。 |
 | **需求类型路由** | Agent 接收需求后先做意图分类，动态决定走哪几个阶段，不强制走完整 8 步流水线。 |
+| **开发闭环** | Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery，是后续 TASK-013～TASK-019 的实现主线。 |
 
 ### 需求类型 → 流水线映射
 
@@ -80,10 +81,11 @@
 | `docs/tech-design/DATA-EXPORT.md` | 训练数据导出（JSONL）、PII 脱敏策略 |
 | `docs/tech-design/SSE-EXECUTION-VISUALIZATION.md` | SSE 执行可视化方案 |
 | `docs/architecture/AGENT-MODEL.md` | Agent 领域模型（类型、能力、Contract Net 协作机制）— **产品定义**，非仓库工作规范 |
+| `docs/architecture/CORE-DEV-WORKFLOW.md` | 核心开发闭环（Project、Mount、Session、PipelineRun、StageState、Artifact、Delivery） |
 | `docs/product-design/PRD-全栈Agent交互体验-20260623.md` | 项目管理、意图路由、阶段感知对话、快捷动作、Agent Bridge |
 | `docs/product-design/PRD-CLAW-集成能力层-20260622.md` | CLAW 集成能力层（Skill / MCP / ClaWHub 市场） |
 | `docs/product-design/PRD-多智能体框架-20260617.md` | 产品定位、用户故事、核心功能、技术栈 |
-| `docs/tasks/CHECKLIST.md` | 实现任务清单（P1→P4，共 28 项） |
+| `docs/tasks/CHECKLIST.md` | 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-019 后续路线图 |
 | `docs/standards/ITERATION-STANDARD.md` | 迭代目录命名、产物规范、小步提交、Skill 使用策略 |
 | `docs/standards/DEVELOPMENT-GUIDE.md` | 环境配置、启动步骤、测试方法、开发规范 |
 | `docs/iterations/` | 迭代记录（按日期/主题建目录） |
@@ -119,6 +121,8 @@
 6. **Memory（记忆状态）** — 4 层记忆架构（Working/Episodic/Semantic/User），详见 `src/agent_forge/memory/` 和 `docs/tech-design/DATABASE.md` 第 5 节
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
+
+**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-012 已完成路线图和任务拆分；后续从 TASK-013 的 Project / Mount / Artifact 数据底座开始逐步实现。
 
 ### 计划技术栈
 

@@ -30,6 +30,7 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | [AGENT-MODEL.md](architecture/AGENT-MODEL.md) | AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制 | ✅ |
+| [CORE-DEV-WORKFLOW.md](architecture/CORE-DEV-WORKFLOW.md) | AgentForge 面向全栈开发工程师的核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery | ✅ |
 
 ## 设计文档清单 (tech-design/)
 
@@ -60,7 +61,7 @@ docs/
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单，按 P1→P2→P3→P4 优先级排列，共 28 项 | ✅ |
+| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-019 后续路线图 | ✅ |
 
 ## 迭代链条
 
@@ -85,6 +86,7 @@ docs/
 | TASK-006 | 2026-06-22 | Skill 引擎（ReAct + Thinking 拆分 + Tracing） | ✅ 已完成 |
 | TASK-009 | 2026-07-07 | SSE 执行过程可视化联调验证 | ✅ 已完成 |
 | TASK-011 | 2026-07-07 | 高级设置面板真实透传 + 技术风险修正 | ✅ 已实现，验证中 |
+| TASK-012 | 2026-07-08 | 核心开发闭环路线图与任务重排 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -115,6 +117,16 @@ docs/
 - **产物**：
   - [TECHNICAL-DESIGN.md](iterations/2026-07-07-task-011-risk-fixes/TECHNICAL-DESIGN.md)
 - **核心功能**：高级设置状态持久化、上下文/阶段配置请求透传、system prompt 注入、沙箱配置和 API 路由前缀风险修正
+
+### TASK-012 详细信息
+- **目录**：`docs/iterations/2026-07-08-core-dev-workflow/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-08-core-dev-workflow/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-08-core-dev-workflow/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-08-core-dev-workflow/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-08-core-dev-workflow/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-08-core-dev-workflow/ITERATION-REVIEW.md)
+- **核心功能**：定义 Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery 闭环，并拆出 TASK-013～TASK-019，避免 Project、Pipeline、Artifact、Bridge 和 Delivery 分散推进
 
 ## 版本号规范
 

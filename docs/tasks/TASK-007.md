@@ -1,6 +1,6 @@
 # TASK-007：全栈 Agent 交互体验 — 静态页面
 
-**状态**：进行中  
+**状态**：静态原型已完成；真实闭环拆分至 TASK-013～TASK-019
 **优先级**：P2  
 **创建日期**：2026-06-23  
 **关联 PRD**：[PRD-全栈Agent交互体验-20260623.md](../product-design/PRD-全栈Agent交互体验-20260623.md)  
@@ -23,6 +23,8 @@
 ## 本任务范围
 
 > **纯静态实现**：所有数据使用 mock，不接后端 API。目的是验证交互体验是否符合预期，确认后再开启后端任务。
+
+> **2026-07-08 状态收口**：本任务按静态 mock 原型归档。项目真实数据、Project/Mount/Artifact 后端模型、阶段状态机、人工确认、Agent Bridge 和写回交付不再回填到本任务，分别由 [TASK-013](TASK-013.md) 至 [TASK-019](TASK-019.md) 跟踪。
 
 涵盖两个页面：
 
@@ -179,7 +181,15 @@
 - ❌ 产物文件保存
 - ❌ 阶段完成卡片的真实 SSE 事件接入
 
-以上均在后续任务（TASK-008 及之后）实现。
+以上均在后续核心开发闭环任务中实现：
+
+- [TASK-013](TASK-013.md)：Project / Mount / Artifact 数据底座
+- [TASK-014](TASK-014.md)：项目管理页接真实数据
+- [TASK-015](TASK-015.md)：PipelineRun / StageState 阶段状态机
+- [TASK-016](TASK-016.md)：Artifact 产物归档与查看
+- [TASK-017](TASK-017.md)：人工确认与阶段继续机制
+- [TASK-018](TASK-018.md)：Agent Bridge / 真实代码库读取
+- [TASK-019](TASK-019.md)：写回与交付闭环
 
 ---
 

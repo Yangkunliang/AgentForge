@@ -20,8 +20,20 @@
 - [RABBITMQ.md](docs/tech-design/RABBITMQ.md) — 消息队列拓扑、Exchange/Queue 设计、消息格式、死信处理
 - [DEPLOYMENT.md](docs/tech-design/DEPLOYMENT.md) — 本地开发环境、生产部署、Nginx 配置、数据库迁移
 
+## 架构蓝图 (docs/architecture/)
+- [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
+- [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery
+
 ## 任务清单 (docs/tasks/)
-- [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单，按 P1→P2→P3→P4 优先级排列，共 28 项
+- [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-019 后续路线图
+- [TASK-012.md](docs/tasks/TASK-012.md) — 核心功能路线图与任务重排，已完成
+- [TASK-013.md](docs/tasks/TASK-013.md) — Project / Mount / Artifact 数据底座，todo
+- [TASK-014.md](docs/tasks/TASK-014.md) — 项目管理页接真实数据，todo
+- [TASK-015.md](docs/tasks/TASK-015.md) — PipelineRun / StageState 阶段状态机，todo
+- [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，todo
+- [TASK-017.md](docs/tasks/TASK-017.md) — 人工确认与阶段继续机制，todo
+- [TASK-018.md](docs/tasks/TASK-018.md) — Agent Bridge / 真实代码库读取，todo
+- [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，todo
 
 ## 迭代记录 (docs/iterations/)
 - [2026-06-17-architecture-design/](docs/iterations/2026-06-17-architecture-design/) — 架构设计迭代记录
@@ -43,6 +55,12 @@
   - [ITERATION-REVIEW.md](docs/iterations/2026-07-07-task-009-sse-validation/ITERATION-REVIEW.md) — TASK-009 浏览器 E2E 验收结论、验证命令和剩余边界
 - [2026-07-07-task-011-risk-fixes/](docs/iterations/2026-07-07-task-011-risk-fixes/) — TASK-011 高级设置真实透传与技术风险修正
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-07-task-011-risk-fixes/TECHNICAL-DESIGN.md) — intent/context/stage 透传、system prompt 注入、沙箱配置、API 路由前缀、依赖锁、SQLite 测试方言与全量 pytest 风险修正
+- [2026-07-08-core-dev-workflow/](docs/iterations/2026-07-08-core-dev-workflow/) — TASK-012 核心开发闭环路线图与任务重排
+  - [PRODUCT-REQUIREMENTS.md](docs/iterations/2026-07-08-core-dev-workflow/PRODUCT-REQUIREMENTS.md) — 核心闭环用户故事 CDW-01～CDW-07
+  - [TASK-CHECKLIST.md](docs/iterations/2026-07-08-core-dev-workflow/TASK-CHECKLIST.md) — TASK-012～TASK-019 任务索引与防遗忘机制
+  - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-08-core-dev-workflow/TECHNICAL-DESIGN.md) — ProjectService、SessionService、PipelineService、StageRuntime、ArtifactService、DeliveryService 设计边界
+  - [TEST-PLAN.md](docs/iterations/2026-07-08-core-dev-workflow/TEST-PLAN.md) — 分阶段验收矩阵
+  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-dev-workflow/ITERATION-REVIEW.md) — TASK-012 决策和后续提醒
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
