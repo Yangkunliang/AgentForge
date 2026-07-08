@@ -1,8 +1,8 @@
 # 核心能力增强迭代复盘
 
 **日期**：2026-07-08
-**当前完成任务**：TASK-020、TASK-021、TASK-022、TASK-023、TASK-024、TASK-025
-**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计、GitHub OAuth Mount 授权底座、GitHub PR Delivery 和 zip Delivery Package 已完成，下一步进入 TASK-026 Upload Mount 上下文兜底。
+**当前完成任务**：TASK-020、TASK-021、TASK-022、TASK-023、TASK-024、TASK-025、TASK-026
+**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计、GitHub OAuth Mount 授权底座、GitHub PR Delivery、zip Delivery Package 和 Upload Mount 上下文兜底已完成。
 
 ## 完成内容
 
@@ -60,6 +60,16 @@
 - 新增过期 zip 清理配置 `DELIVERY_PACKAGE_DIR`、`DELIVERY_PACKAGE_TTL_HOURS`。
 - Artifact Viewer 新增“zip 包”交付模式，可预览包信息、生成 zip 并下载。
 
+### TASK-026
+
+- 新增 Upload Mount multipart 上传 API，创建 connected upload Mount，并把 manifest 保存到 `ProjectMount.metadata`。
+- manifest 记录相对路径、文件大小、MIME、sha256、storage_path 和上传时间，不保存文件正文。
+- Bridge list/read 支持 upload Mount，读取范围严格限定在 manifest 内；Chat 上下文注入可读取 upload 文件。
+- 上传路径拒绝绝对路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径。
+- 上传文件数量、单文件大小、总大小和允许扩展名通过 `UPLOAD_MOUNT_*` 配置控制。
+- 删除 Upload Mount 时清理对应文件集合，并写入 `upload_mount.deleted` 审计。
+- Project 创建向导的“手动上传”接入真实 API，ContextPicker 文件源支持 connected local/upload Mount。
+
 ## 发现并修正的风险
 
 | 风险 | 修正 |
@@ -80,6 +90,9 @@
 | zip 包内路径如果直接信任 Artifact 元数据，可能产生 Zip Slip 风险 | 统一校验相对路径，拒绝绝对路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径 |
 | zip 下载如果暴露服务端临时路径，会泄露部署目录 | report 只保存 `download_url`、package id 和 sha256，下载接口内部解析文件路径 |
 | zip 文件长期堆积会放大磁盘风险 | 新增 TTL 配置，并在 apply 前清理过期包 |
+| Upload Mount 若保存本地路径，会让用户误以为平台在扫描机器 | `locator` 只保存 `upload://<upload_id>`，Bridge 只读服务端 manifest |
+| 上传文件正文进入审计会泄露代码或需求 | 审计 details 只记录路径、大小、sha、状态，不记录正文 |
+| upload Mount 被误用为写回目标 | Delivery 写回仍通过 local-only 校验，upload 只参与 Bridge/Chat 只读上下文 |
 
 ## 验证结果
 
@@ -98,7 +111,10 @@
 - `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium`：4 passed
 - `uv run --extra dev pytest tests/api/test_zip_delivery.py`：5 passed
 - `npm run build`：通过，保留既有 Sass deprecation 和 chunk size warning
+- `uv run --extra dev pytest tests/api/test_upload_mount.py`：5 passed
+- `uv run --extra dev pytest tests/api/test_upload_mount.py tests/api/test_projects.py tests/api/test_delivery.py tests/api/test_zip_delivery.py`：24 passed
+- `npm run test:e2e -- projects.spec.ts bridge-context.spec.ts --project=chromium`：7 passed
 
 ## 下一步
 
-- TASK-026：实现 Upload Mount 上下文兜底。
+- 本轮 TASK-020～TASK-026 已形成可信交付、远程 PR、zip 和 upload 上下文兜底闭环；后续可继续做多 Mount 编排、发布策略和长期文件保留策略。

@@ -1,7 +1,7 @@
 # 核心能力增强测试计划
 
 **日期**：2026-07-08
-**范围**：TASK-020 至 TASK-025
+**范围**：TASK-020 至 TASK-026
 
 ## TASK-020 服务端可信交付
 
@@ -71,6 +71,19 @@
 | 下载接口按 Artifact/Project 用户权限隔离，不暴露服务器临时路径 | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
 | 过期 zip 在后续 apply 前清理 | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
 | Artifact Viewer 可切换到 zip 包模式、生成并下载 zip | `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium` |
+| 前端构建 | `npm run build` |
+
+## TASK-026 Upload Mount 上下文兜底
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| multipart 上传创建 connected upload Mount，并保存 manifest | `uv run --extra dev pytest tests/api/test_upload_mount.py` |
+| Bridge list/read 只读取 manifest 内路径 | `uv run --extra dev pytest tests/api/test_upload_mount.py` |
+| 路径穿越、反斜杠、非法扩展、超限、非 UTF-8 被拒绝 | `uv run --extra dev pytest tests/api/test_upload_mount.py` |
+| 跨用户访问 upload Mount 返回 404 | `uv run --extra dev pytest tests/api/test_upload_mount.py` |
+| 删除 Upload Mount 清理文件并写审计 | `uv run --extra dev pytest tests/api/test_upload_mount.py` |
+| Project 创建向导可创建 upload Mount | `npm run test:e2e -- projects.spec.ts --project=chromium` |
+| ContextPicker 可选择 upload Mount 文件并进入 chat payload | `npm run test:e2e -- bridge-context.spec.ts --project=chromium` |
 | 前端构建 | `npm run build` |
 
 ## 非目标

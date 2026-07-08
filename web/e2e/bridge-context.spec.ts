@@ -107,6 +107,21 @@ async function mockBridgeApi(page: Page, options: { chatRequests: unknown[] }) {
           created_at: now,
           updated_at: now,
         },
+        {
+          id: 'mount-upload',
+          project_id: project.id,
+          mount_type: 'upload',
+          display_name: '上传资料',
+          locator: 'upload://context-files',
+          role: 'docs',
+          status: 'connected',
+          metadata: {
+            upload_id: 'context-files',
+            file_count: 1,
+          },
+          created_at: now,
+          updated_at: now,
+        },
       ]))
       return
     }
@@ -131,6 +146,35 @@ async function mockBridgeApi(page: Page, options: { chatRequests: unknown[] }) {
               {
                 name: 'src',
                 relative_path: 'src',
+                kind: 'directory',
+                size: null,
+                modified_at: now,
+              },
+            ],
+      }))
+      return
+    }
+
+    if (method === 'GET' && path === `/api/v1/projects/${project.id}/mounts/mount-upload/files`) {
+      const requestedPath = url.searchParams.get('path') ?? ''
+      await route.fulfill(json({
+        mount_id: 'mount-upload',
+        project_id: project.id,
+        path: requestedPath,
+        entries: requestedPath
+          ? [
+              {
+                name: 'requirements.md',
+                relative_path: 'docs/requirements.md',
+                kind: 'file',
+                size: 640,
+                modified_at: now,
+              },
+            ]
+          : [
+              {
+                name: 'docs',
+                relative_path: 'docs',
                 kind: 'directory',
                 size: null,
                 modified_at: now,
@@ -194,6 +238,42 @@ test.describe('TASK-018 bridge context picker', () => {
           value: 'src/api/routes/sessions.py',
           label: '主代码库/src/api/routes/sessions.py',
           mount_id: 'mount-primary',
+        },
+      ],
+    })
+  })
+
+  test('selects an uploaded mount file and sends mount_id with chat payload', async ({ page }) => {
+    const chatRequests: unknown[] = []
+    await login(page)
+    await mockBridgeApi(page, { chatRequests })
+
+    await page.goto('/chat/session-bridge')
+
+    await page.locator('.advanced-btn').click()
+    await page.getByRole('button', { name: '添加上下文' }).click()
+
+    await page.locator('.context-picker__field select').selectOption('mount-upload')
+    await expect(page.locator('.file-browser__path')).toHaveText('上传资料')
+    await page.locator('.file-browser__row').filter({ hasText: 'docs' }).click()
+    await page.locator('.file-browser__row').filter({ hasText: 'requirements.md' }).click()
+    await page.getByRole('button', { name: '添加', exact: true }).click()
+
+    await expect(page.locator('.context-chip')).toContainText('上传资料/docs/requirements.md')
+
+    await page.locator('.advanced-panel__close').click()
+    await page.locator('textarea').fill('请基于上传的需求文件拆解任务')
+    await page.locator('.send-btn').click()
+
+    await expect.poll(() => chatRequests.length).toBe(1)
+    expect(chatRequests[0]).toMatchObject({
+      content: '请基于上传的需求文件拆解任务',
+      context_files: [
+        {
+          type: 'file',
+          value: 'docs/requirements.md',
+          label: '上传资料/docs/requirements.md',
+          mount_id: 'mount-upload',
         },
       ],
     })

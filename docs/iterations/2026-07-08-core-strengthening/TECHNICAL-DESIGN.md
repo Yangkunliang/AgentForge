@@ -263,6 +263,14 @@ files/<relative paths>
 
 ### 4.4 Upload Mount
 
+TASK-026 已落地该设计，对应 API 为：
+
+```text
+POST /api/v1/projects/{project_id}/mounts/upload
+GET  /api/v1/projects/{project_id}/mounts/{mount_id}/files
+POST /api/v1/projects/{project_id}/mounts/{mount_id}/files/read
+```
+
 Upload Mount 是上下文读取兜底，不是写回目标：
 
 ```text
@@ -278,6 +286,8 @@ ProjectMount(mount_type=upload)
 - Bridge 读取必须限定在 manifest 中的相对路径。
 - 单文件大小、总大小、文件数量、允许扩展名必须可配置。
 - 删除 Upload Mount 时同步清理文件或标记过期。
+- Chat 上下文注入可读取 upload Mount 文件，但 Delivery 写回仍只允许 local Mount。
+- Project 创建向导的“手动上传”和 ContextPicker 文件源已接入 upload Mount。
 
 审计事件：
 
@@ -295,7 +305,7 @@ upload_mount.failed
 | TASK-023 | GitHub OAuth Mount 授权底座 | TASK-022 | token 不下发前端，Mount 由用户显式授权创建 |
 | TASK-024 | GitHub PR Delivery | TASK-023 | preview/apply、base sha 校验、PR URL、审计日志 |
 | TASK-025 | zip Delivery Package | TASK-022 | 已完成：zip manifest、sha256、下载权限和过期清理 |
-| TASK-026 | Upload Mount 上下文兜底 | TASK-022 | manifest 范围读取、路径安全、上下文选择器接入 |
+| TASK-026 | Upload Mount 上下文兜底 | TASK-022 | 已完成：manifest 范围读取、路径安全、上下文选择器接入 |
 
 ## 5. 验证策略
 

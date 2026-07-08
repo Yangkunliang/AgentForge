@@ -9,13 +9,20 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_forge.bridge.files import BridgeAccessError, list_mount_files, read_mount_file, root_path_for_mount
+from agent_forge.bridge.files import (
+    BridgeAccessError,
+    create_upload_mount_manifest,
+    delete_upload_mount_files,
+    list_mount_files,
+    read_mount_file,
+    root_path_for_mount,
+)
 from agent_forge.config import settings
 from agent_forge.database import get_async_session
 from agent_forge.delivery import (
@@ -419,6 +426,13 @@ def _ensure_connected_local_mount(mount: ProjectMount) -> None:
         raise HTTPException(status_code=409, detail="Mount is not connected")
 
 
+def _ensure_connected_file_mount(mount: ProjectMount) -> None:
+    if mount.mount_type not in ("local", "upload"):
+        raise HTTPException(status_code=400, detail="Only local or upload mounts support file access")
+    if mount.status != "connected":
+        raise HTTPException(status_code=409, detail="Mount is not connected")
+
+
 def _raise_bridge_error(exc: BridgeAccessError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -486,6 +500,62 @@ def _add_zip_delivery_audit(
             details=payload,
         )
     )
+
+
+def _add_upload_mount_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    status_value: str,
+    user_id: str,
+    project_id: str,
+    mount_id: str | None = None,
+    details: dict | None = None,
+) -> None:
+    payload = {
+        "project_id": project_id,
+    }
+    if mount_id:
+        payload["mount_id"] = mount_id
+    if details:
+        payload.update(details)
+    db.add(
+        AuditLog(
+            id=str(uuid.uuid4()),
+            action=action,
+            resource="upload_mount",
+            user_id=user_id,
+            trace_id=get_trace_id() or project_id,
+            status=status_value,
+            degraded=False,
+            details=payload,
+        )
+    )
+
+
+async def _read_upload_files_bounded(files: list[UploadFile]) -> list[dict]:
+    if not files:
+        raise BridgeAccessError(400, "At least one file is required")
+    if len(files) > settings.upload_mount_max_files:
+        raise BridgeAccessError(400, f"Upload mount supports at most {settings.upload_mount_max_files} files")
+
+    uploaded_files: list[dict] = []
+    total_bytes = 0
+    for file in files:
+        content = await file.read(settings.upload_mount_max_file_bytes + 1)
+        if len(content) > settings.upload_mount_max_file_bytes:
+            raise BridgeAccessError(400, f"Upload file exceeds {settings.upload_mount_max_file_bytes} bytes")
+        total_bytes += len(content)
+        if total_bytes > settings.upload_mount_max_total_bytes:
+            raise BridgeAccessError(400, f"Upload mount exceeds {settings.upload_mount_max_total_bytes} total bytes")
+        uploaded_files.append(
+            {
+                "filename": file.filename or "",
+                "content_type": file.content_type or "text/plain",
+                "content": content,
+            }
+        )
+    return uploaded_files
 
 
 def _add_github_mount_audit(
@@ -855,6 +925,68 @@ async def create_mount(
     return _mount_to_dict(mount)
 
 
+@router.post("/{project_id}/mounts/upload", response_model=MountResponse, status_code=status.HTTP_201_CREATED)
+async def create_upload_mount(
+    project_id: str,
+    display_name: str = Form(..., min_length=1, max_length=120),
+    role: MountRole = Form(default="docs"),
+    paths: list[str] | None = Form(default=None),
+    files: list[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    project = await _get_project_or_404(db, project_id, current_user.id)
+    upload_id = uuid.uuid4().hex
+    try:
+        uploaded_files = await _read_upload_files_bounded(files)
+        metadata = create_upload_mount_manifest(
+            project_id=project.id,
+            upload_id=upload_id,
+            files=uploaded_files,
+            relative_paths=paths or [],
+        )
+    except BridgeAccessError as exc:
+        _add_upload_mount_audit(
+            db,
+            action="upload_mount.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            project_id=project.id,
+            details={"error_code": "upload_mount_error", "error_message": exc.detail},
+        )
+        await db.commit()
+        _raise_bridge_error(exc)
+
+    mount = ProjectMount(
+        id=str(uuid.uuid4()),
+        project_id=project.id,
+        mount_type="upload",
+        display_name=display_name.strip(),
+        locator=f"upload://{upload_id}",
+        role=role,
+        status="connected",
+        metadata_json=metadata,
+    )
+    db.add(mount)
+    _add_upload_mount_audit(
+        db,
+        action="upload_mount.file.uploaded",
+        status_value="success",
+        user_id=current_user.id,
+        project_id=project.id,
+        mount_id=mount.id,
+        details={
+            "upload_id": upload_id,
+            "file_count": metadata["file_count"],
+            "total_bytes": metadata["total_bytes"],
+            "paths": [item["path"] for item in metadata["manifest"]],
+        },
+    )
+    await db.commit()
+    await db.refresh(mount)
+    return _mount_to_dict(mount)
+
+
 @router.get("/{project_id}/mounts", response_model=list[MountResponse])
 async def list_mounts(
     project_id: str,
@@ -894,6 +1026,11 @@ async def get_bridge_status(
                 connected_mounts += 1
             except BridgeAccessError:
                 bridge_status = "error"
+        elif mount.mount_type == "upload" and mount.status == "connected":
+            if (mount.metadata_json or {}).get("manifest"):
+                connected_mounts += 1
+            else:
+                bridge_status = "error"
 
         mounts.append(
             {
@@ -922,7 +1059,7 @@ async def list_mount_file_entries(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     mount = await _get_mount_or_404(db, project_id, mount_id, current_user.id)
-    _ensure_connected_local_mount(mount)
+    _ensure_connected_file_mount(mount)
     try:
         return list_mount_files(mount, path)
     except BridgeAccessError as exc:
@@ -938,11 +1075,27 @@ async def read_mount_file_content(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     mount = await _get_mount_or_404(db, project_id, mount_id, current_user.id)
-    _ensure_connected_local_mount(mount)
+    _ensure_connected_file_mount(mount)
     try:
-        return read_mount_file(mount, body.path)
+        content = read_mount_file(mount, body.path)
     except BridgeAccessError as exc:
         _raise_bridge_error(exc)
+    if mount.mount_type == "upload":
+        _add_upload_mount_audit(
+            db,
+            action="upload_mount.file.read",
+            status_value="success",
+            user_id=current_user.id,
+            project_id=project_id,
+            mount_id=mount.id,
+            details={
+                "path": content["path"],
+                "size": content["size"],
+                "truncated": content["truncated"],
+            },
+        )
+        await db.commit()
+    return content
 
 
 @router.patch("/{project_id}/mounts/{mount_id}", response_model=MountResponse)
@@ -1009,6 +1162,18 @@ async def delete_mount(
             user_id=current_user.id,
             project_id=project_id,
             details={"mount_id": mount.id, "credential_id": credential_id},
+        )
+    if mount.mount_type == "upload":
+        upload_id = (mount.metadata_json or {}).get("upload_id")
+        delete_upload_mount_files(mount)
+        _add_upload_mount_audit(
+            db,
+            action="upload_mount.deleted",
+            status_value="success",
+            user_id=current_user.id,
+            project_id=project_id,
+            mount_id=mount.id,
+            details={"upload_id": upload_id},
         )
     await db.delete(mount)
     await db.commit()

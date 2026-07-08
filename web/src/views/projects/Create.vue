@@ -14,6 +14,7 @@ const projectName = ref('')
 const projectDescription = ref('')
 const mountMethod = ref<'cli' | 'github' | 'upload'>('cli')
 const mountLocator = ref('')
+const uploadFiles = ref<File[]>([])
 const selectedTags = ref<string[]>([])
 const customTag = ref('')
 const submitting = ref(false)
@@ -47,10 +48,13 @@ const mountOptions: Array<{
   { id: 'upload', title: '手动上传', desc: '上传关键文件供 Agent 分析', icon: 'upload' },
 ]
 
+const uploadAccept = '.md,.txt,.py,.js,.ts,.tsx,.vue,.json,.yaml,.yml,.toml,.ini,.cfg,.sql,.html,.css,.scss'
+
 const isStepValid = computed(() => {
   if (currentStep.value === 1) return projectName.value.trim().length > 0
   if (currentStep.value === 2) {
     if (mountMethod.value === 'github') return isGitHubRepoInputValid(mountLocator.value)
+    if (mountMethod.value === 'upload') return uploadFiles.value.length > 0
     return mountLocator.value.trim().length > 0
   }
   return true
@@ -70,7 +74,7 @@ const mountLocatorPlaceholder = computed(() => {
 
 const mountLocatorHint = computed(() => {
   if (mountMethod.value === 'github') return '提交后会先创建项目，再生成 GitHub OAuth 授权链接；授权完成后才会创建 connected Mount。'
-  if (mountMethod.value === 'upload') return '上传解析将在后续任务实现，这里先保存手动上传的上下文入口。'
+  if (mountMethod.value === 'upload') return '文件会保存为只读 Upload Mount，可在对话上下文中选择。'
   return 'AgentForge 不会自动扫描本机目录，只会使用你明确授权的路径。'
 })
 
@@ -109,8 +113,12 @@ function toMountType(): ProjectMountType {
 }
 
 function toMountStatus(): ProjectMountStatus {
-  if (mountMethod.value === 'upload') return 'pending'
   return 'connected'
+}
+
+function handleUploadFiles(event: Event) {
+  const input = event.target as HTMLInputElement
+  uploadFiles.value = Array.from(input.files ?? [])
 }
 
 function normalizeGitHubRepoFullName(value: string): string {
@@ -151,6 +159,13 @@ async function submitProject() {
       githubAuthorizationUrl.value = data.authorization_url
       githubOAuthState.value = data.state
       githubOAuthExpiresAt.value = data.expires_at
+    } else if (mountMethod.value === 'upload') {
+      await projectsApi.createUploadMount(project.id, {
+        display_name: '上传文件',
+        role: 'docs',
+        files: uploadFiles.value,
+        paths: uploadFiles.value.map((file) => file.name),
+      })
     } else {
       await projectStore.createMount(project.id, {
         mount_type: toMountType(),
@@ -291,7 +306,7 @@ function openGitHubAuthorization() {
               <div class="oauth-status__desc">授权成功后，平台会保存加密凭据并创建 GitHub connected Mount。</div>
             </div>
 
-            <div class="form-group mount-locator-group">
+            <div v-if="mountMethod !== 'upload'" class="form-group mount-locator-group">
               <label class="form-label">{{ mountLocatorLabel }} <span class="required">*</span></label>
               <input
                 v-model="mountLocator"
@@ -299,6 +314,23 @@ function openGitHubAuthorization() {
                 class="form-input"
                 :placeholder="mountLocatorPlaceholder"
               />
+              <p class="mount-locator-hint">{{ mountLocatorHint }}</p>
+            </div>
+
+            <div v-else class="form-group mount-locator-group">
+              <label class="form-label">关键文件 <span class="required">*</span></label>
+              <input
+                type="file"
+                class="form-input"
+                multiple
+                :accept="uploadAccept"
+                @change="handleUploadFiles"
+              />
+              <div v-if="uploadFiles.length > 0" class="upload-file-list">
+                <span v-for="file in uploadFiles" :key="`${file.name}-${file.size}`" class="upload-file-item">
+                  {{ file.name }} · {{ file.size }}B
+                </span>
+              </div>
               <p class="mount-locator-hint">{{ mountLocatorHint }}</p>
             </div>
           </div>
@@ -682,6 +714,24 @@ function openGitHubAuthorization() {
   font-size: 12px;
   line-height: 1.5;
   color: #6b7280;
+}
+
+.upload-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.upload-file-item {
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .tags-grid {

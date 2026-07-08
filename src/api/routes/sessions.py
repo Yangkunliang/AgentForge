@@ -18,10 +18,10 @@ from agent_forge.api.execution_steps import ExecutionStepCollector
 from agent_forge.api.sse import emit_task_started, get_sse_manager
 from agent_forge.bridge.files import BridgeAccessError, read_mount_file
 from agent_forge.database import get_async_session
-from agent_forge.models import Artifact, Project, ProjectMount, Task, TaskStatus, User
+from agent_forge.models import Artifact, AuditLog, Project, ProjectMount, Task, TaskStatus, User
 from agent_forge.models.session import Message, Session
-from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.models.user_agent_settings import UserAgentSettings
+from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.tracing import get_trace_id, get_tracer
 from middleware.auth import get_current_user
 
@@ -407,8 +407,8 @@ async def _hydrate_context_file(
     mount = result.scalar_one_or_none()
     if not mount:
         raise HTTPException(status_code=404, detail="Mount not found")
-    if mount.mount_type != "local":
-        raise HTTPException(status_code=400, detail="Only local mounts support file context")
+    if mount.mount_type not in ("local", "upload"):
+        raise HTTPException(status_code=400, detail="Only local or upload mounts support file context")
     if mount.status != "connected":
         raise HTTPException(status_code=409, detail="Mount is not connected")
 
@@ -416,6 +416,25 @@ async def _hydrate_context_file(
         content = read_mount_file(mount, item.value)
     except BridgeAccessError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    if mount.mount_type == "upload":
+        db.add(
+            AuditLog(
+                id=str(uuid.uuid4()),
+                action="upload_mount.file.read",
+                resource="upload_mount",
+                user_id=user_id,
+                trace_id=get_trace_id() or session.id,
+                status="success",
+                degraded=False,
+                details={
+                    "project_id": session.project_id,
+                    "mount_id": mount.id,
+                    "path": content["path"],
+                    "size": content["size"],
+                    "truncated": content["truncated"],
+                },
+            )
+        )
 
     context_item.update(
         {

@@ -187,6 +187,13 @@ TASK-025 已补充：
 - 生成成功后读取 `delivery_report.download_url` 并通过 `downloadZipPackage` 拉取 Blob，前端使用 `URL.createObjectURL` 触发浏览器下载。
 - zip Delivery 的下载按钮只在当前 Artifact report 标记 `delivery_channel=zip` 且存在 `download_url` 时显示。
 
+TASK-026 已补充：
+
+- `web/src/api/modules/projects.ts` 新增 `createUploadMount`，使用 multipart 调用 `/projects/{project_id}/mounts/upload`。
+- `web/src/views/projects/Create.vue` 的“手动上传”模式改为真实文件选择，创建 Project 后直接创建 connected Upload Mount。
+- `web/src/components/chat/ContextPickerDialog.vue` 的文件源从 connected local Mount 扩展为 connected local/upload Mount。
+- `web/e2e/projects.spec.ts` 覆盖项目创建时 upload mount API 调用；`web/e2e/bridge-context.spec.ts` 覆盖 ContextPicker 选择 upload manifest 文件并随 chat payload 发送 `mount_id`。
+
 ---
 
 ## 3. 路由设计

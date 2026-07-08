@@ -100,6 +100,7 @@ async function mockProjectApi(page: Page, options?: {
   artifactsByProject?: Record<string, Artifact[]>
   onCreateProject?: (payload: unknown) => Project
   onCreateMount?: (projectId: string, payload: unknown) => void
+  onCreateUploadMount?: (projectId: string, postData: string) => void
   onStartGitHubOAuth?: (projectId: string, payload: unknown) => string
   sessionRequests?: string[]
 }) {
@@ -208,6 +209,38 @@ async function mockProjectApi(page: Page, options?: {
         authorization_url: authorizationUrl,
         state: 'e2e-state',
         expires_at: now,
+      }, 201))
+      return
+    }
+
+    const uploadMountMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/mounts\/upload$/)
+    if (uploadMountMatch && method === 'POST') {
+      const projectId = uploadMountMatch[1]
+      const postData = request.postData() ?? ''
+      options?.onCreateUploadMount?.(projectId, postData)
+      await route.fulfill(json({
+        id: `${projectId}-upload-mount`,
+        project_id: projectId,
+        mount_type: 'upload',
+        display_name: '上传文件',
+        locator: 'upload://e2e-upload',
+        role: 'docs',
+        status: 'connected',
+        metadata: {
+          upload_id: 'e2e-upload',
+          file_count: 1,
+          total_bytes: 16,
+          manifest: [
+            {
+              path: 'requirements.md',
+              size: 16,
+              mime_type: 'text/markdown',
+              sha256: 'e2e-sha',
+            },
+          ],
+        },
+        created_at: now,
+        updated_at: now,
       }, 201))
       return
     }
@@ -394,6 +427,54 @@ test.describe('TASK-014 project real data flow', () => {
     expect((githubOAuthPayload as { redirect_uri: string }).redirect_uri).toBe(
       'http://localhost:3000/api/v1/projects/project-github/mounts/github/oauth/callback',
     )
+    expect(createMountPayload).toBeUndefined()
+  })
+
+  test('creates a project with upload mount files', async ({ page }) => {
+    let createMountPayload: unknown
+    let uploadProjectId: string | undefined
+    let uploadPostData = ''
+
+    await login(page)
+    await mockProjectApi(page, {
+      onCreateProject: (payload) => ({
+        id: 'project-upload',
+        user_id: 'user-1',
+        name: (payload as { name: string }).name,
+        display_name: (payload as { name: string }).name,
+        description: null,
+        tech_tags: [],
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      }),
+      onCreateMount: (_projectId, payload) => {
+        createMountPayload = payload
+      },
+      onCreateUploadMount: (projectId, postData) => {
+        uploadProjectId = projectId
+        uploadPostData = postData
+      },
+    })
+
+    await page.goto('/projects/create')
+
+    await page.getByPlaceholder('例如：我的电商后端').fill('资料上传项目')
+    await page.getByRole('button', { name: '下一步' }).click()
+    await page.getByText('手动上传').click()
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'requirements.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from('# Requirements\n'),
+    })
+    await expect(page.getByText(/requirements\.md/)).toBeVisible()
+    await page.getByRole('button', { name: '下一步' }).click()
+    await page.getByRole('button', { name: '完成' }).click()
+
+    await expect(page.getByText('项目创建成功')).toBeVisible()
+    expect(uploadProjectId).toBe('project-upload')
+    expect(uploadPostData).toContain('requirements.md')
+    expect(uploadPostData).toContain('上传文件')
     expect(createMountPayload).toBeUndefined()
   })
 })

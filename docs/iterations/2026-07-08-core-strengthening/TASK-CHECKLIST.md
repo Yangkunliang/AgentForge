@@ -29,7 +29,7 @@
 | done | TASK-023：GitHub OAuth Mount 授权底座 | P1 | 用户主动授权 GitHub repo，token 服务端加密存储 | TASK-022 |
 | done | TASK-024：GitHub PR Delivery | P1 | branch、commit、PR、base ref 校验、失败报告和审计 | TASK-023 |
 | done | TASK-025：zip Delivery Package | P2 | 生成可下载 zip、manifest、sha256 和 Delivery report | TASK-022 |
-| todo | TASK-026：Upload Mount 上下文兜底 | P2 | 上传文件 manifest、授权读取、ContextPicker 接入 | TASK-022 |
+| done | TASK-026：Upload Mount 上下文兜底 | P2 | 上传文件 manifest、授权读取、ContextPicker 接入 | TASK-022 |
 
 ## 依赖图
 
@@ -52,3 +52,4 @@ TASK-019
 - TASK-023 已完成；合并 main 后立即开启 TASK-024。
 - TASK-024 已完成；合并 main 后立即开启 TASK-025。
 - TASK-025 已完成；合并 main 后立即开启 TASK-026。
+- TASK-026 已完成；本轮核心能力增强任务闭环完成。

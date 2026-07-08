@@ -2,6 +2,7 @@ import request from '@/api/request'
 import type {
   CreateProjectForm,
   CreateProjectMountForm,
+  CreateUploadMountForm,
   Artifact,
   BridgeStatus,
   CreateArtifactForm,
@@ -56,6 +57,18 @@ export const projectsApi = {
       ...data,
       metadata: data.metadata ?? {},
     }),
+
+  createUploadMount: (projectId: string, data: CreateUploadMountForm) => {
+    const form = new FormData()
+    form.append('display_name', data.display_name)
+    form.append('role', data.role)
+    data.files.forEach((file, index) => {
+      form.append('files', file)
+      const path = data.paths?.[index]?.trim() || file.name
+      form.append('paths', path)
+    })
+    return request.post<ProjectMount>(`/projects/${projectId}/mounts/upload`, form)
+  },
 
   startGitHubOAuthMount: (projectId: string, data: GitHubOAuthStartForm) =>
     request.post<GitHubOAuthStartResponse>(`/projects/${projectId}/mounts/github/oauth/start`, data),

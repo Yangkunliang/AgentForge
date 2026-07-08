@@ -126,6 +126,13 @@ GITHUB_OAUTH_SCOPES=repo
 DELIVERY_PACKAGE_DIR=/tmp/agentforge-delivery-packages
 DELIVERY_PACKAGE_TTL_HOURS=24
 
+# ── Upload Mount 上下文文件 ─────────────────────
+UPLOAD_MOUNT_DIR=/tmp/agentforge-upload-mounts
+UPLOAD_MOUNT_MAX_FILES=20
+UPLOAD_MOUNT_MAX_FILE_BYTES=200000
+UPLOAD_MOUNT_MAX_TOTAL_BYTES=2000000
+UPLOAD_MOUNT_ALLOWED_EXTENSIONS=.md,.txt,.py,.js,.ts,.tsx,.vue,.json,.yaml,.yml,.toml,.ini,.cfg,.sql,.html,.css,.scss
+
 # ── Skill 安装目录 ───────────────────────────────
 SKILL_INSTALL_DIR=/opt/agentforge/skills
 
@@ -323,10 +330,16 @@ GITHUB_OAUTH_REDIRECT_URI=
 GITHUB_OAUTH_SCOPES=repo
 DELIVERY_PACKAGE_DIR=/var/lib/agentforge/delivery-packages
 DELIVERY_PACKAGE_TTL_HOURS=24
+UPLOAD_MOUNT_DIR=/var/lib/agentforge/upload-mounts
+UPLOAD_MOUNT_MAX_FILES=20
+UPLOAD_MOUNT_MAX_FILE_BYTES=200000
+UPLOAD_MOUNT_MAX_TOTAL_BYTES=2000000
+UPLOAD_MOUNT_ALLOWED_EXTENSIONS=.md,.txt,.py,.js,.ts,.tsx,.vue,.json,.yaml,.yml,.toml,.ini,.cfg,.sql,.html,.css,.scss
 ```
 
 `GITHUB_OAUTH_REDIRECT_URI` 可留空，Project 创建向导会按当前项目传入 `/api/v1/projects/{project_id}/mounts/github/oauth/callback`。无前端场景才需要配置固定回调地址。
 `DELIVERY_PACKAGE_DIR` 用于保存 TASK-025 生成的临时 zip 交付包，需挂载到后端可写持久卷或可清理目录；`DELIVERY_PACKAGE_TTL_HOURS` 控制下载保留时间。
+`UPLOAD_MOUNT_DIR` 用于保存 TASK-026 手动上传的只读上下文文件，生产环境建议挂载为后端私有持久卷，并按业务保留策略清理。
 
 ### 5.4 前端构建
 

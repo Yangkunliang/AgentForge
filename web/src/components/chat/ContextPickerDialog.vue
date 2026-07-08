@@ -25,16 +25,16 @@ const loadingFiles = ref(false)
 const fileError = ref('')
 const contextTypes: ContextFileType[] = ['file', 'branch', 'url']
 
-const connectedLocalMounts = computed(() => {
+const connectedFileMounts = computed(() => {
   const projectId = projectStore.currentProjectId
   if (!projectId) return []
   return (projectStore.mountsByProject[projectId] ?? []).filter(
-    (mount) => mount.mount_type === 'local' && mount.status === 'connected',
+    (mount) => ['local', 'upload'].includes(mount.mount_type) && mount.status === 'connected',
   )
 })
 
 const activeMount = computed(() =>
-  connectedLocalMounts.value.find((mount) => mount.id === activeMountId.value) ?? null
+  connectedFileMounts.value.find((mount) => mount.id === activeMountId.value) ?? null
 )
 
 const title = computed(() => {
@@ -87,8 +87,8 @@ async function loadMountsAndFiles() {
   const projectId = projectStore.currentProjectId
   if (!projectId || currentType.value !== 'file') return
   await projectStore.fetchProjectMounts(projectId).catch(() => undefined)
-  if (!activeMountId.value || !connectedLocalMounts.value.some((mount) => mount.id === activeMountId.value)) {
-    activeMountId.value = connectedLocalMounts.value[0]?.id ?? ''
+  if (!activeMountId.value || !connectedFileMounts.value.some((mount) => mount.id === activeMountId.value)) {
+    activeMountId.value = connectedFileMounts.value[0]?.id ?? ''
   }
   if (activeMountId.value) {
     await loadFiles('')
@@ -198,11 +198,11 @@ watch(activeMountId, (mountId, previous) => {
         </label>
 
         <div v-if="currentType === 'file'" class="context-picker__mounts">
-          <div v-if="connectedLocalMounts.length > 0" class="mount-browser">
+          <div v-if="connectedFileMounts.length > 0" class="mount-browser">
             <label class="context-picker__field">
-              <span>代码库</span>
+              <span>文件源</span>
               <select v-model="activeMountId">
-                <option v-for="mount in connectedLocalMounts" :key="mount.id" :value="mount.id">
+                <option v-for="mount in connectedFileMounts" :key="mount.id" :value="mount.id">
                   {{ mount.display_name }}
                 </option>
               </select>
@@ -238,7 +238,7 @@ watch(activeMountId, (mountId, previous) => {
               </div>
             </div>
           </div>
-          <span v-else class="context-picker__empty">当前项目没有已连接的本地代码库</span>
+          <span v-else class="context-picker__empty">当前项目没有已连接的代码库或上传文件</span>
         </div>
 
         <label class="context-picker__field">

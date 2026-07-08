@@ -105,6 +105,16 @@ class Settings(BaseSettings):
     )
     delivery_package_ttl_hours: int = Field(default=24, validation_alias="DELIVERY_PACKAGE_TTL_HOURS")
 
+    # Upload mounts
+    upload_mount_dir: str = Field(default="/tmp/agentforge-upload-mounts", validation_alias="UPLOAD_MOUNT_DIR")
+    upload_mount_max_files: int = Field(default=20, validation_alias="UPLOAD_MOUNT_MAX_FILES")
+    upload_mount_max_file_bytes: int = Field(default=200_000, validation_alias="UPLOAD_MOUNT_MAX_FILE_BYTES")
+    upload_mount_max_total_bytes: int = Field(default=2_000_000, validation_alias="UPLOAD_MOUNT_MAX_TOTAL_BYTES")
+    upload_mount_allowed_extensions: str = Field(
+        default=".md,.txt,.py,.js,.ts,.tsx,.vue,.json,.yaml,.yml,.toml,.ini,.cfg,.sql,.html,.css,.scss",
+        validation_alias="UPLOAD_MOUNT_ALLOWED_EXTENSIONS",
+    )
+
     @property
     def cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]

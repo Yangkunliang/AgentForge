@@ -210,6 +210,57 @@ DELETE /api/v1/projects/{project_id}/mounts/{mount_id}
 
 `mount_type` 取值：`local`、`github`、`upload`。TASK-018 后 connected local mount 可通过 Bridge 读取授权 root 内的 UTF-8 文本文件。
 
+### Upload Mount
+
+Upload Mount 是无法连接本地目录或 GitHub 时的只读上下文兜底。它只读取用户主动上传的 manifest 文件，不访问用户本地路径，也不允许作为写回目标。
+
+```http
+POST /api/v1/projects/{project_id}/mounts/upload
+Content-Type: multipart/form-data
+```
+
+表单字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `display_name` | string | Mount 展示名 |
+| `role` | string | `primary` / `reference` / `docs`，默认 `docs` |
+| `files` | file[] | 一个或多个 UTF-8 文本文件 |
+| `paths` | string[] | 可选，相对路径；不传时使用文件名 |
+
+响应为 connected `ProjectMount`：
+
+```json
+{
+  "mount_type": "upload",
+  "locator": "upload://<upload_id>",
+  "status": "connected",
+  "metadata": {
+    "upload_id": "<upload_id>",
+    "file_count": 1,
+    "total_bytes": 128,
+    "manifest": [
+      {
+        "path": "docs/requirements.md",
+        "size": 128,
+        "mime_type": "text/markdown",
+        "sha256": "...",
+        "storage_path": "docs/requirements.md",
+        "uploaded_at": "2026-07-08T10:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+规则：
+
+- 上传路径必须是相对路径，拒绝绝对路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径。
+- 文件必须是 UTF-8 文本，扩展名、单文件大小、总大小和文件数量由 `UPLOAD_MOUNT_*` 配置控制。
+- `GET /mounts/{mount_id}/files` 与 `POST /files/read` 支持 connected upload Mount，但只返回 manifest 范围内文件。
+- 删除 Upload Mount 时清理对应服务端文件集合。
+- 审计事件包括 `upload_mount.file.uploaded`、`upload_mount.file.read`、`upload_mount.deleted`、`upload_mount.failed`，details 不记录文件正文。
+
 ### GitHub OAuth Mount
 
 GitHub Mount 必须由当前登录用户在指定 Project 下显式授权创建。OAuth token 只保存在服务端加密凭证表，前端响应、`ProjectMount.metadata`、审计日志和 Delivery report 均不得包含明文 token。

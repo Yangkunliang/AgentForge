@@ -13,23 +13,23 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | 概念 | 定义 | 当前状态 | 后续任务 |
 |------|------|----------|----------|
 | Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API、前端真实数据流、项目产物列表与 Bridge 状态已实现 | 已接 Delivery |
-| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | connected local Mount 已支持授权 root 内目录列表、只读文件读取和确认写回；GitHub OAuth Mount 已支持 state 校验、服务端加密凭据和 connected GitHub Mount 创建；TASK-022 已完成 GitHub / upload 授权边界设计 | TASK-026 扩展 Upload Mount |
+| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | connected local Mount 已支持授权 root 内目录列表、只读文件读取和确认写回；GitHub OAuth Mount 已支持 state 校验、服务端加密凭据和 connected GitHub Mount 创建；Upload Mount 已支持 multipart 上传、manifest 范围读取和 ContextPicker 浏览 | 可继续增强多 Mount 编排 |
 | Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片和授权文件上下文 | 可继续增强多阶段自动推进 |
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | 可继续增强 Delivery 自动编排 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
-| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | TASK-026 扩展 Upload Mount |
+| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | 可继续增强发布/回滚编排 |
 
 ## 2. 用户路径
 
 MVP 用户路径按以下顺序落地：
 
 1. 用户创建 Project，填写名称、描述和技术栈。
-2. 用户在创建向导中添加 primary Mount；也可以通过 `agentforge mount <path>` 创建 connected local Mount，或通过 GitHub OAuth 授权远程仓库 Mount。
+2. 用户在创建向导中添加 primary Mount；也可以通过 `agentforge mount <path>` 创建 connected local Mount，通过 GitHub OAuth 授权远程仓库 Mount，或手动上传关键文件创建 Upload Mount。
 3. 用户从 Project 进入 Chat，创建归属于 Project 的 Session；刷新后当前项目从本地选择状态恢复。
 4. 用户选择需求类型，或由规则分类得到 intent。
 5. 系统创建 PipelineRun，并根据 intent 初始化 StageState。
-6. 用户可从 connected local Mount 选择文件作为上下文；后端在执行前读取授权 root 内的真实文件内容并注入 Agent。
+6. 用户可从 connected local 或 upload Mount 选择文件作为上下文；后端在执行前读取授权范围或上传 manifest 内的真实文件内容并注入 Agent。
 7. Agent 执行当前阶段，阶段完成后保存 Artifact。
 8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
 9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
@@ -48,6 +48,7 @@ MVP 用户路径按以下顺序落地：
 - Delivery 预览和写入之间必须保持可验证的一致性；若本地目标文件或远程 base ref 已变化，默认拒绝写入并生成失败报告。
 - 写回用户项目、创建远程 PR、导出 zip 的成功、拒绝、冲突和失败都必须进入审计日志，且审计 details 不记录 Artifact 内容、OAuth token 或上传文件正文。
 - Upload Mount 只代表用户主动上传的文件集合，不得反推或访问用户本地路径，也不得作为写回目标。
+- Upload Mount 的 manifest、读取和删除必须可审计，AuditLog 不记录上传文件正文。
 
 ## 4. 分阶段落地
 

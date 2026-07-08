@@ -437,6 +437,13 @@ export interface CreateProjectMountForm {
   metadata?: Record<string, unknown>
 }
 
+export interface CreateUploadMountForm {
+  display_name: string
+  role: ProjectMountRole
+  files: File[]
+  paths?: string[]
+}
+
 export interface GitHubOAuthStartForm {
   repo_full_name: string
   role: ProjectMountRole

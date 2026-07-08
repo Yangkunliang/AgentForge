@@ -71,7 +71,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-023：GitHub OAuth Mount 授权底座](TASK-023.md) | P1 | CDW-02、CDW-10 | TASK-022 | 用户主动授权 GitHub repo，token 服务端加密存储 |
 | [x] | [TASK-024：GitHub PR Delivery](TASK-024.md) | P1 | CDW-07、CDW-08、CDW-10 | TASK-023 | branch、commit、PR、base ref 校验、失败报告和审计 |
 | [x] | [TASK-025：zip Delivery Package](TASK-025.md) | P2 | CDW-07、CDW-10 | TASK-022 | zip manifest、sha256、下载权限和过期清理 |
-| [ ] | [TASK-026：Upload Mount 上下文兜底](TASK-026.md) | P2 | CDW-02、CDW-06、CDW-10 | TASK-022 | upload manifest 范围读取、路径安全、ContextPicker 接入 |
+| [x] | [TASK-026：Upload Mount 上下文兜底](TASK-026.md) | P2 | CDW-02、CDW-06、CDW-10 | TASK-022 | upload manifest 范围读取、路径安全、ContextPicker 接入 |
 
 ## 执行顺序
 

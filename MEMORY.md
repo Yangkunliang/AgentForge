@@ -40,7 +40,7 @@
 - [TASK-023.md](docs/tasks/TASK-023.md) — GitHub OAuth Mount 授权底座，已完成
 - [TASK-024.md](docs/tasks/TASK-024.md) — GitHub PR Delivery，已完成
 - [TASK-025.md](docs/tasks/TASK-025.md) — zip Delivery Package，已完成
-- [TASK-026.md](docs/tasks/TASK-026.md) — Upload Mount 上下文兜底，待开始
+- [TASK-026.md](docs/tasks/TASK-026.md) — Upload Mount 上下文兜底，已完成
 
 ## 迭代记录 (docs/iterations/)
 - [2026-06-17-architecture-design/](docs/iterations/2026-06-17-architecture-design/) — 架构设计迭代记录
@@ -92,7 +92,8 @@
 - TASK-022 已完成：GitHub OAuth Mount、GitHub PR Delivery、zip Delivery、Upload Mount 的授权边界、数据流、失败状态和审计点已写入技术设计，并拆出 TASK-023～TASK-026。
 - TASK-023 已完成：GitHub OAuth start/callback、`oauth_credentials`/`oauth_states`、服务端加密凭据、connected GitHub Mount 创建、删除撤销 credential、Project 创建向导 OAuth 授权入口已落地；callback 通过一次性 state 找回用户和项目，不依赖浏览器重定向携带 JWT header。
 - TASK-024 已完成：GitHub PR Delivery preview/apply API、`expected_base_sha` 二次校验、branch/commit/PR 创建、失败报告、`delivery.github.*` 审计事件和 Artifact Viewer GitHub PR 模式已落地。
-- TASK-025 已完成：zip Delivery preview/apply/download API、deterministic zip sha256、manifest/report、下载权限隔离、过期清理、`delivery.zip.*` 审计事件和 Artifact Viewer zip 包模式已落地；下一步从 TASK-026 Upload Mount 上下文兜底开始。
+- TASK-025 已完成：zip Delivery preview/apply/download API、deterministic zip sha256、manifest/report、下载权限隔离、过期清理、`delivery.zip.*` 审计事件和 Artifact Viewer zip 包模式已落地。
+- TASK-026 已完成：Upload Mount multipart 上传 API、manifest 范围读取、Bridge/Chat 上下文读取、路径/数量/大小/扩展名限制、`upload_mount.*` 审计、Project 创建向导上传模式和 ContextPicker upload 文件源已落地。
 
 ---
 
