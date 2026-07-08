@@ -15,6 +15,7 @@ from .base import Base, TimestampMixin
 if TYPE_CHECKING:
 
     from .api_key import APIKey
+    from .project import Project
     from .task import Task
 
 
@@ -46,6 +47,7 @@ class User(Base, TimestampMixin):
         foreign_keys="[Task.user_id]",
     )
     api_keys: Mapped[list[APIKey]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    projects: Mapped[list[Project]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User id={self.id} username={self.username}>"

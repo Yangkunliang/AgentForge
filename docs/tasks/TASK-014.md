@@ -6,6 +6,8 @@
 **关联 Epic**：EPIC-CORE-DEV-WORKFLOW
 **依赖**：TASK-013
 
+**依赖状态**：TASK-013 已完成，Project / Mount / Artifact 后端模型、迁移和 API 可用于前端接入。
+
 ## 目标
 
 将 `/projects`、`/projects/create`、`ProjectBar` 从静态 mock 改为真实 Project API 数据，让用户能创建、查看、切换项目。

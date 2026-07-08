@@ -12,12 +12,12 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
 |------|------|----------|----------|
-| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 仅前端 mock | TASK-013、TASK-014 |
-| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | 仅前端 mock | TASK-013、TASK-018 |
-| Session | 归属于 Project 的一次对话或开发任务上下文 | 已有会话，但未关联 Project | TASK-013 |
+| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型与 API 已实现 | TASK-014 接真实前端 |
+| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | 后端占位模型与 API 已实现 | TASK-018 接真实 Bridge |
+| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、默认项目兼容 | TASK-015 接 PipelineRun |
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 尚无运行时实体 | TASK-015 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 仅前端展示 | TASK-015、TASK-017 |
-| Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | 尚无实体 | TASK-013、TASK-016 |
+| Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | 后端基础模型与 CRUD API 已实现 | TASK-016 接查看与复用 |
 | Delivery | 将产物写回本地项目、生成 diff 或 PR | 尚无闭环 | TASK-019 |
 
 ## 2. 用户路径
@@ -75,4 +75,4 @@ TASK-012 路线图和状态纠偏
 -> 查看产物 -> 将结果交付到本地或导出
 ```
 
-只要 Project、PipelineRun、Artifact 或确认机制仍是 mock，就不能把核心开发闭环标记为完成。
+只要 PipelineRun、StageState、确认机制或 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。

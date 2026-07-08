@@ -9,8 +9,8 @@
 
 ## 技术设计文档 (docs/tech-design/)
 - [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
-- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
-- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体（9张表）、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
+- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、Artifact、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
+- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、Project/Mount/Artifact 核心闭环表、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
 - [SECURITY.md](docs/tech-design/SECURITY.md) — 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测 + tool_call 分级）、Skill 沙箱分级、审计日志
 - [SANDBOX-RESEARCH.md](docs/tech-design/SANDBOX-RESEARCH.md) — 沙箱机制技术调研报告（方案一 Docker vs 方案二 CubeSandbox，含对比表格与选型依据）
 - [INTEGRATION-CUBESANDBOX.md](docs/tech-design/INTEGRATION-CUBESANDBOX.md) — CubeSandbox 集成详细设计（抽象层、E2B SDK / REST API 两种对接路径、API 设计、分级策略、实施计划）
@@ -27,7 +27,7 @@
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-019 后续路线图
 - [TASK-012.md](docs/tasks/TASK-012.md) — 核心功能路线图与任务重排，已完成
-- [TASK-013.md](docs/tasks/TASK-013.md) — Project / Mount / Artifact 数据底座，todo
+- [TASK-013.md](docs/tasks/TASK-013.md) — Project / Mount / Artifact 数据底座，已完成
 - [TASK-014.md](docs/tasks/TASK-014.md) — 项目管理页接真实数据，todo
 - [TASK-015.md](docs/tasks/TASK-015.md) — PipelineRun / StageState 阶段状态机，todo
 - [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，todo

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent_forge.api.execution_steps import ExecutionStepCollector
 from agent_forge.api.sse import emit_task_started, get_sse_manager
 from agent_forge.database import get_async_session
-from agent_forge.models import Task, TaskStatus, User
+from agent_forge.models import Project, Task, TaskStatus, User
 from agent_forge.models.session import Message, Session
 from agent_forge.models.user_agent_settings import UserAgentSettings
 from agent_forge.tracing import get_trace_id, get_tracer
@@ -28,7 +28,10 @@ logger = logging.getLogger("agent_forge")
 
 class SessionResponse(BaseModel):
     id: str
+    project_id: str | None
     title: str
+    intent_type: str | None = None
+    current_pipeline_run_id: str | None = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
@@ -93,7 +96,13 @@ async def create_session(
     db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user),
 ) -> Session:
-    session = Session(id=str(uuid.uuid4()), user_id=current_user.id, title="新对话")
+    project = await _get_or_create_default_project(db, current_user.id)
+    session = Session(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        project_id=project.id,
+        title="新对话",
+    )
     db.add(session)
     await db.commit()
     await db.refresh(session)
@@ -241,6 +250,31 @@ async def _get_session_or_404(db: AsyncSession, session_id: str, user_id: str) -
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+async def _get_or_create_default_project(db: AsyncSession, user_id: str) -> Project:
+    result = await db.execute(
+        select(Project).where(
+            Project.user_id == user_id,
+            Project.name == "默认项目",
+            Project.status == "active",
+        )
+    )
+    project = result.scalar_one_or_none()
+    if project:
+        return project
+
+    project = Project(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="默认项目",
+        description="兼容旧会话入口自动创建的默认项目",
+        tech_tags=[],
+        status="active",
+    )
+    db.add(project)
+    await db.flush()
+    return project
 
 
 def _build_advanced_context(body: ChatRequest) -> dict:

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base, JSON_VARIANT, TimestampMixin
 
 if TYPE_CHECKING:
-    pass
+    from .project import Artifact, Project
 
 
 class Session(Base, TimestampMixin):
@@ -33,16 +33,25 @@ class Session(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(50), primary_key=True)  # 主键,固定 50 字符
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)  # 所属用户 ID
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )  # 所属项目 ID,旧会话允许为空
 
     title: Mapped[str] = mapped_column(String(100), default="新对话")  # 会话标题
+    intent_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    current_pipeline_run_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Relationships
     user = relationship("User")
+    project: Mapped[Project | None] = relationship("Project", back_populates="sessions")
     messages: Mapped[list[Message]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="Message.created_at",
     )
+    artifacts: Mapped[list[Artifact]] = relationship(back_populates="session")
 
     def __repr__(self) -> str:
         return f"<Session id={self.id} title={self.title!r}>"

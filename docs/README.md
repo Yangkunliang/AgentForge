@@ -37,8 +37,8 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 | ✅ |
-| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
-| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体（9 张表）+ 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
+| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、Artifact、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
+| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
 | [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
 | [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
 | [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
@@ -87,6 +87,7 @@ docs/
 | TASK-009 | 2026-07-07 | SSE 执行过程可视化联调验证 | ✅ 已完成 |
 | TASK-011 | 2026-07-07 | 高级设置面板真实透传 + 技术风险修正 | ✅ 已实现，验证中 |
 | TASK-012 | 2026-07-08 | 核心开发闭环路线图与任务重排 | ✅ 已完成 |
+| TASK-013 | 2026-07-08 | Project / Mount / Artifact 数据底座 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -127,6 +128,10 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-08-core-dev-workflow/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-08-core-dev-workflow/ITERATION-REVIEW.md)
 - **核心功能**：定义 Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery 闭环，并拆出 TASK-013～TASK-019，避免 Project、Pipeline、Artifact、Bridge 和 Delivery 分散推进
+
+### TASK-013 详细信息
+- **核心功能**：Project、ProjectMount、Artifact SQLAlchemy 模型与 Alembic 迁移；Project/Mount/Artifact CRUD API；项目维度 Session API；旧 `/sessions` 默认项目兼容
+- **验证**：`uv run --extra dev pytest` 通过；FastAPI uvicorn 启动到 `AgentForge startup complete ✓`
 
 ## 版本号规范
 

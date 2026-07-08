@@ -33,6 +33,7 @@ async def test_engine(test_database_url: str):
     """测试用异步引擎（session 级别，一次创建）"""
     engine = create_async_engine(test_database_url, echo=False)
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     async with engine.begin() as conn:

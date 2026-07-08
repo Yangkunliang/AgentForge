@@ -123,6 +123,115 @@ Authorization: Bearer <token>
 
 ---
 
+## Project / Mount / Artifact API
+
+Project 是 AgentForge 面向终端全栈开发工程师的上下文容器。所有接口均按当前登录用户隔离，访问其他用户的 Project、Mount、Artifact 返回 404。
+
+### 创建项目
+
+```http
+POST /api/v1/projects
+Authorization: Bearer <token>
+
+{
+  "name": "我的电商后端",
+  "description": "FastAPI + Vue 3 电商项目",
+  "tech_tags": ["FastAPI", "Vue 3", "PostgreSQL"]
+}
+```
+
+**响应 201**:
+```json
+{
+  "id": "project-001",
+  "user_id": "user-001",
+  "name": "我的电商后端",
+  "display_name": "我的电商后端",
+  "description": "FastAPI + Vue 3 电商项目",
+  "tech_tags": ["FastAPI", "Vue 3", "PostgreSQL"],
+  "status": "active",
+  "created_at": "2026-07-08T10:00:00Z",
+  "updated_at": "2026-07-08T10:00:00Z"
+}
+```
+
+### 项目 CRUD
+
+```http
+GET    /api/v1/projects
+GET    /api/v1/projects/{project_id}
+PATCH  /api/v1/projects/{project_id}
+DELETE /api/v1/projects/{project_id}
+```
+
+`DELETE` 为软删除，将 `status` 置为 `archived`。
+
+### 项目会话
+
+```http
+POST /api/v1/projects/{project_id}/sessions
+GET  /api/v1/projects/{project_id}/sessions
+```
+
+创建请求：
+```json
+{
+  "title": "设计订单退款流程",
+  "intent_type": "new_feature"
+}
+```
+
+响应字段包含 `project_id`、`intent_type`、`current_pipeline_run_id`。旧入口 `POST /api/v1/sessions` 仍保留，但会自动创建或复用当前用户的“默认项目”。
+
+### ProjectMount
+
+```http
+GET    /api/v1/projects/{project_id}/mounts
+POST   /api/v1/projects/{project_id}/mounts
+PATCH  /api/v1/projects/{project_id}/mounts/{mount_id}
+DELETE /api/v1/projects/{project_id}/mounts/{mount_id}
+```
+
+创建请求：
+```json
+{
+  "mount_type": "local",
+  "display_name": "shop-api",
+  "locator": "/Users/me/work/shop-api",
+  "role": "primary",
+  "status": "pending",
+  "metadata": {}
+}
+```
+
+`mount_type` 取值：`local`、`github`、`upload`。TASK-013 只保存授权占位和连接状态，不读取本地文件；真实 Bridge 在 TASK-018 接入。
+
+### Artifact
+
+```http
+GET    /api/v1/projects/{project_id}/artifacts
+POST   /api/v1/projects/{project_id}/artifacts
+GET    /api/v1/artifacts/{artifact_id}
+PATCH  /api/v1/artifacts/{artifact_id}
+DELETE /api/v1/artifacts/{artifact_id}
+```
+
+创建请求：
+```json
+{
+  "session_id": "session-001",
+  "artifact_type": "prd",
+  "name": "PRODUCT-REQUIREMENTS.md",
+  "content": "# 退款流程优化",
+  "file_type": "markdown",
+  "metadata": { "stage": "requirements" }
+}
+```
+
+MVP 阶段 Artifact 正文保存在数据库 `content` 字段；对象存储、Artifact Viewer 和 use-as-context 在 TASK-016 继续完善。
+
+---
+
 ## 3. 任务 API
 
 ### 3.1 创建任务

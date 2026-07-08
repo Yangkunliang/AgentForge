@@ -104,10 +104,69 @@
 | active | Boolean | 是否启用 |
 | created_at | DateTime | 创建时间 |
 
+### 1.10 项目 (Project)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| name | String | 用户自定义项目展示名称 |
+| description | Text | 项目说明 |
+| tech_tags | JSON | 技术栈标签，如 `["FastAPI", "Vue 3"]` |
+| status | String | active/archived |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+### 1.11 项目挂载 (ProjectMount)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| project_id | UUID | 外键 → Project(id) ON DELETE CASCADE |
+| mount_type | String | local/github/upload |
+| display_name | String | 挂载入口展示名称 |
+| locator | Text | 本地路径、GitHub URL 或 upload 标识 |
+| role | String | primary/reference/docs |
+| status | String | connected/disconnected/pending/error |
+| metadata | JSON | 附加信息，预留 Bridge、GitHub、上传文件元数据 |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
+### 1.12 会话扩展 (Session)
+`sessions` 表已从纯聊天会话扩展为项目内开发任务上下文。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| project_id | UUID | 外键 → Project(id) ON DELETE SET NULL；新会话应归属项目 |
+| intent_type | String | new_feature/iteration/ui_adjust/bug_fix |
+| current_pipeline_run_id | UUID | 当前 PipelineRun 预留字段，TASK-015 接入 |
+
+历史无 `project_id` 的会话由 `0010` 迁移为每个用户创建“默认项目”并回填。
+
+### 1.13 产物 (Artifact)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| project_id | UUID | 外键 → Project(id) ON DELETE CASCADE |
+| session_id | UUID | 外键 → Session(id) ON DELETE SET NULL |
+| pipeline_run_id | UUID | PipelineRun 预留字段 |
+| stage_state_id | UUID | StageState 预留字段 |
+| artifact_type | String | prd/architecture/api_spec/code/test/report/diff 等 |
+| name | String | 产物名称 |
+| content | Text | MVP 阶段直接存储正文内容 |
+| file_type | String | markdown/json/text/diff 等 |
+| source_message_id | UUID | 外键 → chat_messages(id) ON DELETE SET NULL |
+| metadata | JSON | 阶段、来源、上下文等附加信息 |
+| created_at | DateTime | 创建时间 |
+| updated_at | DateTime | 更新时间 |
+
 ## 2. 关系图
 
 ```
 User 1───n Task
+User 1───n Project
+Project 1───n ProjectMount
+Project 1───n Session
+Project 1───n Artifact
+Session 1───n Artifact
 Task 1───n SubTask
 Task 1───n TaskExecution
 Task 1───n Conversation
@@ -145,6 +204,15 @@ CREATE INDEX idx_conversation_from ON Conversation(from_agent);
 
 -- API Key
 CREATE INDEX idx_apikey_user_id ON APIKey(user_id);
+
+-- 核心开发闭环
+CREATE INDEX ix_projects_user_id ON projects(user_id);
+CREATE INDEX ix_projects_status ON projects(status);
+CREATE INDEX ix_project_mounts_project_id ON project_mounts(project_id);
+CREATE INDEX ix_sessions_project_id ON sessions(project_id);
+CREATE INDEX ix_artifacts_project_id ON artifacts(project_id);
+CREATE INDEX ix_artifacts_session_id ON artifacts(session_id);
+CREATE INDEX ix_artifacts_pipeline_run_id ON artifacts(pipeline_run_id);
 ```
 
 ## 5. 记忆系统表

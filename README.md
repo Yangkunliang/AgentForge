@@ -6,7 +6,7 @@
 
 **当前落地场景**：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态**：Phase 1 — 记忆系统已实现；核心开发闭环已完成路线图拆分。详见 [docs/tasks/CHECKLIST.md](docs/tasks/CHECKLIST.md) 和 [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md)。
+**当前状态**：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现。详见 [docs/tasks/CHECKLIST.md](docs/tasks/CHECKLIST.md) 和 [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md)。
 
 ---
 

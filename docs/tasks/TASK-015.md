@@ -6,6 +6,8 @@
 **关联 Epic**：EPIC-CORE-DEV-WORKFLOW
 **依赖**：TASK-013
 
+**依赖状态**：TASK-013 已完成，Session 已具备 `project_id`、`intent_type`、`current_pipeline_run_id` 字段，可继续接 PipelineRun / StageState。
+
 ## 目标
 
 让需求类型 intent 生成真实的 PipelineRun 和 StageState，使阶段预览从 UI 装饰变成可持久化、可恢复、可推进的运行时状态。

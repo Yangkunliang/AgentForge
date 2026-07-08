@@ -10,7 +10,7 @@
 
 > 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态：Phase 1 — 记忆系统已实现；核心开发闭环已完成路线图拆分。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
+**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
 
 ---
 
@@ -69,8 +69,8 @@
 | 路径 | 一句话说明 |
 |------|-----------|
 | `docs/tech-design/ARCHITECTURE.md` | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 |
-| `docs/tech-design/API-SPEC.md` | 完整 API 规范（认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） |
-| `docs/tech-design/DATABASE.md` | 数据库实体（9 张表）+ 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
+| `docs/tech-design/API-SPEC.md` | 完整 API 规范（Project、Mount、Artifact、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） |
+| `docs/tech-design/DATABASE.md` | 数据库实体、Project/Mount/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
 | `docs/tech-design/SECURITY.md` | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 |
 | `docs/tech-design/LLM-CONFIG.md` | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 |
 | `docs/tech-design/FRONTEND-ARCHITECTURE.md` | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） |
@@ -102,7 +102,7 @@
 | `src/agent_forge/agents/base.py` | Agent 基类 + CodeWriterAgent/AnalysisAgent/SearchAgent + create_agent |
 | `src/agent_forge/agents/coder.py` | CoderAgent |
 | `src/agent_forge/memory/` | 4 层记忆实现 |
-| `src/agent_forge/models/` | SQLAlchemy 数据模型（22 张表） |
+| `src/agent_forge/models/` | SQLAlchemy 数据模型（含 Project、ProjectMount、Artifact 核心闭环表） |
 | `src/agent_forge/tracing.py` | 分布式 tracing（span 装饰器 + 结构化 JSON 日志） |
 | `api/main.py` | FastAPI 入口 |
 | `api/api.py` | 路由注册 |
@@ -122,7 +122,7 @@
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
-**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-012 已完成路线图和任务拆分；后续从 TASK-013 的 Project / Mount / Artifact 数据底座开始逐步实现。
+**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；后续从 TASK-014 前端接真实数据、TASK-015 阶段状态机继续推进。
 
 ### 计划技术栈
 
