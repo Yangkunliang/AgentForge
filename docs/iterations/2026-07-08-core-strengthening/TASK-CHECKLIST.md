@@ -17,7 +17,7 @@
 |----------|----------|
 | CDW-08：写回必须可审计、可解释、可恢复 | TASK-020 |
 | CDW-09：核心工作流下一步动作必须可见 | TASK-021 |
-| CDW-10：交付方式覆盖本地、远程和兜底上传 | TASK-022 |
+| CDW-10：交付方式覆盖本地、远程和兜底上传 | TASK-022、TASK-023、TASK-024、TASK-025、TASK-026 |
 
 ## 任务索引
 
@@ -25,7 +25,11 @@
 |------|------|--------|------|------|
 | done | TASK-020：服务端可信交付巩固 | P0 | preview/apply 一致性、失败落库、审计日志和启动/迁移验证 | TASK-019 |
 | done | TASK-021：核心交互设计复盘与关键入口优化 | P1 | Project/Chat/Stage/Artifact/Delivery 下一步动作可见 | TASK-020 |
-| todo | TASK-022：交付能力扩展设计与实现 | P2 | GitHub PR、zip、upload 等交付扩展设计与拆分 | TASK-021 |
+| done | TASK-022：交付能力扩展设计与实现 | P2 | GitHub PR、zip、upload 等交付扩展设计与拆分 | TASK-021 |
+| todo | TASK-023：GitHub OAuth Mount 授权底座 | P1 | 用户主动授权 GitHub repo，token 服务端加密存储 | TASK-022 |
+| todo | TASK-024：GitHub PR Delivery | P1 | branch、commit、PR、base ref 校验、失败报告和审计 | TASK-023 |
+| todo | TASK-025：zip Delivery Package | P2 | 生成可下载 zip、manifest、sha256 和 Delivery report | TASK-022 |
+| todo | TASK-026：Upload Mount 上下文兜底 | P2 | 上传文件 manifest、授权读取、ContextPicker 接入 | TASK-022 |
 
 ## 依赖图
 
@@ -34,10 +38,14 @@ TASK-019
   -> TASK-020
     -> TASK-021
       -> TASK-022
+        -> TASK-023
+          -> TASK-024
+        -> TASK-025
+        -> TASK-026
 ```
 
 ## 防遗忘机制
 
 - TASK-020 已完成；合并 main 后立即开启 TASK-021。
-- TASK-021 已完成；合并 main 后立即开启 TASK-022。
-- 如果 TASK-022 设计后拆出更多实现任务，必须继续写入 `docs/tasks/CHECKLIST.md` 和独立 `TASK-NNN.md`。
+- TASK-021 已完成。
+- TASK-022 已完成并拆出 TASK-023～TASK-026；合并 main 后立即开启 TASK-023。

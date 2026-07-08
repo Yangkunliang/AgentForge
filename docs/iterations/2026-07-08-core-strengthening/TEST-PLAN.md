@@ -29,10 +29,11 @@
 
 | 验收项 | 自动化验证 |
 |--------|------------|
-| GitHub OAuth Mount 权限边界 | 后端 API 测试 |
-| GitHub PR Delivery 不绕过确认 | 后端 API 测试 + E2E |
-| zip 交付包可下载且内容正确 | 后端 API 测试 |
-| upload Mount 不访问本地路径 | 后端 API 测试 |
+| GitHub OAuth Mount 权限边界 | TASK-023 后端 API 测试 |
+| GitHub PR Delivery 不绕过确认 | TASK-024 后端 API 测试 + E2E |
+| zip 交付包可下载且内容正确 | TASK-025 后端 API 测试 |
+| upload Mount 不访问本地路径 | TASK-026 后端 API 测试 |
+| 扩展设计与任务拆分完整 | `git diff --check` + 文档路径检查 |
 
 ## 非目标
 

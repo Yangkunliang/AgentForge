@@ -1,8 +1,8 @@
 # 核心能力增强迭代复盘
 
 **日期**：2026-07-08
-**当前完成任务**：TASK-020、TASK-021
-**结论**：服务端可信交付巩固与核心交互入口优化已完成，下一步进入 TASK-022 交付能力扩展。
+**当前完成任务**：TASK-020、TASK-021、TASK-022
+**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计已完成，下一步进入 TASK-023 GitHub OAuth Mount 授权底座。
 
 ## 完成内容
 
@@ -24,6 +24,14 @@
 - ConfirmCard 增加“查看产物并交付”入口；ArtifactCard 增加交付状态标签。
 - 新增 `UI-REVIEW.md` 记录 UI/UX 复盘、设计约束和剩余风险。
 
+### TASK-022
+
+- GitHub OAuth Mount 设计明确：OAuth state 绑定用户/Project、token 服务端加密存储、ProjectMount metadata 不放敏感凭证。
+- GitHub PR Delivery 设计明确：preview/apply 两段式、`expected_base_sha` 二次校验、branch/commit/PR 阶段化失败报告和审计事件。
+- zip Delivery 设计明确：zip 包含 `manifest.json`、`delivery-report.md`、`files/`，路径必须是安全相对路径。
+- Upload Mount 设计明确：只读取用户主动上传 manifest 内文件，不访问本地路径，也不作为写回目标。
+- 拆出 TASK-023～TASK-026，分别覆盖 GitHub OAuth Mount、GitHub PR Delivery、zip Delivery Package、Upload Mount。
+
 ## 发现并修正的风险
 
 | 风险 | 修正 |
@@ -33,6 +41,8 @@
 | 默认启动预热 5 个 E2B 云沙箱，增加本地成本和外部依赖 | 新增 `SANDBOX_POOL_PREWARM_ENABLED=false` 默认跳过预热 |
 | Project、Stage、Artifact 数据分散，用户需要自行推断下一步 | Project next-action、Stage 摘要、ConfirmCard 交付入口和 Artifact 交付状态显性化 |
 | Chat 空状态偏泛用 AI 助手，和全栈开发闭环不够贴合 | 改为当前项目工作台入口，快捷动作对齐需求类型路由 |
+| 远程交付、zip、upload 容易混成一个大任务 | TASK-022 只做边界设计，并拆成 TASK-023～TASK-026 独立验收 |
+| OAuth token 容易被误放进 Mount metadata 或前端响应 | 设计单独加密凭证引用，metadata 只保存非敏感 repo 信息 |
 
 ## 验证结果
 
@@ -43,7 +53,11 @@
 - `DATABASE_URL=postgresql+asyncpg://agent:agent@localhost:15432/agentforge uv run --extra dev alembic -c migrations/alembic.ini upgrade head`：通过，使用临时 `pgvector/pgvector:pg15` 容器
 - `PYTHONPATH=/Users/yangkl/AgentForge/src uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18085`：启动到 `AgentForge startup complete ✓`，日志显示 `SandboxPool warmup skipped`
 - `npm run test:e2e -- projects.spec.ts human-confirmation.spec.ts pipeline-stage-state.spec.ts --project=chromium`：7 passed
+- `git diff --check`：TASK-022 文档变更通过
 
 ## 下一步
 
-- TASK-022：在本地可信交付稳定后，设计 GitHub PR、zip、upload 等交付扩展。
+- TASK-023：实现 GitHub OAuth Mount 授权底座。
+- TASK-024：在 TASK-023 之后实现 GitHub PR Delivery。
+- TASK-025：实现 zip Delivery Package。
+- TASK-026：实现 Upload Mount 上下文兜底。

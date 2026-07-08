@@ -41,7 +41,7 @@ PRODUCT-REQUIREMENTS / PRD
 | CDW-07 | 结果能回到项目，形成 diff、写回或导出交付物 | [TASK-012](TASK-012.md)、[TASK-019](TASK-019.md) |
 | CDW-08 | 写回用户项目必须可审计、可解释、可恢复 | [TASK-020](TASK-020.md) |
 | CDW-09 | 核心工作流下一步动作必须可见 | [TASK-021](TASK-021.md) |
-| CDW-10 | 交付方式覆盖本地、远程和兜底上传 | [TASK-022](TASK-022.md) |
+| CDW-10 | 交付方式覆盖本地、远程和兜底上传 | [TASK-022](TASK-022.md)、[TASK-023](TASK-023.md)、[TASK-024](TASK-024.md)、[TASK-025](TASK-025.md)、[TASK-026](TASK-026.md) |
 
 ## 任务列表
 
@@ -67,7 +67,11 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-019：写回与交付闭环](TASK-019.md) | P2 | CDW-07 | TASK-016、TASK-018 | Artifact 可预览 diff、确认写回授权 Mount、生成并导出 Delivery report |
 | [x] | [TASK-020：服务端可信交付巩固](TASK-020.md) | P0 | CDW-08、CDW-07 | TASK-019 | preview/apply 一致性、失败落库、审计日志、迁移与启动验证 |
 | [x] | [TASK-021：核心交互设计复盘与关键入口优化](TASK-021.md) | P1 | CDW-09、CDW-01、CDW-04、CDW-05 | TASK-020 | Project/Chat/Stage/Artifact/Delivery 下一步动作可见 |
-| [ ] | [TASK-022：交付能力扩展设计与实现](TASK-022.md) | P2 | CDW-10、CDW-02、CDW-07 | TASK-021 | GitHub PR、zip、upload 等交付扩展设计与拆分 |
+| [x] | [TASK-022：交付能力扩展设计与实现](TASK-022.md) | P2 | CDW-10、CDW-02、CDW-07 | TASK-021 | GitHub PR、zip、upload 等交付扩展设计与拆分 |
+| [ ] | [TASK-023：GitHub OAuth Mount 授权底座](TASK-023.md) | P1 | CDW-02、CDW-10 | TASK-022 | 用户主动授权 GitHub repo，token 服务端加密存储 |
+| [ ] | [TASK-024：GitHub PR Delivery](TASK-024.md) | P1 | CDW-07、CDW-08、CDW-10 | TASK-023 | branch、commit、PR、base ref 校验、失败报告和审计 |
+| [ ] | [TASK-025：zip Delivery Package](TASK-025.md) | P2 | CDW-07、CDW-10 | TASK-022 | zip manifest、sha256、下载权限和过期清理 |
+| [ ] | [TASK-026：Upload Mount 上下文兜底](TASK-026.md) | P2 | CDW-02、CDW-06、CDW-10 | TASK-022 | upload manifest 范围读取、路径安全、ContextPicker 接入 |
 
 ## 执行顺序
 
@@ -93,6 +97,10 @@ TASK-001
                   -> TASK-020
                     -> TASK-021
                       -> TASK-022
+                        -> TASK-023
+                          -> TASK-024
+                        -> TASK-025
+                        -> TASK-026
 ```
 
 前端任务 `TASK-005` 可以在 API 合同稳定后提前进行 UI 设计，但正式联调依赖后端核心 API 和 SSE 事件格式稳定。

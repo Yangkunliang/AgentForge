@@ -91,12 +91,170 @@ UI 复盘只解决核心工作流入口，不做视觉重写。重点对象：
 
 ## 4. TASK-022 交付扩展
 
-GitHub / zip / upload 交付都必须遵守 Mount 主动授权原则：
+GitHub / zip / upload 交付都必须遵守 Mount 主动授权原则。TASK-022 不直接实现写远程仓库，而是定义后续实现任务边界。
 
-- GitHub Mount 只能访问用户 OAuth 授权的 repo。
-- GitHub PR Delivery 必须先生成 diff，再由用户确认创建 branch/commit/PR。
-- zip Delivery 不写用户目录，只导出可下载交付包。
-- upload Mount 仅用于用户主动上传的文件集合，不推断本地路径。
+### 4.1 GitHub OAuth Mount
+
+GitHub Mount 是 ProjectMount 的远程仓库授权形态：
+
+```text
+Project
+  -> ProjectMount(mount_type=github, role=primary/reference)
+    -> CredentialRef(encrypted OAuth token, server-only)
+```
+
+边界：
+
+- `ProjectMount.metadata` 只保存非敏感信息：`repo_owner`、`repo_name`、`repo_full_name`、`default_branch`、`html_url`、`permission_summary`、`credential_id`。
+- OAuth access token 必须进入服务端加密凭证表，前端响应、审计日志、Delivery report 都不得包含 token。
+- OAuth `state` 必须绑定当前用户、Project、过期时间和 CSRF nonce。
+- 授权完成后只创建用户显式选择的 repo Mount，不自动扫描组织或全部仓库。
+- 如果 OAuth scope 难以做到单 repo 最小权限，产品上必须展示权限摘要；后续可切 GitHub App installation 获取更细粒度授权。
+
+建议 API：
+
+```text
+POST /api/v1/projects/{project_id}/mounts/github/oauth/start
+GET  /api/v1/projects/{project_id}/mounts/github/oauth/callback
+POST /api/v1/projects/{project_id}/mounts/github
+DELETE /api/v1/projects/{project_id}/mounts/{mount_id}
+```
+
+审计事件：
+
+```text
+github_mount.oauth.started
+github_mount.oauth.succeeded
+github_mount.oauth.failed
+github_mount.revoked
+```
+
+### 4.2 GitHub PR Delivery
+
+PR Delivery 复用 Delivery 的 preview/apply 两段式确认，但目标不是本地文件，而是 GitHub remote ref：
+
+```text
+Artifact -> GitHubDelivery.preview -> user confirm -> GitHubDelivery.apply
+  -> create branch -> create/update files -> create commit -> create PR
+```
+
+preview 输入：
+
+```text
+artifact_id
+mount_id
+base_branch
+target_branch
+files[]
+pr_title
+pr_body
+```
+
+preview 输出：
+
+```text
+base_ref
+target_branch
+files[]
+unified_diff
+commit_message
+pr_title
+pr_body
+expected_base_sha
+```
+
+apply 必须带 `expected_base_sha`。如果 base branch 当前 sha 与 preview 时不同，返回 409，保存失败报告，不创建 commit。
+
+branch 命名建议：
+
+```text
+agentforge/<project-slug>/<artifact-short-id>
+```
+
+失败处理：
+
+| 阶段 | 失败处理 |
+|------|----------|
+| base ref 变化 | 拒绝 apply，`delivery_status=failed`，提示重新 preview |
+| branch 创建失败 | 不写 commit，保存 GitHub 错误摘要 |
+| commit 创建失败 | 若 branch 是本次新建且未被 PR 引用，可尝试删除 branch |
+| PR 创建失败 | 保留 branch/commit，report 给出 commit sha 和手动建 PR 指引 |
+
+审计事件：
+
+```text
+delivery.github_pr.preview.succeeded
+delivery.github_pr.apply.denied
+delivery.github_pr.branch.created
+delivery.github_pr.commit.created
+delivery.github_pr.pr.created
+delivery.github_pr.conflict
+delivery.github_pr.failed
+```
+
+### 4.3 zip Delivery Package
+
+zip Delivery 是不写用户目录、不调用远程 API 的交付兜底：
+
+```text
+Artifact -> ZipDelivery.preview -> ZipDelivery.apply -> downloadable package
+```
+
+zip 包必须包含：
+
+```text
+manifest.json
+delivery-report.md
+files/<relative paths>
+```
+
+路径规则：
+
+- 包内路径必须是相对路径。
+- 禁止绝对路径、空路径、`..`、控制字符和重复路径。
+- `manifest.json` 记录 artifact、project、file_count、bytes、sha256。
+
+状态：
+
+- preview：只计算包结构和 sha256，不落下载文件。
+- apply：生成 zip，保存下载引用、sha256、过期时间和 report。
+- failed：写入失败报告，删除未完成临时文件。
+
+### 4.4 Upload Mount
+
+Upload Mount 是上下文读取兜底，不是写回目标：
+
+```text
+ProjectMount(mount_type=upload)
+  -> uploaded file manifest
+  -> Bridge list/read by manifest only
+```
+
+约束：
+
+- 用户必须主动上传文件；平台不读取本地路径。
+- `locator` 可以是服务端内部 upload collection id，不是用户机器路径。
+- Bridge 读取必须限定在 manifest 中的相对路径。
+- 单文件大小、总大小、文件数量、允许扩展名必须可配置。
+- 删除 Upload Mount 时同步清理文件或标记过期。
+
+审计事件：
+
+```text
+upload_mount.file.uploaded
+upload_mount.file.read
+upload_mount.deleted
+upload_mount.failed
+```
+
+### 4.5 后续任务拆分
+
+| 任务 | 范围 | 依赖 | 验收 |
+|------|------|------|------|
+| TASK-023 | GitHub OAuth Mount 授权底座 | TASK-022 | token 不下发前端，Mount 由用户显式授权创建 |
+| TASK-024 | GitHub PR Delivery | TASK-023 | preview/apply、base sha 校验、PR URL、审计日志 |
+| TASK-025 | zip Delivery Package | TASK-022 | zip manifest、sha256、下载权限和过期清理 |
+| TASK-026 | Upload Mount 上下文兜底 | TASK-022 | manifest 范围读取、路径安全、上下文选择器接入 |
 
 ## 5. 验证策略
 

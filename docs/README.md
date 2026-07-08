@@ -61,7 +61,7 @@ docs/
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-022 路线图 | ✅ |
+| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-026 路线图 | ✅ |
 
 ## 迭代链条
 
@@ -96,7 +96,11 @@ docs/
 | TASK-019 | 2026-07-08 | 写回与交付闭环 | ✅ 已完成 |
 | TASK-020 | 2026-07-08 | 服务端可信交付巩固 | ✅ 已完成 |
 | TASK-021 | 2026-07-08 | 核心交互设计复盘与关键入口优化 | ✅ 已完成 |
-| TASK-022 | 2026-07-08 | 交付能力扩展设计与实现 | ⏳ 待开始 |
+| TASK-022 | 2026-07-08 | 交付能力扩展设计与实现 | ✅ 已完成 |
+| TASK-023 | 2026-07-08 | GitHub OAuth Mount 授权底座 | ⏳ 待开始 |
+| TASK-024 | 2026-07-08 | GitHub PR Delivery | ⏳ 待开始 |
+| TASK-025 | 2026-07-08 | zip Delivery Package | ⏳ 待开始 |
+| TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ⏳ 待开始 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -166,7 +170,7 @@ docs/
 - **核心功能**：`DeliveryService`；Artifact delivery 状态字段；Artifact Viewer 交付面板；unified diff 预览；`confirm_write` 后写回 connected local Mount；写前 `.agentforge.bak` 备份；Delivery report 保存和 Markdown 导出
 - **验证**：`uv run --extra dev pytest tests/api/test_delivery.py` 通过；`npm run test:e2e -- artifact-viewer.spec.ts` 通过
 
-### TASK-020～TASK-022 详细信息
+### TASK-020～TASK-026 详细信息
 - **目录**：`docs/iterations/2026-07-08-core-strengthening/`
 - **产物**：
   - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-08-core-strengthening/PRODUCT-REQUIREMENTS.md)
@@ -175,7 +179,7 @@ docs/
   - [UI-REVIEW.md](iterations/2026-07-08-core-strengthening/UI-REVIEW.md)
   - [TEST-PLAN.md](iterations/2026-07-08-core-strengthening/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md)
-- **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再让 Project、Chat、Stage、Artifact 的下一步动作可见；最后设计 GitHub PR、zip、upload 等交付扩展。
+- **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再让 Project、Chat、Stage、Artifact 的下一步动作可见；最后设计 GitHub PR、zip、upload 等交付扩展，并拆出 TASK-023～TASK-026。
 
 ## 版本号规范
 

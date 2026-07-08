@@ -13,12 +13,12 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | 概念 | 定义 | 当前状态 | 后续任务 |
 |------|------|----------|----------|
 | Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API、前端真实数据流、项目产物列表与 Bridge 状态已实现 | 已接 Delivery |
-| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | connected local Mount 已支持授权 root 内目录列表、只读文件读取和确认写回 | 后续扩展 GitHub / upload |
+| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | connected local Mount 已支持授权 root 内目录列表、只读文件读取和确认写回；TASK-022 已完成 GitHub / upload 授权边界设计 | TASK-023 扩展 GitHub OAuth Mount，TASK-026 扩展 Upload Mount |
 | Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片和授权文件上下文 | 可继续增强多阶段自动推进 |
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | 可继续增强 Delivery 自动编排 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
-| Delivery | 将产物写回本地项目、生成 diff 或交付报告 | 已支持 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；TASK-020 起巩固 preview/apply 一致性、失败落库和审计 | 后续扩展 PR / zip / upload |
+| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；TASK-020 已巩固一致性、失败落库和审计；TASK-022 已完成 GitHub PR / zip / upload 扩展设计 | TASK-024 扩展 GitHub PR Delivery，TASK-025 扩展 zip Delivery |
 
 ## 2. 用户路径
 
@@ -44,8 +44,9 @@ MVP 用户路径按以下顺序落地：
 - Artifact 是平台产物，不应该只散落在聊天消息里。
 - 人工确认是流程节点，不是普通按钮。
 - Bridge 读取必须始终受 Mount 授权范围约束；Delivery 仍需复用 Mount 边界。
-- Delivery 预览和写入之间必须保持可验证的一致性；若目标文件已变化，默认拒绝写入并生成失败报告。
-- 写回用户项目的成功、拒绝、冲突和失败都必须进入审计日志，且审计 details 不记录 Artifact 内容和敏感凭证。
+- Delivery 预览和写入之间必须保持可验证的一致性；若本地目标文件或远程 base ref 已变化，默认拒绝写入并生成失败报告。
+- 写回用户项目、创建远程 PR、导出 zip 的成功、拒绝、冲突和失败都必须进入审计日志，且审计 details 不记录 Artifact 内容、OAuth token 或上传文件正文。
+- Upload Mount 只代表用户主动上传的文件集合，不得反推或访问用户本地路径，也不得作为写回目标。
 
 ## 4. 分阶段落地
 
@@ -60,7 +61,11 @@ TASK-012 路线图和状态纠偏
             -> TASK-019 写回与交付闭环
               -> TASK-020 服务端可信交付巩固
                 -> TASK-021 核心交互设计复盘
-                  -> TASK-022 交付能力扩展
+                  -> TASK-022 交付能力扩展设计
+                    -> TASK-023 GitHub OAuth Mount
+                      -> TASK-024 GitHub PR Delivery
+                    -> TASK-025 zip Delivery Package
+                    -> TASK-026 Upload Mount
 ```
 
 ## 5. MVP 非目标
@@ -70,7 +75,7 @@ TASK-012 路线图和状态纠偏
 - 不在 TASK-013 中实现真实本地文件读取；TASK-018 已实现用户选中文件的只读读取。
 - 不要求 Agent 自动完成完整 8 步流水线；当前阶段状态机已支持运行态推进、产物归档与人工确认暂停。
 - 不把用户选择的文件路径当作已读取内容，真实读取必须经过 Mount/Bridge 授权。
-- 不在可信交付巩固前扩展远程 PR 写入，避免把本地写回风险复制到远程协作场景。
+- 不在 GitHub OAuth Mount 完成前扩展远程 PR 写入，避免绕过用户授权或泄露 token。
 
 ## 6. 完成定义
 

@@ -1,6 +1,6 @@
 # TASK-022：交付能力扩展设计与实现
 
-**状态**：todo
+**状态**：done
 **优先级**：P2
 **创建日期**：2026-07-08
 **关联 Epic**：EPIC-CORE-STRENGTHENING
@@ -18,17 +18,23 @@
 
 ## 技术子项
 
-- [ ] 设计 GitHub OAuth Mount 的授权、scope 和 token 存储边界
-- [ ] 设计 GitHub PR Delivery 流程：branch、commit、PR body、失败回滚
-- [ ] 设计 zip 交付包导出，支持多文件 Artifact 或目录结构
-- [ ] 设计 upload Mount，作为无法连接本地/GitHub 时的上下文兜底
-- [ ] 根据设计拆分后续可独立验收的实现任务
+- [x] 设计 GitHub OAuth Mount 的授权、scope 和 token 存储边界
+- [x] 设计 GitHub PR Delivery 流程：branch、commit、PR body、失败回滚
+- [x] 设计 zip 交付包导出，支持多文件 Artifact 或目录结构
+- [x] 设计 upload Mount，作为无法连接本地/GitHub 时的上下文兜底
+- [x] 根据设计拆分后续可独立验收的实现任务
 
 ## acceptance
 
-- [ ] 远程交付不绕过用户授权
-- [ ] PR/zip/upload 的数据流、API、失败状态和审计点清楚
-- [ ] 后续实现任务可以逐个完成、提交、合并，不依赖一次性大改
+- [x] 远程交付不绕过用户授权
+- [x] PR/zip/upload 的数据流、API、失败状态和审计点清楚
+- [x] 后续实现任务可以逐个完成、提交、合并，不依赖一次性大改
+
+## completion
+
+- 在 `docs/iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md` 补充 GitHub OAuth Mount、GitHub PR Delivery、zip Delivery、upload Mount 的详细边界。
+- 在 `docs/architecture/CORE-DEV-WORKFLOW.md` 同步远程/打包/上传交付的架构定位。
+- 拆出 TASK-023～TASK-026，避免 GitHub、zip、upload 在一个大任务里耦合推进。
 
 ## 不做
 

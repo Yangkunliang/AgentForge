@@ -22,10 +22,10 @@
 
 ## 架构蓝图 (docs/architecture/)
 - [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
-- [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery；增强阶段按 TASK-020 服务端可信交付、TASK-021 交互复盘、TASK-022 交付扩展推进
+- [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery；增强阶段按 TASK-020 服务端可信交付、TASK-021 交互复盘、TASK-022 交付扩展设计、TASK-023～TASK-026 实现推进
 
 ## 任务清单 (docs/tasks/)
-- [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-022 路线图
+- [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-026 路线图
 - [TASK-012.md](docs/tasks/TASK-012.md) — 核心功能路线图与任务重排，已完成
 - [TASK-013.md](docs/tasks/TASK-013.md) — Project / Mount / Artifact 数据底座，已完成
 - [TASK-014.md](docs/tasks/TASK-014.md) — 项目管理页接真实数据，已完成
@@ -36,7 +36,11 @@
 - [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，已完成
 - [TASK-020.md](docs/tasks/TASK-020.md) — 服务端可信交付巩固，已完成
 - [TASK-021.md](docs/tasks/TASK-021.md) — 核心交互设计复盘与关键入口优化，已完成
-- [TASK-022.md](docs/tasks/TASK-022.md) — 交付能力扩展设计与实现，待开始
+- [TASK-022.md](docs/tasks/TASK-022.md) — 交付能力扩展设计与实现，已完成
+- [TASK-023.md](docs/tasks/TASK-023.md) — GitHub OAuth Mount 授权底座，待开始
+- [TASK-024.md](docs/tasks/TASK-024.md) — GitHub PR Delivery，待开始
+- [TASK-025.md](docs/tasks/TASK-025.md) — zip Delivery Package，待开始
+- [TASK-026.md](docs/tasks/TASK-026.md) — Upload Mount 上下文兜底，待开始
 
 ## 迭代记录 (docs/iterations/)
 - [2026-06-17-architecture-design/](docs/iterations/2026-06-17-architecture-design/) — 架构设计迭代记录
@@ -64,13 +68,13 @@
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-08-core-dev-workflow/TECHNICAL-DESIGN.md) — ProjectService、SessionService、PipelineService、StageRuntime、ArtifactService、DeliveryService 设计边界
   - [TEST-PLAN.md](docs/iterations/2026-07-08-core-dev-workflow/TEST-PLAN.md) — 分阶段验收矩阵
   - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-dev-workflow/ITERATION-REVIEW.md) — TASK-012 决策和后续提醒
-- [2026-07-08-core-strengthening/](docs/iterations/2026-07-08-core-strengthening/) — TASK-020～TASK-022 核心能力增强排期
+- [2026-07-08-core-strengthening/](docs/iterations/2026-07-08-core-strengthening/) — TASK-020～TASK-026 核心能力增强排期
   - [PRODUCT-REQUIREMENTS.md](docs/iterations/2026-07-08-core-strengthening/PRODUCT-REQUIREMENTS.md) — 可信写回、下一步动作清楚、多交付方式
-  - [TASK-CHECKLIST.md](docs/iterations/2026-07-08-core-strengthening/TASK-CHECKLIST.md) — TASK-020～TASK-022 优先级、依赖和防遗忘机制
-  - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md) — Delivery fingerprint、一致性校验、失败报告、审计日志和扩展边界
+  - [TASK-CHECKLIST.md](docs/iterations/2026-07-08-core-strengthening/TASK-CHECKLIST.md) — TASK-020～TASK-026 优先级、依赖和防遗忘机制
+  - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md) — Delivery fingerprint、一致性校验、失败报告、审计日志、GitHub PR、zip、upload 扩展边界
   - [UI-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/UI-REVIEW.md) — TASK-021 核心交互入口复盘、设计约束和 E2E 验收覆盖
   - [TEST-PLAN.md](docs/iterations/2026-07-08-core-strengthening/TEST-PLAN.md) — 服务端、UI、交付扩展验证矩阵
-  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020～TASK-021 完成内容、风险修正和验证结果
+  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020～TASK-022 完成内容、风险修正和验证结果
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -84,7 +88,8 @@
 - TASK-018 已完成：新增 `agentforge mount <path>` CLI、Bridge 状态和文件列表/读取 API、授权 root 内路径校验、敏感文件拒绝、ContextPicker 挂载文件选择，以及 Chat `context_files[type=file].mount_id` 真实内容注入 SkillExecutionEngine。
 - TASK-019 已完成：新增 `agent_forge.delivery`、Artifact delivery 字段、diff preview、`confirm_write` 写回 connected local Mount、写前 `.agentforge.bak` 备份、Delivery report 和 Markdown 导出；Artifact Viewer 已接交付面板。
 - TASK-020 已完成：Delivery preview/apply 一致性校验、失败报告、`AuditLog.resource=artifact_delivery` 审计、默认不预热远程 E2B 沙箱。
-- TASK-021 已完成：Project 页按 Mount、PipelineRun、Artifact 聚合下一步动作；Chat 空状态展示当前项目和代码库连接状态；StagePreview 展示当前阶段摘要；ConfirmCard 增加“查看产物并交付”；ArtifactCard 展示交付状态；TASK-022 继续按交付扩展推进。
+- TASK-021 已完成：Project 页按 Mount、PipelineRun、Artifact 聚合下一步动作；Chat 空状态展示当前项目和代码库连接状态；StagePreview 展示当前阶段摘要；ConfirmCard 增加“查看产物并交付”；ArtifactCard 展示交付状态。
+- TASK-022 已完成：GitHub OAuth Mount、GitHub PR Delivery、zip Delivery、Upload Mount 的授权边界、数据流、失败状态和审计点已写入技术设计，并拆出 TASK-023～TASK-026；下一步从 TASK-023 开始。
 
 ---
 
