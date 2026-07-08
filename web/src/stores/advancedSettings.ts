@@ -48,6 +48,7 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
         type: file.type,
         value: file.value,
         label: file.label,
+        mount_id: file.mount_id,
       }))
     }
 
@@ -68,7 +69,7 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
     const value = file.value.trim()
     if (!value) return
     const exists = contextFiles.value.some(
-      (item) => item.type === file.type && item.value === value,
+      (item) => item.type === file.type && item.value === value && item.mount_id === file.mount_id,
     )
     if (exists) return
     contextFiles.value.push({

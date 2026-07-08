@@ -507,6 +507,18 @@ CORS_CONFIG = {
 - 解压后静态扫描：检查导入的模块是否在白名单内（详见 §5.7）
 - 安装到隔离目录：`/opt/agentforge/skills/`
 
+### 7.2 Agent Bridge 本地文件读取
+
+TASK-018 后，Agent Bridge 支持读取用户主动授权的 connected local Mount 文件。安全边界：
+
+- 授权根目录来自 ProjectMount 的 `metadata.root_path` 或 `locator`，平台不会自动扫描用户本机目录。
+- API 请求路径必须是相对路径；绝对路径和包含 `..` 的路径直接拒绝。
+- 解析后的真实路径必须仍位于授权 root 内，防止符号链接或路径拼接绕过。
+- `.env`、`.env.*`、私钥文件、`.pem`、`.key`、`.p12`、`.pfx` 等敏感文件拒绝读取。
+- 文件列表过滤 `.git`、`node_modules`、`.venv`、`dist`、`build`、缓存目录等高噪声或高风险目录。
+- 文件读取仅支持 UTF-8 文本，并按最大字节数截断，避免二进制内容或超大文件进入 LLM 上下文。
+- 只有属于当前登录用户当前 Project 的 connected local Mount 可以读取；其他用户 Project、非 local Mount 或 disconnected Mount 均拒绝。
+
 ---
 
 ## 8. Secrets 管理

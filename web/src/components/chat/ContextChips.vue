@@ -27,7 +27,7 @@ function contextTypeLabel(type: ContextFile['type']) {
       :key="chip.id"
       class="context-chip"
       :class="{ active: chip.active }"
-      :title="chip.active ? '点击停用' : '点击激活'"
+      :title="`${chip.label} · ${chip.active ? '点击停用' : '点击激活'}`"
       @click="advancedSettings.toggleContextFile(chip.id)"
     >
       <svg v-if="chip.active" class="chip-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

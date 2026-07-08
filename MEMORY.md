@@ -32,7 +32,7 @@
 - [TASK-015.md](docs/tasks/TASK-015.md) — PipelineRun / StageState 阶段状态机，已完成
 - [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，已完成
 - [TASK-017.md](docs/tasks/TASK-017.md) — 人工确认与阶段继续机制，已完成
-- [TASK-018.md](docs/tasks/TASK-018.md) — Agent Bridge / 真实代码库读取，todo
+- [TASK-018.md](docs/tasks/TASK-018.md) — Agent Bridge / 真实代码库读取，已完成
 - [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，todo
 
 ## 迭代记录 (docs/iterations/)
@@ -71,7 +71,8 @@
 - 前端已新增 `pipelineRunsApi`、`usePipelineStore`，Chat 进入已有 Session 或首次发送消息后会拉取当前 PipelineRun；StagePreview 在有后端 run 时以 StageState 为唯一状态源，optional skip/restore 会落库。
 - TASK-016 已完成：`src/agent_forge/artifacts/service.py` 负责阶段到 Artifact 类型映射；StageRuntime 阶段完成后创建 Artifact 并发 `artifact_created` SSE；`GET /sessions/{id}/messages` 会回带关联 artifacts；前端新增 `artifactsApi`、`useArtifactStore`、`ArtifactCard`、`/artifacts/:artifactId` Viewer，Project 页展示最近产物，Artifact 可作为 `context_files[type=artifact]` 加入下一轮上下文。
 - TASK-017 已完成：`PipelineStageState` 新增确认动作、反馈和处理时间字段；确认阶段完成后进入 `waiting_confirmation` 并发 `confirm_required`；`POST /pipeline-runs/{run_id}/stages/{stage_id}/confirm` 支持 approve/revise/cancel；StageRuntime 等待确认时停止调用 SkillExecutionEngine，revise 反馈会注入下一次同阶段执行；Chat ConfirmCard 已接真实 API 和 Artifact。
-- 下一步保持 TASK-018：Bridge / 真实代码库读取仍是未完成闭环，不要提前声称 Agent 已能读取用户授权代码库。
+- TASK-018 已完成：新增 `agentforge mount <path>` CLI、Bridge 状态和文件列表/读取 API、授权 root 内路径校验、敏感文件拒绝、ContextPicker 挂载文件选择，以及 Chat `context_files[type=file].mount_id` 真实内容注入 SkillExecutionEngine。
+- 下一步保持 TASK-019：写回与交付闭环仍未完成，不要提前声称 Agent 已能生成 diff 或写回用户本地项目。
 
 ---
 

@@ -20,3 +20,27 @@ def test_build_system_prompt_includes_advanced_task_context():
     assert "branch: main" in prompt
     assert "关闭阶段：frontend_dev" in prompt
     assert "上下文条目只是用户给出的关注线索" in prompt
+
+
+def test_build_system_prompt_includes_authorized_file_content():
+    prompt = _build_system_prompt(
+        agent_name="CodeSoul",
+        advanced_context={
+            "context_files": [
+                {
+                    "type": "file",
+                    "value": "src/api/orders.py",
+                    "label": "shop-api/src/api/orders.py",
+                    "mount_id": "mount-001",
+                    "source": "project_mount",
+                    "content": "def create_order():\n    return 'created'\n",
+                    "content_truncated": False,
+                }
+            ],
+        },
+    )
+
+    assert "file: shop-api/src/api/orders.py" in prompt
+    assert "授权文件内容" in prompt
+    assert "def create_order()" in prompt
+    assert "上下文条目只是用户给出的关注线索" not in prompt

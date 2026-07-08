@@ -105,6 +105,7 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
         lines.append(f"- 需求类型：{label}（{intent}）")
 
     context_files = advanced_context.get("context_files")
+    has_unread_context = False
     if isinstance(context_files, list) and context_files:
         lines.append("- 用户指定上下文：")
         for item in context_files[:10]:
@@ -112,8 +113,19 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
                 continue
             item_type = str(item.get("type", "")).strip()
             value = str(item.get("value", "")).strip()
+            label = str(item.get("label") or value).strip()
             if item_type and value:
-                lines.append(f"  - {item_type}: {value}")
+                lines.append(f"  - {item_type}: {label}")
+                content = item.get("content")
+                if isinstance(content, str):
+                    lines.append("    授权文件内容：")
+                    lines.append("    ```text")
+                    lines.extend(f"    {line}" for line in content.splitlines())
+                    if item.get("content_truncated") is True:
+                        lines.append("    ...（内容已按读取上限截断）")
+                    lines.append("    ```")
+                else:
+                    has_unread_context = True
 
     stage_overrides = advanced_context.get("stage_overrides")
     if isinstance(stage_overrides, dict) and stage_overrides:
@@ -125,10 +137,11 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
         if disabled:
             lines.append(f"- 关闭阶段：{', '.join(disabled)}")
 
-    lines.append(
-        "- 上下文条目只是用户给出的关注线索，不代表你已经读取了文件内容；"
-        "需要真实内容时应调用可用工具获取，或明确说明需要用户授权/提供内容。"
-    )
+    if has_unread_context:
+        lines.append(
+            "- 上下文条目只是用户给出的关注线索，不代表你已经读取了文件内容；"
+            "需要真实内容时应调用可用工具获取，或明确说明需要用户授权/提供内容。"
+        )
     lines.append("- 回答和执行时优先尊重需求类型与阶段设置，但不得跳过必要的风险说明和用户确认。")
 
     return "\n".join(lines)

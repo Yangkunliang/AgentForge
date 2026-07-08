@@ -3,7 +3,10 @@ import type {
   CreateProjectForm,
   CreateProjectMountForm,
   Artifact,
+  BridgeStatus,
   CreateArtifactForm,
+  MountFileListResponse,
+  MountFileReadResponse,
   Project,
   ProjectMount,
   Session,
@@ -32,6 +35,19 @@ export const projectsApi = {
 
   listMounts: (projectId: string) =>
     request.get<ProjectMount[]>(`/projects/${projectId}/mounts`),
+
+  bridgeStatus: (projectId: string) =>
+    request.get<BridgeStatus>(`/projects/${projectId}/bridge/status`),
+
+  listMountFiles: (projectId: string, mountId: string, path = '') =>
+    request.get<MountFileListResponse>(`/projects/${projectId}/mounts/${mountId}/files`, {
+      params: { path },
+    }),
+
+  readMountFile: (projectId: string, mountId: string, path: string) =>
+    request.post<MountFileReadResponse>(`/projects/${projectId}/mounts/${mountId}/files/read`, {
+      path,
+    }),
 
   createMount: (projectId: string, data: CreateProjectMountForm) =>
     request.post<ProjectMount>(`/projects/${projectId}/mounts`, {

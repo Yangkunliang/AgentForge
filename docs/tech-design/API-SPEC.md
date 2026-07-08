@@ -185,6 +185,8 @@ GET  /api/v1/projects/{project_id}/sessions
 
 `POST /api/v1/sessions/{session_id}/chat` 首次发送消息时会根据请求中的 `intent` 和 `stage_overrides` 创建 `PipelineRun`；响应在原有 `message_id`、`task_id` 基础上增加 `pipeline_run_id`，前端据此拉取阶段运行态。
 
+`context_files[type=file]` 可携带 `mount_id`。当 `mount_id` 指向当前项目的 connected local mount 时，后端会在任务执行前读取授权 root 内的真实文件内容，并注入 SkillExecutionEngine；未携带 `mount_id` 的 file 仍只是用户提供的路径线索。
+
 ### ProjectMount
 
 ```http
@@ -206,7 +208,77 @@ DELETE /api/v1/projects/{project_id}/mounts/{mount_id}
 }
 ```
 
-`mount_type` 取值：`local`、`github`、`upload`。TASK-013 只保存授权占位和连接状态，不读取本地文件；真实 Bridge 在 TASK-018 接入。
+`mount_type` 取值：`local`、`github`、`upload`。TASK-018 后 connected local mount 可通过 Bridge 读取授权 root 内的 UTF-8 文本文件。
+
+### Agent Bridge
+
+```http
+GET  /api/v1/projects/{project_id}/bridge/status
+GET  /api/v1/projects/{project_id}/mounts/{mount_id}/files?path=src
+POST /api/v1/projects/{project_id}/mounts/{mount_id}/files/read
+```
+
+Bridge 状态响应：
+```json
+{
+  "project_id": "project-001",
+  "connected_mounts": 1,
+  "mounts": [
+    {
+      "mount_id": "mount-001",
+      "mount_type": "local",
+      "display_name": "shop-api",
+      "role": "primary",
+      "status": "connected",
+      "root_path": "/Users/me/work/shop-api"
+    }
+  ]
+}
+```
+
+目录列表响应：
+```json
+{
+  "mount_id": "mount-001",
+  "project_id": "project-001",
+  "path": "src",
+  "entries": [
+    {
+      "name": "main.py",
+      "relative_path": "src/main.py",
+      "kind": "file",
+      "size": 1280,
+      "modified_at": "2026-07-08T13:30:00Z"
+    }
+  ]
+}
+```
+
+文件读取请求：
+```json
+{ "path": "src/main.py" }
+```
+
+文件读取响应：
+```json
+{
+  "mount_id": "mount-001",
+  "project_id": "project-001",
+  "path": "src/main.py",
+  "content": "print('hello')\n",
+  "size": 15,
+  "truncated": false
+}
+```
+
+安全规则：
+
+- `mount_id` 必须属于当前登录用户的当前 Project。
+- 只支持 connected local mount；disconnected/pending/error 返回 409。
+- 请求 path 必须是相对路径，绝对路径和 `..` 穿越返回 400。
+- `.env`、`.env.*`、私钥、`.pem`、`.key`、`.p12`、`.pfx` 等敏感文件返回 403。
+- 文件读取仅支持 UTF-8 文本；二进制或非 UTF-8 返回 415。
+- 列表接口过滤 `.git`、`node_modules`、`.venv`、`dist`、`build` 等高噪声目录。
 
 ### Artifact
 

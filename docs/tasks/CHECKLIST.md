@@ -60,7 +60,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-015：PipelineRun / StageState 阶段状态机](TASK-015.md) | P0 | CDW-03 | TASK-013 | intent 生成真实阶段计划，StageRuntime 推进当前阶段，StagePreview 读取后端状态 |
 | [x] | [TASK-016：Artifact 产物归档与查看](TASK-016.md) | P1 | CDW-04 | TASK-015 | 阶段输出保存为 Artifact，可查看、作为上下文复用 |
 | [x] | [TASK-017：人工确认与阶段继续机制](TASK-017.md) | P1 | CDW-05 | TASK-015、TASK-016 | PRD、技术选型、影响范围确认后继续下一阶段 |
-| [ ] | [TASK-018：Agent Bridge / 真实代码库读取](TASK-018.md) | P1 | CDW-02、CDW-06 | TASK-013、TASK-017 | 本地 mount、连接状态、授权范围和只读文件读取 |
+| [x] | [TASK-018：Agent Bridge / 真实代码库读取](TASK-018.md) | P1 | CDW-02、CDW-06 | TASK-013、TASK-017 | 本地 mount、连接状态、授权范围和只读文件读取已落地 |
 | [ ] | [TASK-019：写回与交付闭环](TASK-019.md) | P2 | CDW-07 | TASK-016、TASK-018 | 将产物生成 diff、写回本地项目或导出交付结果 |
 
 ## 执行顺序

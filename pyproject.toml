@@ -56,6 +56,7 @@ dev = [
 
 [project.scripts]
 agent-forge = "src.api.main:main"
+agentforge = "agent_forge.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_forge", "src/api", "src/middleware"]

@@ -321,6 +321,8 @@ export const useProjectStore = defineStore('project', () => {
 - `/projects`、`/projects/create`、`ProjectBar` 不保留静态 mock 项目。
 - 当前项目 ID 使用 `localStorage: agentforge.current_project_id` 恢复；若对应项目不存在，回退到项目列表第一项。
 - 创建项目时同时创建 primary Mount，记录用户主动授权的本地路径、GitHub URL 或上传占位。
+- TASK-018 后，`projectsApi` 新增 Bridge status、Mount 文件列表和文件读取 API；`ContextPickerDialog` 只展示当前项目 connected local Mount 的文件。
+- `ContextFile` 支持 `mount_id`，聊天 payload 中的 `context_files[type=file].mount_id` 表示该文件来自用户授权 Mount，后端会读取真实内容；没有 `mount_id` 的 file 仍只是手填路径线索。
 - `SessionStore` 新建和读取会话时优先使用 `currentProjectId`，调用 `/projects/{project_id}/sessions`。
 
 ### 4.3 Pipeline 状态 (pipeline.ts)

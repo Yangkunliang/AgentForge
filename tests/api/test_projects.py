@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,6 +123,115 @@ def test_project_mounts_support_local_github_and_upload(async_client: TestClient
     )
     assert list_resp.status_code == 200
     assert [item["mount_type"] for item in list_resp.json()] == ["local", "github", "upload"]
+
+
+def test_connected_local_mount_lists_and_reads_files_inside_authorized_root(
+    async_client: TestClient,
+    fake_user: User,
+    tmp_path: Path,
+):
+    root = tmp_path / "shop-api"
+    src_dir = root / "src"
+    src_dir.mkdir(parents=True)
+    (src_dir / "main.py").write_text("print('hello from mounted repo')\n", encoding="utf-8")
+    (src_dir / ".env").write_text("DATABASE_URL=postgres://secret\n", encoding="utf-8")
+
+    project = async_client.post(
+        "/api/v1/projects",
+        json={"name": "授权代码库"},
+        headers=_auth_headers(fake_user),
+    ).json()
+    mount = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts",
+        json={
+            "mount_type": "local",
+            "display_name": "shop-api",
+            "locator": str(root),
+            "role": "primary",
+            "status": "connected",
+            "metadata": {"root_path": str(root)},
+        },
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    status_resp = async_client.get(
+        f"/api/v1/projects/{project['id']}/bridge/status",
+        headers=_auth_headers(fake_user),
+    )
+    assert status_resp.status_code == 200
+    bridge_status = status_resp.json()
+    assert bridge_status["connected_mounts"] == 1
+    assert bridge_status["mounts"][0]["mount_id"] == mount["id"]
+    assert bridge_status["mounts"][0]["root_path"] == str(root.resolve())
+
+    list_resp = async_client.get(
+        f"/api/v1/projects/{project['id']}/mounts/{mount['id']}/files",
+        params={"path": "src"},
+        headers=_auth_headers(fake_user),
+    )
+    assert list_resp.status_code == 200
+    files = list_resp.json()["entries"]
+    assert [item["relative_path"] for item in files] == ["src/main.py"]
+
+    read_resp = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts/{mount['id']}/files/read",
+        json={"path": "src/main.py"},
+        headers=_auth_headers(fake_user),
+    )
+    assert read_resp.status_code == 200
+    content = read_resp.json()
+    assert content["mount_id"] == mount["id"]
+    assert content["path"] == "src/main.py"
+    assert content["content"] == "print('hello from mounted repo')\n"
+    assert content["truncated"] is False
+
+    traversal_resp = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts/{mount['id']}/files/read",
+        json={"path": "../outside.py"},
+        headers=_auth_headers(fake_user),
+    )
+    assert traversal_resp.status_code == 400
+
+    sensitive_resp = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts/{mount['id']}/files/read",
+        json={"path": "src/.env"},
+        headers=_auth_headers(fake_user),
+    )
+    assert sensitive_resp.status_code == 403
+
+
+def test_mount_file_read_requires_connected_local_mount(
+    async_client: TestClient,
+    fake_user: User,
+    tmp_path: Path,
+):
+    root = tmp_path / "shop-api"
+    root.mkdir()
+    (root / "main.py").write_text("print('not connected')\n", encoding="utf-8")
+
+    project = async_client.post(
+        "/api/v1/projects",
+        json={"name": "未连接代码库"},
+        headers=_auth_headers(fake_user),
+    ).json()
+    mount = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts",
+        json={
+            "mount_type": "local",
+            "display_name": "shop-api",
+            "locator": str(root),
+            "role": "primary",
+            "status": "disconnected",
+        },
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    read_resp = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts/{mount['id']}/files/read",
+        json={"path": "main.py"},
+        headers=_auth_headers(fake_user),
+    )
+    assert read_resp.status_code == 409
 
 
 def test_artifact_is_saved_under_project_and_session(async_client: TestClient, fake_user: User):
@@ -268,3 +379,74 @@ async def test_session_messages_include_linked_artifacts(
     }
     assert linked_artifact["created_at"]
     assert linked_artifact["updated_at"]
+
+
+def test_chat_context_hydrates_selected_mount_file_content(
+    async_client: TestClient,
+    fake_user: User,
+    tmp_path: Path,
+    monkeypatch,
+):
+    root = tmp_path / "shop-api"
+    src_dir = root / "src"
+    src_dir.mkdir(parents=True)
+    (src_dir / "main.py").write_text("def checkout():\n    return 'ok'\n", encoding="utf-8")
+
+    captured: dict = {}
+
+    def capture_run_task_with_skills(**kwargs):
+        captured.update(kwargs)
+
+        async def noop():
+            return None
+
+        return noop()
+
+    monkeypatch.setattr("api.routes.sessions._run_task_with_skills", capture_run_task_with_skills)
+
+    project = async_client.post(
+        "/api/v1/projects",
+        json={"name": "上下文注入项目"},
+        headers=_auth_headers(fake_user),
+    ).json()
+    mount = async_client.post(
+        f"/api/v1/projects/{project['id']}/mounts",
+        json={
+            "mount_type": "local",
+            "display_name": "shop-api",
+            "locator": str(root),
+            "role": "primary",
+            "status": "connected",
+        },
+        headers=_auth_headers(fake_user),
+    ).json()
+    session = async_client.post(
+        f"/api/v1/projects/{project['id']}/sessions",
+        json={"title": "读取真实文件", "intent_type": "iteration"},
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    resp = async_client.post(
+        f"/api/v1/sessions/{session['id']}/chat",
+        json={
+            "content": "基于 main.py 看一下 checkout",
+            "intent": "iteration",
+            "context_files": [
+                {
+                    "type": "file",
+                    "value": "src/main.py",
+                    "label": "shop-api/src/main.py",
+                    "mount_id": mount["id"],
+                }
+            ],
+        },
+        headers=_auth_headers(fake_user),
+    )
+
+    assert resp.status_code == 202
+    [context_item] = captured["advanced_context"]["context_files"]
+    assert context_item["mount_id"] == mount["id"]
+    assert context_item["value"] == "src/main.py"
+    assert context_item["source"] == "project_mount"
+    assert context_item["content"] == "def checkout():\n    return 'ok'\n"
+    assert context_item["content_truncated"] is False

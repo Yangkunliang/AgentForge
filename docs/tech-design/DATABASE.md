@@ -126,9 +126,11 @@
 | locator | Text | 本地路径、GitHub URL 或 upload 标识 |
 | role | String | primary/reference/docs |
 | status | String | connected/disconnected/pending/error |
-| metadata | JSON | 附加信息，预留 Bridge、GitHub、上传文件元数据 |
+| metadata | JSON | 附加信息；local Bridge 使用 `root_path`、`bridge` 等字段记录授权根目录和来源 |
 | created_at | DateTime | 创建时间 |
 | updated_at | DateTime | 更新时间 |
+
+TASK-018 后，connected local Mount 的 `metadata.root_path` 是 Agent Bridge 读取文件的唯一授权根目录。Bridge API 每次读取前都会解析 `root_path` 并校验目标路径仍在该根目录内，不新增额外数据库表；连接状态继续由 `status` 字段表达。
 
 ### 1.12 会话扩展 (Session)
 `sessions` 表已从纯聊天会话扩展为项目内开发任务上下文。

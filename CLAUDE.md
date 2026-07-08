@@ -10,7 +10,7 @@
 
 > 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现；PipelineRun / StageState 阶段状态机已实现；Artifact 归档、查看和上下文复用已实现；人工确认与阶段继续机制已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
+**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现；PipelineRun / StageState 阶段状态机已实现；Artifact 归档、查看和上下文复用已实现；人工确认与阶段继续机制已实现；Agent Bridge 只读授权文件上下文已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
 
 ---
 
@@ -104,6 +104,8 @@
 | `src/agent_forge/memory/` | 4 层记忆实现 |
 | `src/agent_forge/models/` | SQLAlchemy 数据模型（含 Project、ProjectMount、PipelineRun、PipelineStageState、Artifact 核心闭环表） |
 | `src/agent_forge/pipeline/` | Pipeline intent 配置、状态机服务与 StageRuntime |
+| `src/agent_forge/bridge/` | Agent Bridge 授权本地 Mount 文件列表和只读读取安全边界 |
+| `src/agent_forge/cli.py` | `agentforge mount <path>` CLI 入口 |
 | `src/agent_forge/tracing.py` | 分布式 tracing（span 装饰器 + 结构化 JSON 日志） |
 | `api/main.py` | FastAPI 入口 |
 | `api/api.py` | 路由注册 |
@@ -123,7 +125,7 @@
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
-**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；TASK-014 已完成项目管理页、创建向导、ProjectBar 和 Chat Session 的真实 Project API 接入；TASK-015 已实现 PipelineRun / StageState 状态机、StageRuntime 和 StagePreview 后端状态渲染；TASK-016 已实现阶段 Artifact 自动归档、Chat / Project / Viewer 查看和上下文复用；TASK-017 已实现 `waiting_confirmation`、ConfirmCard、确认 API、确认 SSE 和审计日志。后续从 TASK-018 Bridge / 真实代码库读取继续推进。
+**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；TASK-014 已完成项目管理页、创建向导、ProjectBar 和 Chat Session 的真实 Project API 接入；TASK-015 已实现 PipelineRun / StageState 状态机、StageRuntime 和 StagePreview 后端状态渲染；TASK-016 已实现阶段 Artifact 自动归档、Chat / Project / Viewer 查看和上下文复用；TASK-017 已实现 `waiting_confirmation`、ConfirmCard、确认 API、确认 SSE 和审计日志；TASK-018 已实现 `agentforge mount`、Bridge 状态/文件列表/读取 API、ContextPicker 授权文件选择和真实文件内容注入 SkillExecutionEngine。后续从 TASK-019 写回与交付闭环继续推进。
 
 ### 计划技术栈
 

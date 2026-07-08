@@ -35,11 +35,14 @@
 -> 用户确认 -> 下一阶段开始 -> 查看 Artifact
 ```
 
-Bridge 接入后补充：
+TASK-018 已补充：
 
 ```text
-创建本地 Mount -> 读取授权文件 -> Artifact 写回或导出 diff
+创建 connected local Mount -> 从授权 root 列文件 -> 读取授权文件
+-> Chat context_files 携带 mount_id -> SkillExecutionEngine 收到真实文件内容
 ```
+
+TASK-019 继续补充 Artifact 写回、导出 diff 和交付报告路径。
 
 ## 4. 非阻塞警告
 

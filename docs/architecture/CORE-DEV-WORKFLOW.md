@@ -12,11 +12,11 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
 |------|------|----------|----------|
-| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API、前端真实数据流与项目产物列表已实现 | TASK-018 接真实 Bridge |
-| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | 后端占位模型与 API 已实现 | TASK-018 接真实 Bridge |
-| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片 | TASK-018 接 Bridge 上下文 |
-| PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出与人工确认暂停已实现 | TASK-018 加载代码库上下文 |
-| StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈与 StagePreview 后端渲染 | TASK-018 接真实上下文 |
+| Project | 用户的一个产品或代码库，是会话和产物的归属容器 | 后端模型、API、前端真实数据流、项目产物列表与 Bridge 状态已实现 | TASK-019 接 Delivery |
+| Mount | 用户主动授权的代码库访问入口，本地目录、GitHub 或上传文件 | connected local Mount 已支持授权 root 内目录列表与只读文件读取 | TASK-019 复用 Mount 写回 |
+| Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片和授权文件上下文 | TASK-019 接 Delivery 结果 |
+| PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | TASK-019 写回/交付 |
+| StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | TASK-019 交付状态 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文 | TASK-019 接 Delivery |
 | Delivery | 将产物写回本地项目、生成 diff 或 PR | 尚无闭环 | TASK-019 |
 
@@ -25,14 +25,15 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 MVP 用户路径按以下顺序落地：
 
 1. 用户创建 Project，填写名称、描述和技术栈。
-2. 用户在创建向导中添加 primary Mount。MVP 允许手动路径、GitHub 仓库 URL 或上传文件占位，真实 Bridge 在后续接入。
+2. 用户在创建向导中添加 primary Mount；也可以通过 `agentforge mount <path>` 创建 connected local Mount。
 3. 用户从 Project 进入 Chat，创建归属于 Project 的 Session；刷新后当前项目从本地选择状态恢复。
 4. 用户选择需求类型，或由规则分类得到 intent。
 5. 系统创建 PipelineRun，并根据 intent 初始化 StageState。
-6. Agent 执行当前阶段，阶段完成后保存 Artifact。
-7. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
-8. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
-9. 后续 Delivery 阶段把产物写回本地目录、生成 diff、测试报告或 PR。
+6. 用户可从 connected local Mount 选择文件作为上下文；后端在执行前读取授权 root 内的真实文件内容并注入 Agent。
+7. Agent 执行当前阶段，阶段完成后保存 Artifact。
+8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
+9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
+10. 后续 Delivery 阶段把产物写回本地目录、生成 diff、测试报告或 PR。
 
 ## 3. 设计原则
 
@@ -42,7 +43,7 @@ MVP 用户路径按以下顺序落地：
 - StageState 是状态机，不是纯 UI pill。
 - Artifact 是平台产物，不应该只散落在聊天消息里。
 - 人工确认是流程节点，不是普通按钮。
-- Bridge 和真实代码读取可以延后，但数据模型必须预留 Mount 与 Delivery 边界。
+- Bridge 读取必须始终受 Mount 授权范围约束；Delivery 仍需复用 Mount 边界。
 
 ## 4. 分阶段落地
 
@@ -61,7 +62,7 @@ TASK-012 路线图和状态纠偏
 
 - 不做多人协作。
 - 不做完整 GitHub App PR 流程，TASK-019 只保留可扩展接口。
-- 不在 TASK-013 中实现真实本地文件读取。
+- 不在 TASK-013 中实现真实本地文件读取；TASK-018 已实现用户选中文件的只读读取。
 - 不要求 Agent 自动完成完整 8 步流水线；当前阶段状态机已支持运行态推进、产物归档与人工确认暂停。
 - 不把用户选择的文件路径当作已读取内容，真实读取必须经过 Mount/Bridge 授权。
 
@@ -75,4 +76,4 @@ TASK-012 路线图和状态纠偏
 -> 查看产物 -> 将结果交付到本地或导出
 ```
 
-只要 Bridge 或 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。
+只要 Delivery 仍是 mock，就不能把核心开发闭环标记为完成。

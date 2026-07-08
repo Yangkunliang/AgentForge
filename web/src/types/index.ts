@@ -243,6 +243,7 @@ export interface ContextFile {
   label: string
   value: string
   active: boolean
+  mount_id?: string
 }
 
 export interface ChatAdvancedPayload {
@@ -251,6 +252,7 @@ export interface ChatAdvancedPayload {
       type: ContextFileType
       value: string
       label?: string
+      mount_id?: string
   }>
   stage_overrides?: Record<string, boolean>
 }
@@ -385,6 +387,45 @@ export interface ProjectMount {
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
+}
+
+export interface BridgeStatusMount {
+  mount_id: string
+  mount_type: string
+  display_name: string
+  role: string
+  status: ProjectMountStatus | string
+  root_path?: string | null
+}
+
+export interface BridgeStatus {
+  project_id: string
+  connected_mounts: number
+  mounts: BridgeStatusMount[]
+}
+
+export interface MountFileEntry {
+  name: string
+  relative_path: string
+  kind: 'file' | 'directory'
+  size?: number | null
+  modified_at: string
+}
+
+export interface MountFileListResponse {
+  mount_id: string
+  project_id: string
+  path: string
+  entries: MountFileEntry[]
+}
+
+export interface MountFileReadResponse {
+  mount_id: string
+  project_id: string
+  path: string
+  content: string
+  size: number
+  truncated: boolean
 }
 
 export interface CreateProjectMountForm {

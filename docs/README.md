@@ -92,6 +92,7 @@ docs/
 | TASK-015 | 2026-07-08 | PipelineRun / StageState 阶段状态机 | ✅ 已完成 |
 | TASK-016 | 2026-07-08 | Artifact 产物归档与查看 | ✅ 已完成 |
 | TASK-017 | 2026-07-08 | 人工确认与阶段继续机制 | ✅ 已完成 |
+| TASK-018 | 2026-07-08 | Agent Bridge / 真实代码库读取 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -152,6 +153,10 @@ docs/
 ### TASK-017 详细信息
 - **核心功能**：`PipelineStageState` 确认字段与迁移；`waiting_confirmation` 状态；`confirm_required` / `confirm_resolved` SSE；确认 API 支持 approve/revise/cancel；StageRuntime 等待确认时停止推进；Chat ConfirmCard 可确认继续、提交修改意见或终止需求；确认操作写入审计日志
 - **验证**：`uv run --extra dev pytest tests/api/test_pipeline_runs.py::test_confirmation_api_approves_or_revises_waiting_stage` 通过；`uv run --extra dev pytest tests/pipeline/test_runtime.py::test_stage_runtime_blocks_waiting_confirmation_stage` 通过；`npm run test:e2e -- human-confirmation.spec.ts` 通过；`npm run build` 通过
+
+### TASK-018 详细信息
+- **核心功能**：`agentforge mount <path>` CLI；Bridge 状态 API；授权 root 内目录列表与 UTF-8 文本读取；路径穿越和敏感文件拒绝；ContextPicker 浏览 connected local Mount 文件；Chat 请求携带 `mount_id` 后读取真实文件内容并注入 SkillExecutionEngine
+- **验证**：`uv run --extra dev pytest tests/api/test_projects.py tests/api/test_bridge_cli.py tests/skills/test_engine_context.py` 通过；`npm run test:e2e -- bridge-context.spec.ts` 通过；`npm run build` 通过
 
 ## 版本号规范
 

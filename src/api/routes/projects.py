@@ -6,11 +6,12 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.bridge.files import BridgeAccessError, list_mount_files, read_mount_file, root_path_for_mount
 from agent_forge.database import get_async_session
 from agent_forge.models import Artifact, Project, ProjectMount, User
 from agent_forge.models.session import Session
@@ -94,6 +95,49 @@ class MountResponse(BaseModel):
     metadata: dict
     created_at: datetime
     updated_at: datetime
+
+
+class BridgeStatusMountResponse(BaseModel):
+    mount_id: str
+    mount_type: str
+    display_name: str
+    role: str
+    status: str
+    root_path: str | None
+
+
+class BridgeStatusResponse(BaseModel):
+    project_id: str
+    connected_mounts: int
+    mounts: list[BridgeStatusMountResponse]
+
+
+class MountFileEntryResponse(BaseModel):
+    name: str
+    relative_path: str
+    kind: Literal["file", "directory"]
+    size: int | None
+    modified_at: datetime
+
+
+class MountFileListResponse(BaseModel):
+    mount_id: str
+    project_id: str
+    path: str
+    entries: list[MountFileEntryResponse]
+
+
+class MountFileReadRequest(BaseModel):
+    path: str = Field(..., min_length=1, max_length=2000)
+
+
+class MountFileReadResponse(BaseModel):
+    mount_id: str
+    project_id: str
+    path: str
+    content: str
+    size: int
+    truncated: bool
 
 
 class ArtifactCreateRequest(BaseModel):
@@ -234,6 +278,36 @@ async def _get_project_session_or_404(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+async def _get_mount_or_404(
+    db: AsyncSession,
+    project_id: str,
+    mount_id: str,
+    user_id: str,
+) -> ProjectMount:
+    await _get_project_or_404(db, project_id, user_id)
+    result = await db.execute(
+        select(ProjectMount).where(
+            ProjectMount.id == mount_id,
+            ProjectMount.project_id == project_id,
+        )
+    )
+    mount = result.scalar_one_or_none()
+    if not mount:
+        raise HTTPException(status_code=404, detail="Mount not found")
+    return mount
+
+
+def _ensure_connected_local_mount(mount: ProjectMount) -> None:
+    if mount.mount_type != "local":
+        raise HTTPException(status_code=400, detail="Only local mounts support file access")
+    if mount.status != "connected":
+        raise HTTPException(status_code=409, detail="Mount is not connected")
+
+
+def _raise_bridge_error(exc: BridgeAccessError) -> None:
+    raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("", response_model=list[ProjectResponse])
@@ -383,6 +457,81 @@ async def list_mounts(
         .order_by(ProjectMount.created_at.asc())
     )
     return [_mount_to_dict(mount) for mount in result.scalars().all()]
+
+
+@router.get("/{project_id}/bridge/status", response_model=BridgeStatusResponse)
+async def get_bridge_status(
+    project_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    await _get_project_or_404(db, project_id, current_user.id)
+    result = await db.execute(
+        select(ProjectMount)
+        .where(ProjectMount.project_id == project_id)
+        .order_by(ProjectMount.created_at.asc())
+    )
+
+    mounts: list[dict] = []
+    connected_mounts = 0
+    for mount in result.scalars().all():
+        root_path: str | None = None
+        bridge_status = mount.status
+        if mount.mount_type == "local" and mount.status == "connected":
+            try:
+                root_path = str(root_path_for_mount(mount))
+                connected_mounts += 1
+            except BridgeAccessError:
+                bridge_status = "error"
+
+        mounts.append(
+            {
+                "mount_id": mount.id,
+                "mount_type": mount.mount_type,
+                "display_name": mount.display_name,
+                "role": mount.role,
+                "status": bridge_status,
+                "root_path": root_path,
+            }
+        )
+
+    return {
+        "project_id": project_id,
+        "connected_mounts": connected_mounts,
+        "mounts": mounts,
+    }
+
+
+@router.get("/{project_id}/mounts/{mount_id}/files", response_model=MountFileListResponse)
+async def list_mount_file_entries(
+    project_id: str,
+    mount_id: str,
+    path: str = Query(default="", max_length=2000),
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    mount = await _get_mount_or_404(db, project_id, mount_id, current_user.id)
+    _ensure_connected_local_mount(mount)
+    try:
+        return list_mount_files(mount, path)
+    except BridgeAccessError as exc:
+        _raise_bridge_error(exc)
+
+
+@router.post("/{project_id}/mounts/{mount_id}/files/read", response_model=MountFileReadResponse)
+async def read_mount_file_content(
+    project_id: str,
+    mount_id: str,
+    body: MountFileReadRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    mount = await _get_mount_or_404(db, project_id, mount_id, current_user.id)
+    _ensure_connected_local_mount(mount)
+    try:
+        return read_mount_file(mount, body.path)
+    except BridgeAccessError as exc:
+        _raise_bridge_error(exc)
 
 
 @router.patch("/{project_id}/mounts/{mount_id}", response_model=MountResponse)

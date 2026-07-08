@@ -16,8 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.api.execution_steps import ExecutionStepCollector
 from agent_forge.api.sse import emit_task_started, get_sse_manager
+from agent_forge.bridge.files import BridgeAccessError, read_mount_file
 from agent_forge.database import get_async_session
-from agent_forge.models import Artifact, Project, Task, TaskStatus, User
+from agent_forge.models import Artifact, Project, ProjectMount, Task, TaskStatus, User
 from agent_forge.models.session import Message, Session
 from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.models.user_agent_settings import UserAgentSettings
@@ -74,6 +75,7 @@ class ContextFileItem(BaseModel):
     type: Literal["branch", "file", "url", "artifact"]
     value: str = Field(..., min_length=1, max_length=2000)
     label: str | None = Field(default=None, max_length=500)
+    mount_id: str | None = Field(default=None, max_length=50)
 
 
 class ChatRequest(BaseModel):
@@ -239,6 +241,13 @@ async def send_message(
         )
         pipeline_run_id = run.id
 
+    advanced_context = await _build_advanced_context(
+        body,
+        db=db,
+        session=session,
+        user_id=current_user.id,
+    )
+
     task_id = str(uuid.uuid4())
     trace_id = get_trace_id() or task_id
 
@@ -309,7 +318,7 @@ async def send_message(
             user_id=current_user.id,
             agent_name=agent_name,
             pipeline_run_id=pipeline_run_id,
-            advanced_context=_build_advanced_context(body),
+            advanced_context=advanced_context,
         )
     )
 
@@ -351,18 +360,72 @@ async def _get_or_create_default_project(db: AsyncSession, user_id: str) -> Proj
     return project
 
 
-def _build_advanced_context(body: ChatRequest) -> dict:
+async def _build_advanced_context(
+    body: ChatRequest,
+    *,
+    db: AsyncSession,
+    session: Session,
+    user_id: str,
+) -> dict:
     """提取高级设置上下文，供 SkillExecutionEngine 注入 system prompt。"""
     context: dict = {}
     if body.intent:
         context["intent"] = body.intent
     if body.context_files:
         context["context_files"] = [
-            item.model_dump(exclude_none=True) for item in body.context_files
+            await _hydrate_context_file(item, db=db, session=session, user_id=user_id)
+            for item in body.context_files
         ]
     if body.stage_overrides:
         context["stage_overrides"] = body.stage_overrides
     return context
+
+
+async def _hydrate_context_file(
+    item: ContextFileItem,
+    *,
+    db: AsyncSession,
+    session: Session,
+    user_id: str,
+) -> dict:
+    context_item = item.model_dump(exclude_none=True)
+    if item.type != "file" or not item.mount_id:
+        return context_item
+    if not session.project_id:
+        raise HTTPException(status_code=400, detail="File context requires a project session")
+
+    result = await db.execute(
+        select(ProjectMount)
+        .join(Project, ProjectMount.project_id == Project.id)
+        .where(
+            ProjectMount.id == item.mount_id,
+            ProjectMount.project_id == session.project_id,
+            Project.user_id == user_id,
+            Project.status != "archived",
+        )
+    )
+    mount = result.scalar_one_or_none()
+    if not mount:
+        raise HTTPException(status_code=404, detail="Mount not found")
+    if mount.mount_type != "local":
+        raise HTTPException(status_code=400, detail="Only local mounts support file context")
+    if mount.status != "connected":
+        raise HTTPException(status_code=409, detail="Mount is not connected")
+
+    try:
+        content = read_mount_file(mount, item.value)
+    except BridgeAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    context_item.update(
+        {
+            "source": "project_mount",
+            "content": content["content"],
+            "content_truncated": content["truncated"],
+            "size": content["size"],
+        }
+    )
+    return context_item
 
 
 async def _run_task_with_skills(
