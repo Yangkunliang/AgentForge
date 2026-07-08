@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { sessionsApi } from '@/api/modules/sessions'
 import { useProjectStore } from '@/stores/project'
-import type { Session, ChatMessage, ExecutionStep } from '@/types'
+import type { Session, ChatMessage, ExecutionStep, Artifact } from '@/types'
 
 export const useSessionStore = defineStore('session', () => {
   const sessions = ref<Session[]>([])
@@ -42,6 +42,7 @@ export const useSessionStore = defineStore('session', () => {
       messages.value = data.map((msg: any) => ({
         ...msg,
         execution_steps: msg.extra_data ?? undefined,
+        artifacts: msg.artifacts ?? [],
       }))
     } finally {
       loading.value = false
@@ -96,6 +97,16 @@ export const useSessionStore = defineStore('session', () => {
       msg.content = content
       msg.streaming = false
     }
+  }
+
+  function attachArtifact(localId: string, artifact: Artifact) {
+    const msg = messages.value.find((m) => m.id === localId)
+    if (!msg) return
+    const existing = msg.artifacts ?? []
+    msg.artifacts = [
+      artifact,
+      ...existing.filter((item) => item.id !== artifact.id),
+    ]
   }
 
   // ── Execution Steps 操作（TASK-009）──────────────────────────
@@ -318,6 +329,7 @@ export const useSessionStore = defineStore('session', () => {
     appendUserMessage,
     appendStreamChunk,
     finalizeAssistantMessage,
+    attachArtifact,
     // Execution Steps
     startThinkingStep,
     appendThinkingDelta,

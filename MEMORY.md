@@ -30,7 +30,7 @@
 - [TASK-013.md](docs/tasks/TASK-013.md) — Project / Mount / Artifact 数据底座，已完成
 - [TASK-014.md](docs/tasks/TASK-014.md) — 项目管理页接真实数据，已完成
 - [TASK-015.md](docs/tasks/TASK-015.md) — PipelineRun / StageState 阶段状态机，已完成
-- [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，todo
+- [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，已完成
 - [TASK-017.md](docs/tasks/TASK-017.md) — 人工确认与阶段继续机制，todo
 - [TASK-018.md](docs/tasks/TASK-018.md) — Agent Bridge / 真实代码库读取，todo
 - [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，todo
@@ -69,7 +69,8 @@
 
 - TASK-015 已完成：后端 `PipelineRun` / `PipelineStageState` 模型、`011_pipeline_run_stage_state.py` 迁移、pipeline intent 配置表、阶段状态 API、StageRuntime 与 SkillExecutionEngine 连接、pipeline/stage SSE 事件已落地。
 - 前端已新增 `pipelineRunsApi`、`usePipelineStore`，Chat 进入已有 Session 或首次发送消息后会拉取当前 PipelineRun；StagePreview 在有后端 run 时以 StageState 为唯一状态源，optional skip/restore 会落库。
-- 下一步保持 TASK-016、TASK-017：Artifact 归档查看与人工确认机制仍是未完成闭环，不要提前标记核心开发闭环完成。
+- TASK-016 已完成：`src/agent_forge/artifacts/service.py` 负责阶段到 Artifact 类型映射；StageRuntime 阶段完成后创建 Artifact 并发 `artifact_created` SSE；`GET /sessions/{id}/messages` 会回带关联 artifacts；前端新增 `artifactsApi`、`useArtifactStore`、`ArtifactCard`、`/artifacts/:artifactId` Viewer，Project 页展示最近产物，Artifact 可作为 `context_files[type=artifact]` 加入下一轮上下文。
+- 下一步保持 TASK-017：人工确认机制仍是未完成闭环，不要提前标记核心开发闭环完成。
 
 ---
 

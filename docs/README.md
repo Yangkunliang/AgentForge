@@ -90,6 +90,7 @@ docs/
 | TASK-013 | 2026-07-08 | Project / Mount / Artifact 数据底座 | ✅ 已完成 |
 | TASK-014 | 2026-07-08 | 项目管理页接真实数据 | ✅ 已完成 |
 | TASK-015 | 2026-07-08 | PipelineRun / StageState 阶段状态机 | ✅ 已完成 |
+| TASK-016 | 2026-07-08 | Artifact 产物归档与查看 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -142,6 +143,10 @@ docs/
 ### TASK-015 详细信息
 - **核心功能**：`PipelineRun` / `PipelineStageState` 模型与迁移；intent 到阶段配置；会话首次 chat 自动创建 PipelineRun；阶段 skip/restore/start/complete/fail API；StageRuntime 调用 SkillExecutionEngine 前后推进阶段；StagePreview 从后端 StageState 渲染
 - **验证**：`uv run --extra dev pytest tests/api/test_pipeline_runs.py tests/pipeline/test_runtime.py` 通过；`npm run test:e2e -- pipeline-stage-state.spec.ts` 通过；`npm run build` 通过
+
+### TASK-016 详细信息
+- **核心功能**：StageRuntime 阶段完成后创建 Artifact；`artifact_created` SSE；会话消息回带关联 Artifact；Artifact Viewer；Chat ArtifactCard；Project 最近产物列表；Artifact 可加入下一轮上下文
+- **验证**：`uv run --extra dev pytest tests/api/test_projects.py tests/api/test_pipeline_runs.py tests/pipeline/test_runtime.py` 通过；`npm run test:e2e -- artifact-viewer.spec.ts` 通过；`npm run build` 通过
 
 ## 版本号规范
 

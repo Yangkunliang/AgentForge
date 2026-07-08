@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { renderMarkdown } from '@/utils/markdown'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import ArtifactCard from './ArtifactCard.vue'
 import ExecutionProgressBar from './ExecutionProgressBar.vue'
 import ExecutionStepList from './ExecutionStepList.vue'
 import type { ChatMessage } from '@/types'
@@ -204,6 +205,12 @@ function handleContentClick(e: MouseEvent) {
         <button v-if="collapsible" class="collapse-toggle" @click="collapsed = !collapsed">
           {{ collapsed ? '展开全部 ↓' : '收起 ↑' }}
         </button>
+
+        <ArtifactCard
+          v-for="artifact in message.artifacts ?? []"
+          :key="artifact.id"
+          :artifact="artifact"
+        />
 
         <!-- 流式光标 -->
         <span v-if="message.streaming && bodyText" class="stream-cursor" />

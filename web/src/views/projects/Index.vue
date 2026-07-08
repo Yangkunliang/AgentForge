@@ -3,11 +3,14 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 import { useSessionStore } from '@/stores/session'
-import type { Project, ProjectMount } from '@/types'
+import { useArtifactStore } from '@/stores/artifact'
+import type { Artifact, Project, ProjectMount } from '@/types'
+import { artifactTypeLabel } from '@/utils/artifacts'
 
 const router = useRouter()
 const projectStore = useProjectStore()
 const sessionStore = useSessionStore()
+const artifactStore = useArtifactStore()
 
 const projects = computed(() => projectStore.projects)
 
@@ -16,6 +19,11 @@ onMounted(async () => {
   await Promise.all(
     data.map((project) =>
       projectStore.fetchProjectMounts(project.id).catch(() => [])
+    )
+  )
+  await Promise.all(
+    data.map((project) =>
+      artifactStore.fetchProjectArtifacts(project.id).catch(() => [])
     )
   )
 })
@@ -68,6 +76,14 @@ function formatRelative(isoStr: string): string {
 function getActivityHeat(updatedAt: string): number {
   const diffDays = Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 86400000)
   return Math.max(0.2, Math.min(1, 1 - diffDays * 0.18))
+}
+
+function latestArtifacts(project: Project): Artifact[] {
+  return artifactStore.artifactsForProject(project.id).slice(0, 2)
+}
+
+function artifactCount(project: Project): number {
+  return artifactStore.artifactsForProject(project.id).length
 }
 
 function handleNewProject() {
@@ -172,6 +188,25 @@ async function handleContinueChat(project: Project) {
                 borderColor: tagColor(tag).border
               }"
             >{{ tag }}</span>
+          </div>
+
+          <div class="artifact-shelf">
+            <div class="artifact-shelf__header">
+              <span>最近产物</span>
+              <span>{{ artifactCount(project) }}</span>
+            </div>
+            <div v-if="latestArtifacts(project).length > 0" class="artifact-shelf__list">
+              <RouterLink
+                v-for="artifact in latestArtifacts(project)"
+                :key="artifact.id"
+                class="artifact-row"
+                :to="`/artifacts/${artifact.id}`"
+              >
+                <span class="artifact-row__type">{{ artifactTypeLabel(artifact.artifact_type) }}</span>
+                <span class="artifact-row__name">{{ artifact.name }}</span>
+              </RouterLink>
+            </div>
+            <p v-else class="artifact-shelf__empty">暂无阶段产物</p>
           </div>
 
           <!-- 底部：meta + 操作 -->
@@ -492,6 +527,67 @@ async function handleContinueChat(project: Project) {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
+}
+
+.artifact-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #e5eefb;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.artifact-shelf__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.artifact-shelf__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artifact-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #0f172a;
+  text-decoration: none;
+  font-size: 12px;
+
+  &:hover .artifact-row__name {
+    color: #1d4ed8;
+  }
+}
+
+.artifact-row__type {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.artifact-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-shelf__empty {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 // ── 卡片底部 ──────────────────────────────────────────────────

@@ -6,6 +6,8 @@
 **关联 Epic**：EPIC-CORE-DEV-WORKFLOW
 **依赖**：TASK-015、TASK-016
 
+**依赖状态**：TASK-015 已完成 PipelineRun / StageState / StageRuntime；TASK-016 已完成阶段 Artifact 归档、查看和上下文复用，确认节点可复用 Artifact 作为待确认内容。
+
 ## 目标
 
 把 PRD 确认、技术选型确认、影响范围确认做成真实流程节点。Agent 在确认点必须暂停，用户确认或修改后才能继续。

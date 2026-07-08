@@ -7,7 +7,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.auth.jwt import create_access_token
-from agent_forge.models import User
+from agent_forge.models import Artifact, User
+from agent_forge.models.session import Message
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -197,3 +198,73 @@ async def test_project_access_is_scoped_to_current_user(
         headers=_auth_headers(fake_user),
     )
     assert mount_resp.status_code == 404
+
+
+async def test_session_messages_include_linked_artifacts(
+    async_client: TestClient,
+    fake_user: User,
+    db_session: AsyncSession,
+):
+    project = async_client.post(
+        "/api/v1/projects",
+        json={"name": "消息产物项目"},
+        headers=_auth_headers(fake_user),
+    ).json()
+    session = async_client.post(
+        f"/api/v1/projects/{project['id']}/sessions",
+        json={"title": "生成技术方案", "intent_type": "new_feature"},
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    assistant_msg = Message(
+        id="msg-with-artifact",
+        session_id=session["id"],
+        role="assistant",
+        content="已经生成技术方案",
+        task_id=None,
+    )
+    artifact = Artifact(
+        id="artifact-tech-design",
+        project_id=project["id"],
+        session_id=session["id"],
+        pipeline_run_id="run-design",
+        stage_state_id="stage-design",
+        artifact_type="architecture",
+        name="架构设计.md",
+        content="# 架构设计",
+        file_type="markdown",
+        source_message_id=assistant_msg.id,
+        metadata_json={"stage_id": "design"},
+    )
+    db_session.add_all([assistant_msg, artifact])
+    await db_session.commit()
+
+    resp = async_client.get(
+        f"/api/v1/sessions/{session['id']}/messages",
+        headers=_auth_headers(fake_user),
+    )
+
+    assert resp.status_code == 200
+    [message] = resp.json()
+    assert message["id"] == assistant_msg.id
+    [linked_artifact] = message["artifacts"]
+    assert linked_artifact | {
+        "created_at": None,
+        "updated_at": None,
+    } == {
+        "id": "artifact-tech-design",
+        "project_id": project["id"],
+        "session_id": session["id"],
+        "pipeline_run_id": "run-design",
+        "stage_state_id": "stage-design",
+        "artifact_type": "architecture",
+        "name": "架构设计.md",
+        "content": "# 架构设计",
+        "file_type": "markdown",
+        "source_message_id": "msg-with-artifact",
+        "metadata": {"stage_id": "design"},
+        "created_at": None,
+        "updated_at": None,
+    }
+    assert linked_artifact["created_at"]
+    assert linked_artifact["updated_at"]

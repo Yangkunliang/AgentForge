@@ -176,9 +176,9 @@
 | id | UUID | 主键 |
 | project_id | UUID | 外键 → Project(id) ON DELETE CASCADE |
 | session_id | UUID | 外键 → Session(id) ON DELETE SET NULL |
-| pipeline_run_id | UUID | PipelineRun 预留字段 |
-| stage_state_id | UUID | StageState 预留字段 |
-| artifact_type | String | prd/architecture/api_spec/code/test/report/diff 等 |
+| pipeline_run_id | UUID | 关联 PipelineRun(id)，TASK-016 后由 StageRuntime 写入 |
+| stage_state_id | UUID | 关联 PipelineStageState(id)，TASK-016 后由 StageRuntime 写入 |
+| artifact_type | String | prd/architecture/api_spec/code/test/report/diff |
 | name | String | 产物名称 |
 | content | Text | MVP 阶段直接存储正文内容 |
 | file_type | String | markdown/json/text/diff 等 |
@@ -186,6 +186,8 @@
 | metadata | JSON | 阶段、来源、上下文等附加信息 |
 | created_at | DateTime | 创建时间 |
 | updated_at | DateTime | 更新时间 |
+
+TASK-016 后，StageRuntime 会在阶段完成时根据 `stage_id` 映射 `artifact_type` 并写入 Artifact；`source_message_id` 指向本次 assistant 消息，供 Chat 消息列表回带 ArtifactCard。
 
 ## 2. 关系图
 

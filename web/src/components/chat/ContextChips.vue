@@ -10,6 +10,13 @@ const pickerOpen = ref(false)
 function addContextFile(file: Omit<ContextFile, 'id'>) {
   advancedSettings.addContextFile(file)
 }
+
+function contextTypeLabel(type: ContextFile['type']) {
+  if (type === 'branch') return '分支'
+  if (type === 'url') return '网址'
+  if (type === 'artifact') return '产物'
+  return '文件'
+}
 </script>
 
 <template>
@@ -27,7 +34,7 @@ function addContextFile(file: Omit<ContextFile, 'id'>) {
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
         <polyline points="22 4 12 14.01 9 11.01"/>
       </svg>
-      <span class="chip-type">{{ chip.type === 'branch' ? '分支' : chip.type === 'url' ? '网址' : '文件' }}</span>
+      <span class="chip-type">{{ contextTypeLabel(chip.type) }}</span>
       <span class="chip-label">{{ chip.label }}</span>
       <button class="chip-remove" title="删除上下文" @click.stop="advancedSettings.removeContextFile(chip.id)">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

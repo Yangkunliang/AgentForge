@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -16,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent_forge.api.execution_steps import ExecutionStepCollector
 from agent_forge.api.sse import emit_task_started, get_sse_manager
 from agent_forge.database import get_async_session
-from agent_forge.models import Project, Task, TaskStatus, User
+from agent_forge.models import Artifact, Project, Task, TaskStatus, User
 from agent_forge.models.session import Message, Session
 from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.models.user_agent_settings import UserAgentSettings
@@ -38,12 +39,29 @@ class SessionResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MessageArtifactResponse(BaseModel):
+    id: str
+    project_id: str
+    session_id: str | None
+    pipeline_run_id: str | None
+    stage_state_id: str | None
+    artifact_type: str
+    name: str
+    content: str
+    file_type: str | None
+    source_message_id: str | None
+    metadata: dict
+    created_at: datetime
+    updated_at: datetime
+
+
 class MessageResponse(BaseModel):
     id: str
     role: str
     content: str
     task_id: str | None
     extra_data: list | None = None
+    artifacts: list[MessageArtifactResponse] = Field(default_factory=list)
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -53,7 +71,7 @@ class RenameSessionRequest(BaseModel):
 
 
 class ContextFileItem(BaseModel):
-    type: Literal["branch", "file", "url"]
+    type: Literal["branch", "file", "url", "artifact"]
     value: str = Field(..., min_length=1, max_length=2000)
     label: str | None = Field(default=None, max_length=500)
 
@@ -78,6 +96,24 @@ class ChatResponse(BaseModel):
     message_id: str
     task_id: str
     pipeline_run_id: str | None = None
+
+
+def _artifact_to_dict(artifact: Artifact) -> dict:
+    return {
+        "id": artifact.id,
+        "project_id": artifact.project_id,
+        "session_id": artifact.session_id,
+        "pipeline_run_id": artifact.pipeline_run_id,
+        "stage_state_id": artifact.stage_state_id,
+        "artifact_type": artifact.artifact_type,
+        "name": artifact.name,
+        "content": artifact.content,
+        "file_type": artifact.file_type,
+        "source_message_id": artifact.source_message_id,
+        "metadata": artifact.metadata_json or {},
+        "created_at": artifact.created_at,
+        "updated_at": artifact.updated_at,
+    }
 
 
 @router.get("", response_model=list[SessionResponse])
@@ -141,14 +177,39 @@ async def list_messages(
     session_id: str,
     db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user),
-) -> list[Message]:
+) -> list[dict]:
     await _get_session_or_404(db, session_id, current_user.id)
     result = await db.execute(
         select(Message)
         .where(Message.session_id == session_id)
         .order_by(Message.created_at.asc())
     )
-    return list(result.scalars().all())
+    messages = list(result.scalars().all())
+    message_ids = [message.id for message in messages]
+    artifacts_by_message: dict[str, list[dict]] = defaultdict(list)
+
+    if message_ids:
+        artifact_result = await db.execute(
+            select(Artifact)
+            .where(Artifact.source_message_id.in_(message_ids))
+            .order_by(Artifact.created_at.asc())
+        )
+        for artifact in artifact_result.scalars().all():
+            if artifact.source_message_id:
+                artifacts_by_message[artifact.source_message_id].append(_artifact_to_dict(artifact))
+
+    return [
+        {
+            "id": message.id,
+            "role": message.role,
+            "content": message.content,
+            "task_id": message.task_id,
+            "extra_data": message.extra_data,
+            "artifacts": artifacts_by_message.get(message.id, []),
+            "created_at": message.created_at,
+        }
+        for message in messages
+    ]
 
 
 @router.post("/{session_id}/chat", response_model=ChatResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -375,6 +436,7 @@ async def _run_task_with_skills(
                     user_id=user_id,
                     agent_name=agent_name,
                     advanced_context=advanced_context,
+                    source_message_id=assistant_msg_id,
                 )
 
                 async for chunk in async_gen:

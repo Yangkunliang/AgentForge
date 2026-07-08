@@ -70,6 +70,7 @@
 | `stage_started` | 状态辅助 | 刷新 PipelineRun，StagePreview 显示 running/current |
 | `stage_completed` | 状态辅助 | 刷新 PipelineRun，StagePreview 推进到下一阶段 |
 | `stage_skipped` | 状态辅助 | 刷新 PipelineRun，StagePreview 显示 skipped |
+| `artifact_created` | 状态辅助 | 拉取 Artifact 详情，刷新项目产物缓存，并在当前 assistant 消息显示 ArtifactCard |
 | `sandbox_created` | 内部 | 忽略 |
 | `sandbox_connected` | 内部 | 忽略 |
 | `sandbox_paused` | 内部 | 忽略 |

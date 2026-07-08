@@ -235,7 +235,7 @@ export interface WebSearchResponse {
 
 // 高级设置（TASK-011）
 export type ChatIntentType = 'new_feature' | 'iteration' | 'ui_adjust' | 'bug_fix'
-export type ContextFileType = 'branch' | 'file' | 'url'
+export type ContextFileType = 'branch' | 'file' | 'url' | 'artifact'
 
 export interface ContextFile {
   id: string
@@ -248,9 +248,9 @@ export interface ContextFile {
 export interface ChatAdvancedPayload {
   intent?: ChatIntentType
   context_files?: Array<{
-    type: ContextFileType
-    value: string
-    label?: string
+      type: ContextFileType
+      value: string
+      label?: string
   }>
   stage_overrides?: Record<string, boolean>
 }
@@ -323,6 +323,7 @@ export type SSEEventType =
   | 'stage_started'
   | 'stage_completed'
   | 'stage_skipped'
+  | 'artifact_created'
   | 'session_title_updated'
   | 'heartbeat'
 
@@ -388,6 +389,43 @@ export interface CreateProjectMountForm {
   metadata?: Record<string, unknown>
 }
 
+export type ArtifactType =
+  | 'prd'
+  | 'architecture'
+  | 'api_spec'
+  | 'code'
+  | 'test'
+  | 'report'
+  | 'diff'
+
+export interface Artifact {
+  id: string
+  project_id: string
+  session_id?: string | null
+  pipeline_run_id?: string | null
+  stage_state_id?: string | null
+  artifact_type: ArtifactType | string
+  name: string
+  content: string
+  file_type?: 'markdown' | 'code' | 'text' | string | null
+  source_message_id?: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateArtifactForm {
+  session_id?: string | null
+  pipeline_run_id?: string | null
+  stage_state_id?: string | null
+  artifact_type: ArtifactType
+  name: string
+  content: string
+  file_type?: string | null
+  source_message_id?: string | null
+  metadata?: Record<string, unknown>
+}
+
 // ToolCall 已迁移为 ExecutionStep，此旧接口仅兼容历史消息
 export interface LegacyToolCall {
   tool_name: string
@@ -410,6 +448,8 @@ export interface ChatMessage {
   execution_steps?: ExecutionStep[]
   // 旧格式：工具调用记录（deprecated，仅兼容历史消息）
   tool_calls?: LegacyToolCall[]
+  // 阶段输出产物
+  artifacts?: Artifact[]
 }
 
 export interface ChatImage {

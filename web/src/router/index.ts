@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/projects/Create.vue'),
       },
       {
+        path: 'artifacts/:artifactId',
+        name: 'ArtifactDetail',
+        component: () => import('@/views/artifacts/Detail.vue'),
+        props: true,
+      },
+      {
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/chat/Index.vue'),

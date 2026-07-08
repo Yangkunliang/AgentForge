@@ -19,6 +19,7 @@ import { sessionsApi } from '@/api/modules/sessions'
 import { useSessionStore } from '@/stores/session'
 import { useAuthStore } from '@/stores/auth'
 import { usePipelineStore } from '@/stores/pipeline'
+import { useArtifactStore } from '@/stores/artifact'
 import type { ChatAdvancedPayload, SSEEvent } from '@/types'
 
 export function useChat(sessionId?: string) {
@@ -174,6 +175,7 @@ async function _typeReply(
 async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<AbortController> {
   const sessionStore = useSessionStore()
   const pipelineStore = usePipelineStore()
+  const artifactStore = useArtifactStore()
   const token = localStorage.getItem('access_token')
   if (!token) {
     return new AbortController()
@@ -224,6 +226,16 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                 if (runId) {
                   sessionStore.updateCurrentPipelineRunId(runId, event.data.session_id as string | undefined)
                   void pipelineStore.fetchRun(runId)
+                }
+                break
+              }
+
+              case 'artifact_created': {
+                const artifactId = event.data.artifact_id as string | undefined
+                if (artifactId) {
+                  artifactStore.fetchArtifact(artifactId).then((artifact) => {
+                    sessionStore.attachArtifact(localAssistantId, artifact)
+                  }).catch(() => undefined)
                 }
                 break
               }

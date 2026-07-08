@@ -23,6 +23,7 @@ IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix"]
 MountType = Literal["local", "github", "upload"]
 MountRole = Literal["primary", "reference", "docs"]
 MountStatus = Literal["connected", "disconnected", "pending", "error"]
+ArtifactType = Literal["prd", "architecture", "api_spec", "code", "test", "report", "diff"]
 
 
 class ProjectCreateRequest(BaseModel):
@@ -99,7 +100,7 @@ class ArtifactCreateRequest(BaseModel):
     session_id: str | None = None
     pipeline_run_id: str | None = None
     stage_state_id: str | None = None
-    artifact_type: str = Field(..., min_length=1, max_length=40)
+    artifact_type: ArtifactType
     name: str = Field(..., min_length=1, max_length=200)
     content: str = Field(..., min_length=1)
     file_type: str | None = Field(default=None, max_length=40)
@@ -108,7 +109,7 @@ class ArtifactCreateRequest(BaseModel):
 
 
 class ArtifactUpdateRequest(BaseModel):
-    artifact_type: str | None = Field(default=None, min_length=1, max_length=40)
+    artifact_type: ArtifactType | None = None
     name: str | None = Field(default=None, min_length=1, max_length=200)
     content: str | None = Field(default=None, min_length=1)
     file_type: str | None = Field(default=None, max_length=40)

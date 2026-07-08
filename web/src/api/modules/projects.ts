@@ -2,6 +2,8 @@ import request from '@/api/request'
 import type {
   CreateProjectForm,
   CreateProjectMountForm,
+  Artifact,
+  CreateArtifactForm,
   Project,
   ProjectMount,
   Session,
@@ -33,6 +35,15 @@ export const projectsApi = {
 
   createMount: (projectId: string, data: CreateProjectMountForm) =>
     request.post<ProjectMount>(`/projects/${projectId}/mounts`, {
+      ...data,
+      metadata: data.metadata ?? {},
+    }),
+
+  listArtifacts: (projectId: string) =>
+    request.get<Artifact[]>(`/projects/${projectId}/artifacts`),
+
+  createArtifact: (projectId: string, data: CreateArtifactForm) =>
+    request.post<Artifact>(`/projects/${projectId}/artifacts`, {
       ...data,
       metadata: data.metadata ?? {},
     }),

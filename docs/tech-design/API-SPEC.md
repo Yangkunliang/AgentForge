@@ -230,7 +230,17 @@ DELETE /api/v1/artifacts/{artifact_id}
 }
 ```
 
-MVP 阶段 Artifact 正文保存在数据库 `content` 字段；对象存储、Artifact Viewer 和 use-as-context 在 TASK-016 继续完善。
+`artifact_type` 取值：`prd`、`architecture`、`api_spec`、`code`、`test`、`report`、`diff`。
+
+MVP 阶段 Artifact 正文保存在数据库 `content` 字段。TASK-016 已落地 Artifact Viewer、Chat ArtifactCard、Project 最近产物列表和作为 `context_files[type=artifact]` 复用；对象存储和多人共享权限不在本阶段范围内。
+
+### 会话消息中的 Artifact
+
+```http
+GET /api/v1/sessions/{session_id}/messages
+```
+
+每条消息响应增加 `artifacts` 数组；当 Artifact 的 `source_message_id` 指向该 assistant 消息时，前端会在聊天气泡中展示 ArtifactCard。
 
 ---
 
@@ -311,7 +321,7 @@ POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
 - `complete` 将当前阶段置为 `completed`，并推进到下一个未 completed/skipped 阶段；没有下一阶段时 run 变为 `completed`。
 - `fail` 将阶段与 run 置为 `failed`。
 
-StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；Artifact 创建与人工确认继续在 TASK-016/TASK-017 落地。
+StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；TASK-016 已补充阶段完成后的 Artifact 创建和 `artifact_created` SSE，人工确认继续在 TASK-017 落地。
 
 ---
 

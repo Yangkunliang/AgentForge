@@ -57,7 +57,8 @@ web/
 │   │       ├── auth.ts
 │   │       ├── tasks.ts
 │   │       ├── agents.ts
-│   │       ├── projects.ts    # Project / Mount / Project Session API
+│   │       ├── projects.ts    # Project / Mount / Project Session / Project Artifact API
+│   │       ├── artifacts.ts   # Artifact 详情 API
 │   │       ├── pipelineRuns.ts # PipelineRun / StageState API
 │   │       ├── skills.ts
 │   │       ├── exports.ts
@@ -119,6 +120,7 @@ web/
 │   │   ├── modules/
 │   │   │   ├── auth.ts        # 用户状态 + Token 管理
 │   │   │   ├── project.ts     # 当前项目、项目列表、Mount 缓存
+│   │   │   ├── artifact.ts    # Project Artifact 列表、Viewer 当前产物
 │   │   │   ├── pipeline.ts    # 当前 PipelineRun、StageState mutation
 │   │   │   ├── task.ts        # 任务列表/详情 + SSE 实时更新入口
 │   │   │   ├── agent.ts
@@ -136,6 +138,7 @@ web/
 │       ├── Login.vue
 │       ├── Register.vue
 │       ├── Dashboard.vue
+│       ├── artifacts/Detail.vue # Artifact Viewer
 │       ├── TaskList.vue
 │       ├── TaskCreate.vue
 │       ├── TaskDetail.vue     # 包含 TaskFeedback 组件
@@ -146,6 +149,14 @@ web/
 │       ├── Export.vue
 │       └── 404.vue
 ```
+
+TASK-016 已补充：
+
+- `web/src/components/chat/ArtifactCard.vue`：聊天消息中的阶段产物卡片，可查看或加入上下文。
+- `web/src/views/artifacts/Detail.vue`：Artifact Viewer，支持 Markdown 与 code/text 兜底渲染。
+- `web/src/stores/artifact.ts`：按 Project 缓存 Artifact 列表，并维护当前 Viewer 详情。
+- `web/src/api/modules/artifacts.ts`：独立 Artifact 详情接口。
+- `web/src/views/projects/Index.vue`：项目卡片展示最近产物列表。
 
 ---
 

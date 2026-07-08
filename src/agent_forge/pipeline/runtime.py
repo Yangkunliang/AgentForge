@@ -7,7 +7,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agent_forge.artifacts.service import create_stage_artifact
 from agent_forge.api.sse import (
+    emit_artifact_created,
     emit_pipeline_started,
     emit_stage_completed,
     emit_stage_started,
@@ -51,8 +53,10 @@ class StageRuntime:
         sse_publish: SsePublisher,
         agent_name: str,
         advanced_context: dict | None,
+        source_message_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         active_stage_id: str | None = None
+        stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
             active_stage_id = await self._start_current_stage(
                 task_id=task_id,
@@ -74,6 +78,8 @@ class StageRuntime:
             )
 
             async for chunk in async_gen:
+                if chunk:
+                    stage_output_chunks.append(chunk)
                 yield chunk
         except Exception:
             if active_stage_id and pipeline_run_id and user_id:
@@ -86,6 +92,8 @@ class StageRuntime:
                     pipeline_run_id=pipeline_run_id,
                     user_id=user_id,
                     stage_id=active_stage_id,
+                    stage_output="".join(stage_output_chunks),
+                    source_message_id=source_message_id,
                 )
 
     async def _start_current_stage(
@@ -130,6 +138,8 @@ class StageRuntime:
         pipeline_run_id: str,
         user_id: str,
         stage_id: str,
+        stage_output: str,
+        source_message_id: str | None,
     ) -> None:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
@@ -138,6 +148,23 @@ class StageRuntime:
                 return
 
             complete_stage(run, stage_id)
+            artifact = await create_stage_artifact(
+                db,
+                run=run,
+                stage=stage,
+                task_id=task_id,
+                content=stage_output,
+                source_message_id=source_message_id,
+            )
+            artifact_payload = {
+                "project_id": artifact.project_id,
+                "session_id": artifact.session_id,
+                "pipeline_run_id": artifact.pipeline_run_id,
+                "stage_id": stage.stage_id,
+                "artifact_id": artifact.id,
+                "artifact_type": artifact.artifact_type,
+                "name": artifact.name,
+            }
             await db.commit()
             await emit_stage_completed(
                 task_id=task_id,
@@ -146,6 +173,7 @@ class StageRuntime:
                 pipeline_run_id=run.id,
                 stage_id=stage_id,
             )
+            await emit_artifact_created(task_id=task_id, **artifact_payload)
 
     async def _fail_stage(self, pipeline_run_id: str, user_id: str, stage_id: str) -> None:
         async with self.session_factory() as db:

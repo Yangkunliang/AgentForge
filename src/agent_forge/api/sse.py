@@ -65,6 +65,7 @@ class SSEEventTypes:
     STAGE_STARTED    = "stage_started"
     STAGE_COMPLETED  = "stage_completed"
     STAGE_SKIPPED    = "stage_skipped"
+    ARTIFACT_CREATED = "artifact_created"
 
     # ── 沙箱生命周期（内部，不透出给用户）────────────────────
     SANDBOX_CREATED   = "sandbox_created"
@@ -292,6 +293,33 @@ async def emit_stage_skipped(
             "pipeline_run_id": pipeline_run_id,
             "stage_id": stage_id,
             "reason": reason,
+        },
+    )
+
+
+async def emit_artifact_created(
+    task_id: str,
+    *,
+    project_id: str,
+    session_id: str | None,
+    pipeline_run_id: str | None,
+    stage_id: str | None,
+    artifact_id: str,
+    artifact_type: str,
+    name: str,
+) -> None:
+    await get_sse_manager().publish(
+        task_id,
+        SSEEventTypes.ARTIFACT_CREATED,
+        {
+            "task_id": task_id,
+            "project_id": project_id,
+            "session_id": session_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+            "artifact_id": artifact_id,
+            "artifact_type": artifact_type,
+            "name": name,
         },
     )
 

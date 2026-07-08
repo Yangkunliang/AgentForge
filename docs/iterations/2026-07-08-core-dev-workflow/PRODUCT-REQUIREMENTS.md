@@ -5,7 +5,7 @@
 **关联架构**：`docs/architecture/CORE-DEV-WORKFLOW.md`
 **状态**：路线图设计中
 
-> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机已落地；TASK-016 起继续推进 Artifact 查看复用、人工确认、Bridge 与 Delivery。
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用已落地；TASK-017 起继续推进人工确认、Bridge 与 Delivery。
 
 ## 1. 背景
 
@@ -36,7 +36,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | CDW-01 | 作为全栈开发工程师，我希望每个对话归属于某个项目 | Session 有 project_id，切换项目后只看到该项目会话 |
 | CDW-02 | 我希望上下文文件和代码库来源是我主动授权的 | ProjectMount 记录授权方式、角色和连接状态 |
 | CDW-03 | 我希望需求类型真的决定执行阶段 | 发送消息后生成 PipelineRun 和 StageState |
-| CDW-04 | 我希望阶段输出成为可复用产物 | 阶段完成后保存 Artifact，并能在 UI 查看 |
+| CDW-04 | 我希望阶段输出成为可复用产物 | 阶段完成后保存 Artifact，并能在 Chat / Project / Viewer 中查看和加入上下文 |
 | CDW-05 | 我希望关键节点暂停确认 | PRD、技术选型、影响范围可触发 confirm_required |
 | CDW-06 | 我希望 Agent 能逐步读我的真实代码库 | Bridge 接入后可读取 Mount 内文件 |
 | CDW-07 | 我希望结果能回到我的项目 | Delivery 阶段生成 diff、写回本地或导出 |
