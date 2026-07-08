@@ -735,6 +735,12 @@ CUBE_TEMPLATE_ID=tpl-xxxxx
 # 沙箱默认 TTL 秒数
 CUBE_SANDBOX_TIMEOUT=300
 
+# 应用启动时是否预热远程沙箱池；本地开发默认 false，生产需要时显式开启
+SANDBOX_POOL_PREWARM_ENABLED=false
+
+# 开启预热后的热沙箱数量
+SANDBOX_POOL_MIN_SIZE=5
+
 # ─── 沙箱选择策略 ───
 # 默认沙箱提供商：docker | cubesandbox | auto
 CUBE_SANDBOX_DEFAULT_PROVIDER=cubesandbox
@@ -927,7 +933,7 @@ class SandboxReclaimer:
 
 ### 7.2 资源池化（已实现）
 
-为极致降低冷启动延迟，可维护一个"热沙箱池"：
+为极致降低冷启动延迟，可维护一个"热沙箱池"。TASK-020 后，热池预热不再是应用启动默认行为；需要生产预热时显式设置 `SANDBOX_POOL_PREWARM_ENABLED=true`：
 
 ```python
 class SandboxPool:

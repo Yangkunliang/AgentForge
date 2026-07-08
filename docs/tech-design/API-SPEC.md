@@ -348,7 +348,13 @@ GET  /api/v1/artifacts/{artifact_id}/delivery/report
   "report": {
     "mount_id": "mount-001",
     "target_path": "src/main.py",
-    "bytes_to_write": 128
+    "bytes_to_write": 128,
+    "target_fingerprint": {
+      "exists": true,
+      "size": 36,
+      "mtime_ns": 1720425600000000000,
+      "sha256": "..."
+    }
   }
 }
 ```
@@ -359,7 +365,8 @@ GET  /api/v1/artifacts/{artifact_id}/delivery/report
 {
   "mount_id": "mount-001",
   "target_path": "src/main.py",
-  "confirm_write": true
+  "confirm_write": true,
+  "expected_target_hash": "<preview.report.target_fingerprint.sha256>"
 }
 ```
 
@@ -367,9 +374,12 @@ GET  /api/v1/artifacts/{artifact_id}/delivery/report
 
 - `preview` 只生成 unified diff，不写入文件。
 - `apply` 在 `confirm_write` 非 `true` 时返回 409。
+- `apply` 可传 `expected_target_hash`。如果目标文件当前 sha256 与预览时不一致，返回 409，Artifact 置为 `delivery_status=failed`，并保存失败报告。
 - `mount_id` 必须属于 Artifact 所在 Project，并且是 connected local Mount。
 - `target_path` 必须位于授权 root 内；绝对路径、`..` 穿越、`.env` 和私钥类敏感文件会被拒绝。
 - 写回前若目标文件存在，会在同目录生成 `.agentforge.bak` 备份路径并写入 `delivery_report`。
+- 写回成功、未确认拒绝、目标冲突、Bridge 写入失败都会写入 `AuditLog.resource=artifact_delivery`。审计 details 不记录 Artifact 正文。
+- Bridge 写入失败时，Artifact 置为 `delivery_status=failed`，`delivery_report` 包含 `phase`、`error_code`、`error_message`、`recovery_hint`。
 - `GET /delivery/report` 在 Artifact 已交付后返回 `text/markdown`，用于导出 Delivery report；未交付返回 409。
 
 ### 会话消息中的 Artifact

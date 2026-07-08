@@ -103,8 +103,11 @@ async def lifespan(app: FastAPI):
     # ── 6. 预热沙箱池 ────────────────────────────────────────────────
     try:
         from agent_forge.skills.code_executor import init_sandbox_pool
-        await init_sandbox_pool()
-        logger.info("SandboxPool warmed up")
+        warmed = await init_sandbox_pool()
+        if warmed:
+            logger.info("SandboxPool warmed up")
+        else:
+            logger.info("SandboxPool warmup skipped")
     except Exception as e:
         logger.warning("SandboxPool warmup failed (non-fatal): %s", e)
 

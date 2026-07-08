@@ -111,6 +111,7 @@ def read_mount_file(
         raise BridgeAccessError(400, "Path must be a file")
 
     raw = target.read_bytes()
+    stat_result = target.stat()
     truncated = len(raw) > max_bytes
     if truncated:
         raw = raw[:max_bytes]
@@ -125,7 +126,9 @@ def read_mount_file(
         "project_id": mount.project_id,
         "path": target.relative_to(root).as_posix(),
         "content": content,
-        "size": target.stat().st_size,
+        "size": stat_result.st_size,
+        "mtime_ns": stat_result.st_mtime_ns,
+        "modified_at": datetime.fromtimestamp(stat_result.st_mtime, tz=timezone.utc),
         "truncated": truncated,
     }
 

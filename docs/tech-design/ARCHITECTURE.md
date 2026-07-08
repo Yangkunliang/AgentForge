@@ -436,12 +436,14 @@ SandboxReclaimer ── TTL 后台扫描 + 自动回收
 #### 设计理念
 
 高并发场景下，每次按需创建沙箱的 ~60ms 冷启动延迟不可接受。
-SandboxPool 通过**预热（bootstrap）→ 复用（acquire/release）→ 降级（cold-start）→ 清理（cleanup）** 四步循环，将热沙箱的获取延迟降至 ~0ms。
+SandboxPool 通过**可选预热（bootstrap）→ 复用（acquire/release）→ 降级（cold-start）→ 清理（cleanup）** 四步循环，将热沙箱的获取延迟降至 ~0ms。
+
+TASK-020 后，应用启动默认不预热远程沙箱，避免本地启动或测试时自动创建 E2B 云资源。生产环境如需要热池，必须显式设置 `SANDBOX_POOL_PREWARM_ENABLED=true`。
 
 #### 生命周期
 
 ```
-应用启动
+应用启动（仅 SANDBOX_POOL_PREWARM_ENABLED=true）
     │
     ▼
 bootstrap() ── 预创建 min_size 个沙箱，放入 asyncio.Queue
@@ -471,8 +473,9 @@ release()
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `min_size` | 5 | 预热时预创建的沙箱数量 |
-| `max_size` | 50 | 池的最大容量，超出后 release 直接销毁 |
+| `SANDBOX_POOL_PREWARM_ENABLED` | false | 是否在应用启动时预热沙箱池 |
+| `SANDBOX_POOL_MIN_SIZE` | 5 | 开启预热后启动时预创建的沙箱数量 |
+| `SANDBOX_POOL_MAX_SIZE` | 20 | 池的最大容量，超出后 release 直接销毁 |
 | `cleanup_timeout` | 5s | 归还前清理沙箱内状态的超时 |
 
 #### 清理策略（cleanup）

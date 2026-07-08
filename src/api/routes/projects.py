@@ -13,9 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.bridge.files import BridgeAccessError, list_mount_files, read_mount_file, root_path_for_mount
 from agent_forge.database import get_async_session
-from agent_forge.delivery import apply_artifact_delivery, build_delivery_report_markdown, preview_artifact_delivery
-from agent_forge.models import Artifact, Project, ProjectMount, User
+from agent_forge.delivery import (
+    DeliveryConsistencyError,
+    apply_artifact_delivery,
+    build_delivery_report_markdown,
+    mark_artifact_delivery_failed,
+    preview_artifact_delivery,
+)
+from agent_forge.models import Artifact, AuditLog, Project, ProjectMount, User
 from agent_forge.models.session import Session
+from agent_forge.tracing import get_trace_id
 from middleware.auth import get_current_user
 
 router = APIRouter()
@@ -188,6 +195,7 @@ class DeliveryPreviewRequest(BaseModel):
 
 class DeliveryApplyRequest(DeliveryPreviewRequest):
     confirm_write: bool = False
+    expected_target_hash: str | None = Field(default=None, max_length=64)
 
 
 class DeliveryResponse(BaseModel):
@@ -195,7 +203,7 @@ class DeliveryResponse(BaseModel):
     project_id: str
     mount_id: str
     target_path: str
-    status: Literal["previewed", "delivered"]
+    status: Literal["previewed", "delivered", "failed"]
     has_changes: bool
     unified_diff: str
     report: dict
@@ -337,6 +345,39 @@ def _ensure_connected_local_mount(mount: ProjectMount) -> None:
 
 def _raise_bridge_error(exc: BridgeAccessError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _add_delivery_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    status_value: str,
+    user_id: str,
+    artifact: Artifact,
+    mount: ProjectMount,
+    target_path: str,
+    details: dict | None = None,
+) -> None:
+    payload = {
+        "artifact_id": artifact.id,
+        "project_id": artifact.project_id,
+        "mount_id": mount.id,
+        "target_path": target_path,
+    }
+    if details:
+        payload.update(details)
+    db.add(
+        AuditLog(
+            id=str(uuid.uuid4()),
+            action=action,
+            resource="artifact_delivery",
+            user_id=user_id,
+            trace_id=get_trace_id() or artifact.id,
+            status=status_value,
+            degraded=False,
+            details=payload,
+        )
+    )
 
 
 @router.get("", response_model=list[ProjectResponse])
@@ -702,9 +743,35 @@ async def preview_artifact_delivery_api(
     artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
     mount = await _get_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
     try:
-        return preview_artifact_delivery(artifact, mount, body.target_path)
+        delivery = preview_artifact_delivery(artifact, mount, body.target_path)
     except BridgeAccessError as exc:
+        _add_delivery_audit(
+            db,
+            action="delivery.preview.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details={"error_code": "bridge_access_error", "error_message": exc.detail},
+        )
+        await db.commit()
         _raise_bridge_error(exc)
+    _add_delivery_audit(
+        db,
+        action="delivery.preview.succeeded",
+        status_value="success",
+        user_id=current_user.id,
+        artifact=artifact,
+        mount=mount,
+        target_path=delivery["target_path"],
+        details={
+            "has_changes": delivery["has_changes"],
+            "target_fingerprint": delivery["report"].get("target_fingerprint"),
+        },
+    )
+    await db.commit()
+    return delivery
 
 
 @artifact_router.post("/{artifact_id}/delivery/apply", response_model=DeliveryResponse)
@@ -717,12 +784,101 @@ async def apply_artifact_delivery_api(
     artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
     mount = await _get_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
     if not body.confirm_write:
+        _add_delivery_audit(
+            db,
+            action="delivery.apply.denied",
+            status_value="denied",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details={"reason": "missing_confirmation"},
+        )
+        await db.commit()
         raise HTTPException(status_code=409, detail="Write confirmation is required before delivery")
 
     try:
-        delivery = await apply_artifact_delivery(db, artifact, mount, body.target_path)
+        delivery = await apply_artifact_delivery(
+            db,
+            artifact,
+            mount,
+            body.target_path,
+            expected_target_hash=body.expected_target_hash,
+        )
+    except DeliveryConsistencyError as exc:
+        _add_delivery_audit(
+            db,
+            action="delivery.apply.conflict",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details=exc.report,
+        )
+        await db.commit()
+        raise HTTPException(status_code=409, detail=exc.detail) from exc
     except BridgeAccessError as exc:
+        report = await mark_artifact_delivery_failed(
+            db,
+            artifact,
+            mount,
+            body.target_path,
+            phase="apply",
+            error_code="bridge_access_error",
+            error_message=exc.detail,
+            recovery_hint="Review the target path, mount status, and sensitive file policy before retrying.",
+        )
+        _add_delivery_audit(
+            db,
+            action="delivery.apply.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details=report,
+        )
+        await db.commit()
         _raise_bridge_error(exc)
+    except Exception as exc:
+        report = await mark_artifact_delivery_failed(
+            db,
+            artifact,
+            mount,
+            body.target_path,
+            phase="apply",
+            error_code="unexpected_error",
+            error_message=str(exc) or exc.__class__.__name__,
+            recovery_hint="Retry after checking server logs. If the error repeats, keep the backup and inspect the mount path.",
+        )
+        _add_delivery_audit(
+            db,
+            action="delivery.apply.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            mount=mount,
+            target_path=body.target_path,
+            details=report,
+        )
+        await db.commit()
+        raise HTTPException(status_code=500, detail="Delivery failed unexpectedly") from exc
+    _add_delivery_audit(
+        db,
+        action="delivery.apply.succeeded",
+        status_value="success",
+        user_id=current_user.id,
+        artifact=artifact,
+        mount=mount,
+        target_path=delivery["target_path"],
+        details={
+            "backup_path": delivery["report"].get("backup_path"),
+            "bytes_written": delivery["report"].get("bytes_written"),
+            "target_fingerprint": delivery["report"].get("target_fingerprint"),
+            "expected_target_hash": body.expected_target_hash,
+        },
+    )
     await db.commit()
     await db.refresh(artifact)
     return delivery

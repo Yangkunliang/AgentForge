@@ -1,6 +1,6 @@
 # TASK-020：服务端可信交付巩固
 
-**状态**：in_progress
+**状态**：done
 **优先级**：P0
 **创建日期**：2026-07-08
 **关联 Epic**：EPIC-CORE-STRENGTHENING
@@ -17,21 +17,23 @@
 
 ## 技术子项
 
-- [ ] Delivery preview 返回目标文件 fingerprint（存在性、大小、mtime、sha256）
-- [ ] Delivery apply 支持 expected target hash，一旦目标文件在预览后变化则拒绝写入
-- [ ] Delivery apply 失败时将 Artifact 标记为 `failed`，并保存可读失败报告
-- [ ] Delivery preview/apply/denied/conflict/failure 写入 `AuditLog`
-- [ ] Bridge 写入错误、敏感路径拒绝和备份路径进入审计 details
-- [ ] Alembic migration smoke test 纳入本任务验收
-- [ ] FastAPI 启动验证确保交付路由和依赖无启动期错误
+- [x] Delivery preview 返回目标文件 fingerprint（存在性、大小、mtime、sha256）
+- [x] Delivery apply 支持 expected target hash，一旦目标文件在预览后变化则拒绝写入
+- [x] Delivery apply 失败时将 Artifact 标记为 `failed`，并保存可读失败报告
+- [x] Delivery preview/apply/denied/conflict/failure 写入 `AuditLog`
+- [x] Bridge 写入错误、敏感路径拒绝和备份路径进入审计 details
+- [x] 本地/默认启动不自动预热远程 E2B 沙箱池
+- [x] Alembic migration smoke test 纳入本任务验收
+- [x] FastAPI 启动验证确保交付路由和依赖无启动期错误
 
 ## acceptance
 
-- [ ] 用户预览后，如果目标文件被外部修改，写回 API 返回 409 且不会覆盖用户文件
-- [ ] 写回失败后 Artifact 可查询到 `delivery_status=failed` 和失败原因
-- [ ] 成功、拒绝、冲突、失败均有 `AuditLog` 可追溯
-- [ ] 既有 TASK-019 diff 预览、confirm_write、备份和 Markdown report 行为不回退
-- [ ] `uv run --extra dev pytest`、Alembic upgrade smoke、FastAPI 启动检查通过
+- [x] 用户预览后，如果目标文件被外部修改，写回 API 返回 409 且不会覆盖用户文件
+- [x] 写回失败后 Artifact 可查询到 `delivery_status=failed` 和失败原因
+- [x] 成功、拒绝、冲突、失败均有 `AuditLog` 可追溯
+- [x] 既有 TASK-019 diff 预览、confirm_write、备份和 Markdown report 行为不回退
+- [x] FastAPI 默认启动不会创建远程 E2B 沙箱；生产可通过 `SANDBOX_POOL_PREWARM_ENABLED=true` 显式开启预热
+- [x] `uv run --extra dev pytest`、Alembic upgrade smoke、FastAPI 启动检查通过
 
 ## 产出
 
@@ -39,6 +41,7 @@
 - `DeliveryApplyRequest` 增加可选一致性校验字段。
 - `agent_forge.delivery` 增加失败报告持久化能力。
 - Delivery 路由增加审计日志记录。
+- `init_sandbox_pool()` 增加默认跳过预热策略，避免本地启动创建远程沙箱。
 
 ## 验证
 

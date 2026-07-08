@@ -485,6 +485,7 @@ export interface DeliveryTargetPayload {
 
 export interface DeliveryApplyPayload extends DeliveryTargetPayload {
   confirm_write: boolean
+  expected_target_hash?: string | null
 }
 
 export interface DeliveryResponse {
@@ -492,7 +493,7 @@ export interface DeliveryResponse {
   project_id: string
   mount_id: string
   target_path: string
-  status: 'previewed' | 'delivered' | string
+  status: 'previewed' | 'delivered' | 'failed' | string
   has_changes: boolean
   unified_diff: string
   report: Record<string, unknown>

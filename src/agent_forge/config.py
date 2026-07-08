@@ -153,6 +153,9 @@ class CubeSandboxConfig(BaseSettings):
     )
 
     # ── 沙箱池 + 并发控制 ─────────────────────────────────
+    # 是否在应用启动时预创建热沙箱；默认关闭，避免本地启动消耗远程 E2B 资源
+    sandbox_pool_prewarm_enabled: bool = Field(default=False, validation_alias="SANDBOX_POOL_PREWARM_ENABLED")
+
     # 池预热数量（应用启动时预创建的热沙箱数）
     sandbox_pool_min_size: int = Field(default=5, validation_alias="SANDBOX_POOL_MIN_SIZE")
 

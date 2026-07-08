@@ -10,10 +10,10 @@
 
 池生命周期管理
 --------------
-- ``init_sandbox_pool()``：应用启动时预热沙箱（调用 lifespan hook）
+- ``init_sandbox_pool()``：应用启动时按配置预热沙箱（调用 lifespan hook）
 - ``shutdown_sandbox_pool()``：应用关闭时销毁池中所有沙箱
 
-开发环境：E2B 云服务（配置 E2B_API_KEY 即可，无需本地 Docker/KVM）
+开发环境：默认不预热远程沙箱，首次代码执行时冷启动
 生产环境：E2B 云服务 或 自部署 CubeSandbox（设置 CUBE_SANDBOX_URL 切换）
 
 安全设计
@@ -99,13 +99,17 @@ def _get_semaphore() -> asyncio.Semaphore:
 
 # ── 池生命周期管理 ─────────────────────────────────────────────────
 
-async def init_sandbox_pool() -> None:
-    """应用启动时预热沙箱池。
+async def init_sandbox_pool() -> bool:
+    """应用启动时按配置预热沙箱池。
 
     应在 FastAPI lifespan / startup hook 中调用。
     """
+    if not sandbox_settings.sandbox_pool_prewarm_enabled:
+        logger.info("SandboxPool prewarm skipped (SANDBOX_POOL_PREWARM_ENABLED=false)")
+        return False
     pool = _get_pool()
     await pool.bootstrap()
+    return True
 
 
 async def shutdown_sandbox_pool() -> None:

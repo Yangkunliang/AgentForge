@@ -172,6 +172,12 @@ TASK-019 已补充：
 - `web/src/views/artifacts/Detail.vue`：Artifact Viewer 新增交付面板，支持选择 connected local Mount、输入目标路径、预览 unified diff、确认写回、展示交付报告和导出 Markdown。
 - `web/e2e/artifact-viewer.spec.ts`：覆盖 diff 预览、确认写回 payload、Delivery report 展示和 Markdown 下载。
 
+TASK-020 已补充：
+
+- `DeliveryApplyPayload` 增加 `expected_target_hash`。
+- Artifact Viewer 在 preview 后从 `report.target_fingerprint.sha256` 读取目标文件 hash，并在确认写回时提交给后端。
+- 如果后端返回目标文件冲突或写回失败，交付面板沿用错误区域展示可读失败原因，用户需重新预览后再确认。
+
 ---
 
 ## 3. 路由设计

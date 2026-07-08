@@ -94,7 +94,7 @@ docs/
 | TASK-017 | 2026-07-08 | 人工确认与阶段继续机制 | ✅ 已完成 |
 | TASK-018 | 2026-07-08 | Agent Bridge / 真实代码库读取 | ✅ 已完成 |
 | TASK-019 | 2026-07-08 | 写回与交付闭环 | ✅ 已完成 |
-| TASK-020 | 2026-07-08 | 服务端可信交付巩固 | 🚧 进行中 |
+| TASK-020 | 2026-07-08 | 服务端可信交付巩固 | ✅ 已完成 |
 | TASK-021 | 2026-07-08 | 核心交互设计复盘与关键入口优化 | ⏳ 待开始 |
 | TASK-022 | 2026-07-08 | 交付能力扩展设计与实现 | ⏳ 待开始 |
 
@@ -173,6 +173,7 @@ docs/
   - [TASK-CHECKLIST.md](iterations/2026-07-08-core-strengthening/TASK-CHECKLIST.md)
   - [TECHNICAL-DESIGN.md](iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md)
   - [TEST-PLAN.md](iterations/2026-07-08-core-strengthening/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md)
 - **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再复盘核心交互入口；最后设计 GitHub PR、zip、upload 等交付扩展。
 
 ## 版本号规范

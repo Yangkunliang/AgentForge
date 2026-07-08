@@ -76,6 +76,10 @@ delivery.apply.failed
 
 `details` 包含 artifact、project、mount、target_path、backup_path、fingerprint、error 等信息。审计日志不记录 Artifact 内容。
 
+### 2.5 Startup hardening
+
+本地 FastAPI 启动不得默认创建远程 E2B 沙箱。`init_sandbox_pool()` 只在 `SANDBOX_POOL_PREWARM_ENABLED=true` 时 bootstrap；默认情况下保留冷启动路径，首次 code executor 调用时再创建沙箱。
+
 ## 3. TASK-021 交互设计复盘
 
 UI 复盘只解决核心工作流入口，不做视觉重写。重点对象：

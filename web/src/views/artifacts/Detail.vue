@@ -108,6 +108,7 @@ async function applyDelivery() {
       mount_id: selectedMountId.value,
       target_path: targetPath.value.trim(),
       confirm_write: true,
+      expected_target_hash: previewTargetHash(),
     })
     deliveryPreview.value = data
     targetPath.value = data.target_path
@@ -142,6 +143,15 @@ async function exportDeliveryReport() {
 function deliveryErrorMessage(error: unknown) {
   const maybeError = error as { response?: { data?: { detail?: string } } }
   return maybeError.response?.data?.detail ?? '交付失败'
+}
+
+function previewTargetHash(): string | null | undefined {
+  const fingerprint = deliveryPreview.value?.report?.target_fingerprint
+  if (!fingerprint || typeof fingerprint !== 'object') {
+    return undefined
+  }
+  const hash = (fingerprint as { sha256?: unknown }).sha256
+  return typeof hash === 'string' || hash === null ? hash : undefined
 }
 
 onMounted(loadArtifact)
