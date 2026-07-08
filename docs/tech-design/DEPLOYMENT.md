@@ -108,10 +108,19 @@ JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_SEC=3600
 REFRESH_TOKEN_EXPIRE_SEC=604800
 
+# ── 服务端凭据加密 ──────────────────────────────
+CREDENTIAL_ENCRYPTION_KEY=dev-credential-key-change-in-production
+
 # ── LLM API Keys ────────────────────────────────
 OPENAI_API_KEY=sk-xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
 # GEMINI_API_KEY=xxx
+
+# ── GitHub OAuth Mount ──────────────────────────
+GITHUB_OAUTH_CLIENT_ID=
+GITHUB_OAUTH_CLIENT_SECRET=
+GITHUB_OAUTH_REDIRECT_URI=
+GITHUB_OAUTH_SCOPES=repo
 
 # ── Skill 安装目录 ───────────────────────────────
 SKILL_INSTALL_DIR=/opt/agentforge/skills
@@ -303,7 +312,14 @@ RABBITMQ_PASS=<强密码>
 REDIS_PASSWORD=<强密码>
 OPENAI_API_KEY=sk-xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
+CREDENTIAL_ENCRYPTION_KEY=<独立随机字符串，建议 32 位以上>
+GITHUB_OAUTH_CLIENT_ID=<GitHub OAuth App Client ID>
+GITHUB_OAUTH_CLIENT_SECRET=<GitHub OAuth App Client Secret>
+GITHUB_OAUTH_REDIRECT_URI=
+GITHUB_OAUTH_SCOPES=repo
 ```
+
+`GITHUB_OAUTH_REDIRECT_URI` 可留空，Project 创建向导会按当前项目传入 `/api/v1/projects/{project_id}/mounts/github/oauth/callback`。无前端场景才需要配置固定回调地址。
 
 ### 5.4 前端构建
 

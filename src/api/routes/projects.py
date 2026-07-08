@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import secrets
+import urllib.parse
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -12,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.bridge.files import BridgeAccessError, list_mount_files, read_mount_file, root_path_for_mount
+from agent_forge.config import settings
 from agent_forge.database import get_async_session
 from agent_forge.delivery import (
     DeliveryConsistencyError,
@@ -20,8 +23,15 @@ from agent_forge.delivery import (
     mark_artifact_delivery_failed,
     preview_artifact_delivery,
 )
-from agent_forge.models import Artifact, AuditLog, Project, ProjectMount, User
+from agent_forge.integrations.github import (
+    GitHubOAuthError,
+    build_github_authorization_url,
+    exchange_github_oauth_code,
+    fetch_github_repo,
+)
+from agent_forge.models import Artifact, AuditLog, OAuthCredential, OAuthState, Project, ProjectMount, User
 from agent_forge.models.session import Session
+from agent_forge.security.credentials import encrypt_secret
 from agent_forge.tracing import get_trace_id
 from middleware.auth import get_current_user
 
@@ -90,6 +100,18 @@ class MountUpdateRequest(BaseModel):
     role: MountRole | None = None
     status: MountStatus | None = None
     metadata: dict | None = None
+
+
+class GitHubOAuthStartRequest(BaseModel):
+    repo_full_name: str = Field(..., min_length=3, max_length=200)
+    role: MountRole = "primary"
+    redirect_uri: str | None = Field(default=None, max_length=4000)
+
+
+class GitHubOAuthStartResponse(BaseModel):
+    authorization_url: str
+    state: str
+    expires_at: datetime
 
 
 class MountResponse(BaseModel):
@@ -262,6 +284,20 @@ def _mount_to_dict(mount: ProjectMount) -> dict:
     }
 
 
+def _parse_repo_full_name(repo_full_name: str) -> tuple[str, str]:
+    value = repo_full_name.strip()
+    parts = value.split("/")
+    if (
+        len(parts) != 2
+        or not parts[0]
+        or not parts[1]
+        or any(part in {".", ".."} for part in parts)
+        or any("\\" in part for part in parts)
+    ):
+        raise HTTPException(status_code=400, detail="GitHub repo must use owner/name format")
+    return parts[0], parts[1]
+
+
 def _artifact_to_dict(artifact: Artifact) -> dict:
     return {
         "id": artifact.id,
@@ -380,6 +416,58 @@ def _add_delivery_audit(
     )
 
 
+def _add_github_mount_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    status_value: str,
+    user_id: str,
+    project_id: str,
+    details: dict | None = None,
+) -> None:
+    db.add(
+        AuditLog(
+            id=str(uuid.uuid4()),
+            action=action,
+            resource="github_mount",
+            user_id=user_id,
+            trace_id=get_trace_id() or project_id,
+            status=status_value,
+            degraded=False,
+            details={"project_id": project_id, **(details or {})},
+        )
+    )
+
+
+def _oauth_value(payload: object, key: str):
+    if isinstance(payload, dict):
+        return payload[key]
+    return getattr(payload, key)
+
+
+def _oauth_optional_value(payload: object, key: str, default=None):
+    if isinstance(payload, dict):
+        return payload.get(key, default)
+    return getattr(payload, key, default)
+
+
+def _is_expired(expires_at: datetime) -> bool:
+    now = datetime.now(UTC)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    return expires_at <= now
+
+
+def _github_redirect_uri(body_redirect_uri: str | None, project_id: str) -> str:
+    redirect_uri = (body_redirect_uri or settings.github_oauth_redirect_uri).strip()
+    if body_redirect_uri:
+        parsed = urllib.parse.urlparse(redirect_uri)
+        expected_path = f"/api/v1/projects/{project_id}/mounts/github/oauth/callback"
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path != expected_path:
+            raise HTTPException(status_code=400, detail="GitHub OAuth redirect URI is not allowed")
+    return redirect_uri
+
+
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
     db: AsyncSession = Depends(get_async_session),
@@ -488,6 +576,187 @@ async def list_project_sessions(
         .order_by(Session.updated_at.desc())
     )
     return [_session_to_dict(session) for session in result.scalars().all()]
+
+
+@router.post(
+    "/{project_id}/mounts/github/oauth/start",
+    response_model=GitHubOAuthStartResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def start_github_oauth_mount(
+    project_id: str,
+    body: GitHubOAuthStartRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    project = await _get_project_or_404(db, project_id, current_user.id)
+    owner, repo = _parse_repo_full_name(body.repo_full_name)
+    redirect_uri = _github_redirect_uri(body.redirect_uri, project.id)
+    if not settings.github_oauth_client_id or not redirect_uri:
+        _add_github_mount_audit(
+            db,
+            action="github_mount.oauth.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            project_id=project.id,
+            details={"repo_full_name": f"{owner}/{repo}", "error_code": "github_oauth_not_configured"},
+        )
+        await db.commit()
+        raise HTTPException(status_code=503, detail="GitHub OAuth is not configured")
+
+    state_value = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(minutes=10)
+    oauth_state = OAuthState(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        project_id=project.id,
+        provider="github",
+        state=state_value,
+        redirect_uri=redirect_uri,
+        expires_at=expires_at,
+        metadata_json={
+            "repo_full_name": f"{owner}/{repo}",
+            "role": body.role,
+        },
+    )
+    db.add(oauth_state)
+    _add_github_mount_audit(
+        db,
+        action="github_mount.oauth.started",
+        status_value="pending",
+        user_id=current_user.id,
+        project_id=project.id,
+        details={"repo_full_name": f"{owner}/{repo}", "role": body.role},
+    )
+    await db.commit()
+    return {
+        "authorization_url": build_github_authorization_url(state=state_value, redirect_uri=redirect_uri),
+        "state": state_value,
+        "expires_at": expires_at,
+    }
+
+
+@router.get(
+    "/{project_id}/mounts/github/oauth/callback",
+    response_model=MountResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def complete_github_oauth_mount(
+    project_id: str,
+    code: str = Query(..., min_length=1, max_length=500),
+    state: str = Query(..., min_length=1, max_length=200),
+    db: AsyncSession = Depends(get_async_session),
+) -> dict:
+    result = await db.execute(
+        select(OAuthState).where(
+            OAuthState.state == state,
+            OAuthState.project_id == project_id,
+            OAuthState.provider == "github",
+            OAuthState.consumed_at.is_(None),
+        )
+    )
+    oauth_state = result.scalar_one_or_none()
+    if not oauth_state or _is_expired(oauth_state.expires_at):
+        if oauth_state:
+            _add_github_mount_audit(
+                db,
+                action="github_mount.oauth.failed",
+                status_value="failed",
+                user_id=oauth_state.user_id,
+                project_id=project_id,
+                details={"error_code": "invalid_or_expired_state"},
+            )
+            await db.commit()
+        raise HTTPException(status_code=400, detail="OAuth state is invalid or expired")
+
+    project_result = await db.execute(
+        select(Project).where(
+            Project.id == project_id,
+            Project.user_id == oauth_state.user_id,
+            Project.status != "archived",
+        )
+    )
+    project = project_result.scalar_one_or_none()
+    if not project:
+        _add_github_mount_audit(
+            db,
+            action="github_mount.oauth.failed",
+            status_value="failed",
+            user_id=oauth_state.user_id,
+            project_id=project_id,
+            details={"error_code": "project_not_found"},
+        )
+        await db.commit()
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    metadata = oauth_state.metadata_json or {}
+    repo_full_name = str(metadata.get("repo_full_name") or "")
+    if not repo_full_name:
+        raise HTTPException(status_code=400, detail="OAuth state is missing repo metadata")
+
+    try:
+        token = await exchange_github_oauth_code(code, oauth_state.redirect_uri)
+        access_token = _oauth_value(token, "access_token")
+        scopes = list(_oauth_optional_value(token, "scopes", []))
+        repo_info = await fetch_github_repo(access_token, repo_full_name)
+    except GitHubOAuthError as exc:
+        _add_github_mount_audit(
+            db,
+            action="github_mount.oauth.failed",
+            status_value="failed",
+            user_id=oauth_state.user_id,
+            project_id=project.id,
+            details={"repo_full_name": repo_full_name, "error_code": "github_oauth_error", "error_message": str(exc)},
+        )
+        await db.commit()
+        raise HTTPException(status_code=502, detail="GitHub OAuth callback failed") from exc
+
+    credential = OAuthCredential(
+        id=str(uuid.uuid4()),
+        user_id=oauth_state.user_id,
+        provider="github",
+        name=f"GitHub {repo_info['full_name']}",
+        encrypted_access_token=encrypt_secret(access_token),
+        scopes_json=scopes,
+        metadata_json={"repo_full_name": repo_info["full_name"]},
+    )
+    mount = ProjectMount(
+        id=str(uuid.uuid4()),
+        project_id=project.id,
+        mount_type="github",
+        display_name=repo_info["name"],
+        locator=f"github://{repo_info['full_name']}",
+        role=str(metadata.get("role") or "primary"),
+        status="connected",
+        metadata_json={
+            "repo_owner": repo_info["owner"],
+            "repo_name": repo_info["name"],
+            "repo_full_name": repo_info["full_name"],
+            "default_branch": repo_info["default_branch"],
+            "html_url": repo_info["html_url"],
+            "permission_summary": scopes,
+            "credential_id": credential.id,
+        },
+    )
+    oauth_state.consumed_at = datetime.now(UTC)
+    db.add(credential)
+    db.add(mount)
+    _add_github_mount_audit(
+        db,
+        action="github_mount.oauth.succeeded",
+        status_value="success",
+        user_id=oauth_state.user_id,
+        project_id=project.id,
+        details={
+            "repo_full_name": repo_info["full_name"],
+            "mount_id": mount.id,
+            "credential_id": credential.id,
+            "scopes": scopes,
+        },
+    )
+    await db.commit()
+    await db.refresh(mount)
+    return _mount_to_dict(mount)
 
 
 @router.post("/{project_id}/mounts", response_model=MountResponse, status_code=status.HTTP_201_CREATED)
@@ -648,6 +917,27 @@ async def delete_mount(
     mount = result.scalar_one_or_none()
     if not mount:
         raise HTTPException(status_code=404, detail="Mount not found")
+    if mount.mount_type == "github":
+        credential_id = (mount.metadata_json or {}).get("credential_id")
+        if credential_id:
+            credential_result = await db.execute(
+                select(OAuthCredential).where(
+                    OAuthCredential.id == credential_id,
+                    OAuthCredential.user_id == current_user.id,
+                    OAuthCredential.provider == "github",
+                )
+            )
+            credential = credential_result.scalar_one_or_none()
+            if credential:
+                credential.revoked_at = datetime.now(UTC)
+        _add_github_mount_audit(
+            db,
+            action="github_mount.revoked",
+            status_value="success",
+            user_id=current_user.id,
+            project_id=project_id,
+            details={"mount_id": mount.id, "credential_id": credential_id},
+        )
     await db.delete(mount)
     await db.commit()
 

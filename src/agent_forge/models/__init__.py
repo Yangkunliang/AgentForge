@@ -9,6 +9,7 @@ from .audit_log import AuditLog
 from .conversation import Conversation
 from .export_task import ExportTask
 from .memory_entry import MemoryEntry
+from .oauth import OAuthCredential, OAuthState
 from .pipeline import PipelineRun, PipelineStageState
 from .project import Artifact, Project, ProjectMount
 from .semantic_entry import SemanticEntry
@@ -33,6 +34,8 @@ __all__ = [
     "Artifact",
     "MemoryEntry",
     "Message",
+    "OAuthCredential",
+    "OAuthState",
     "PipelineRun",
     "PipelineStageState",
     "Project",

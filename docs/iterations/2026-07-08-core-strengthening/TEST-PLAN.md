@@ -1,7 +1,7 @@
 # 核心能力增强测试计划
 
 **日期**：2026-07-08
-**范围**：TASK-020 至 TASK-022
+**范围**：TASK-020 至 TASK-023
 
 ## TASK-020 服务端可信交付
 
@@ -34,6 +34,19 @@
 | zip 交付包可下载且内容正确 | TASK-025 后端 API 测试 |
 | upload Mount 不访问本地路径 | TASK-026 后端 API 测试 |
 | 扩展设计与任务拆分完整 | `git diff --check` + 文档路径检查 |
+
+## TASK-023 GitHub OAuth Mount 授权底座
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| OAuth start 创建 state 并写审计，不泄露 token | `uv run --extra dev pytest tests/api/test_github_mount.py` |
+| OAuth start 拒绝外部 redirect_uri | `uv run --extra dev pytest tests/api/test_github_mount.py` |
+| OAuth callback 创建 connected GitHub Mount，token 只服务端加密存储 | `uv run --extra dev pytest tests/api/test_github_mount.py` |
+| 重复 state 被拒绝 | `uv run --extra dev pytest tests/api/test_github_mount.py` |
+| 删除 GitHub Mount 标记 credential revoked 并写审计 | `uv run --extra dev pytest tests/api/test_github_mount.py` |
+| Project 创建向导选择 GitHub 时调用 OAuth start 而非普通 mount | `npm run test:e2e -- projects.spec.ts --project=chromium` |
+| 迁移 smoke | `DATABASE_URL=postgresql+asyncpg://agent:agent@localhost:15432/agentforge uv run --extra dev alembic -c migrations/alembic.ini upgrade head` |
+| FastAPI 启动 | `PYTHONPATH=/Users/yangkl/AgentForge/src uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18086` |
 
 ## 非目标
 

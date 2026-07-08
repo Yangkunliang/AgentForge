@@ -89,6 +89,15 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
+    # Credential encryption
+    credential_encryption_key: str = Field(default="", validation_alias="CREDENTIAL_ENCRYPTION_KEY")
+
+    # GitHub OAuth
+    github_oauth_client_id: str = Field(default="", validation_alias="GITHUB_OAUTH_CLIENT_ID")
+    github_oauth_client_secret: str = Field(default="", validation_alias="GITHUB_OAUTH_CLIENT_SECRET")
+    github_oauth_redirect_uri: str = Field(default="", validation_alias="GITHUB_OAUTH_REDIRECT_URI")
+    github_oauth_scopes: str = Field(default="repo", validation_alias="GITHUB_OAUTH_SCOPES")
+
     @property
     def cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]

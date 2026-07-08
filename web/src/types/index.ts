@@ -437,6 +437,18 @@ export interface CreateProjectMountForm {
   metadata?: Record<string, unknown>
 }
 
+export interface GitHubOAuthStartForm {
+  repo_full_name: string
+  role: ProjectMountRole
+  redirect_uri?: string
+}
+
+export interface GitHubOAuthStartResponse {
+  authorization_url: string
+  state: string
+  expires_at: string
+}
+
 export type ArtifactType =
   | 'prd'
   | 'architecture'

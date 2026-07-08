@@ -5,6 +5,8 @@ import type {
   Artifact,
   BridgeStatus,
   CreateArtifactForm,
+  GitHubOAuthStartForm,
+  GitHubOAuthStartResponse,
   MountFileListResponse,
   MountFileReadResponse,
   Project,
@@ -54,6 +56,9 @@ export const projectsApi = {
       ...data,
       metadata: data.metadata ?? {},
     }),
+
+  startGitHubOAuthMount: (projectId: string, data: GitHubOAuthStartForm) =>
+    request.post<GitHubOAuthStartResponse>(`/projects/${projectId}/mounts/github/oauth/start`, data),
 
   listArtifacts: (projectId: string) =>
     request.get<Artifact[]>(`/projects/${projectId}/artifacts`),

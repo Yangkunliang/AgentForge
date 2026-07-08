@@ -210,6 +210,71 @@ DELETE /api/v1/projects/{project_id}/mounts/{mount_id}
 
 `mount_type` 取值：`local`、`github`、`upload`。TASK-018 后 connected local mount 可通过 Bridge 读取授权 root 内的 UTF-8 文本文件。
 
+### GitHub OAuth Mount
+
+GitHub Mount 必须由当前登录用户在指定 Project 下显式授权创建。OAuth token 只保存在服务端加密凭证表，前端响应、`ProjectMount.metadata`、审计日志和 Delivery report 均不得包含明文 token。
+
+```http
+POST /api/v1/projects/{project_id}/mounts/github/oauth/start
+Authorization: Bearer <token>
+
+{
+  "repo_full_name": "acme/shop-api",
+  "role": "primary",
+  "redirect_uri": "http://localhost:3000/api/v1/projects/project-001/mounts/github/oauth/callback"
+}
+```
+
+**响应 201**:
+```json
+{
+  "authorization_url": "https://github.com/login/oauth/authorize?client_id=...&state=...",
+  "state": "opaque-csrf-state",
+  "expires_at": "2026-07-08T10:10:00Z"
+}
+```
+
+说明：
+
+- `repo_full_name` 必须是 `owner/name` 格式，前端可把 `https://github.com/owner/name` 规整后传入。
+- `redirect_uri` 可选；前端推荐传入当前 Project 专属 callback 地址，避免服务端全局配置推断项目。客户端传入的 URI 必须是 `http(s)://host/api/v1/projects/{project_id}/mounts/github/oauth/callback`，否则返回 400。
+- `state` 绑定当前 `user_id`、`project_id`、provider、repo 和 10 分钟过期时间。
+- 如果 `GITHUB_OAUTH_CLIENT_ID` 或 redirect URI 未配置，返回 503，并写入 `github_mount.oauth.failed`。
+
+授权回调：
+
+```http
+GET /api/v1/projects/{project_id}/mounts/github/oauth/callback?code=...&state=...
+```
+
+**响应 201**:
+```json
+{
+  "id": "mount-001",
+  "project_id": "project-001",
+  "mount_type": "github",
+  "display_name": "shop-api",
+  "locator": "github://acme/shop-api",
+  "role": "primary",
+  "status": "connected",
+  "metadata": {
+    "repo_owner": "acme",
+    "repo_name": "shop-api",
+    "repo_full_name": "acme/shop-api",
+    "default_branch": "main",
+    "html_url": "https://github.com/acme/shop-api",
+    "permission_summary": ["repo"],
+    "credential_id": "credential-001"
+  },
+  "created_at": "2026-07-08T10:00:00Z",
+  "updated_at": "2026-07-08T10:00:00Z"
+}
+```
+
+说明：OAuth callback 是 GitHub 浏览器重定向路径，通常不会携带 `Authorization` header。后端通过一次性 `state` 找回发起授权的 `user_id` 和 `project_id`，并在成功后消费 state。
+
+删除 GitHub Mount 时，`DELETE /api/v1/projects/{project_id}/mounts/{mount_id}` 会标记关联 `OAuthCredential.revoked_at`，并写入 `github_mount.revoked` 审计。GitHub OAuth 审计事件包括：`github_mount.oauth.started`、`github_mount.oauth.succeeded`、`github_mount.oauth.failed`、`github_mount.revoked`。
+
 ### Agent Bridge
 
 ```http

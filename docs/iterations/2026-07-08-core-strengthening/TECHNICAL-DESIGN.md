@@ -103,11 +103,14 @@ Project
     -> CredentialRef(encrypted OAuth token, server-only)
 ```
 
+TASK-023 已落地授权底座：`oauth_states` 负责短期 state 绑定与一次性消费，`oauth_credentials` 负责服务端加密 token 存储；Project 创建向导选择 GitHub OAuth 时调用 start API 并传入项目专属 callback URI，完成页展示授权链接，callback 通过一次性 state 找回用户和项目，不依赖浏览器重定向携带 JWT header。
+
 边界：
 
 - `ProjectMount.metadata` 只保存非敏感信息：`repo_owner`、`repo_name`、`repo_full_name`、`default_branch`、`html_url`、`permission_summary`、`credential_id`。
 - OAuth access token 必须进入服务端加密凭证表，前端响应、审计日志、Delivery report 都不得包含 token。
 - OAuth `state` 必须绑定当前用户、Project、过期时间和 CSRF nonce。
+- 客户端传入的 `redirect_uri` 必须指向当前 Project 的 AgentForge callback path。
 - 授权完成后只创建用户显式选择的 repo Mount，不自动扫描组织或全部仓库。
 - 如果 OAuth scope 难以做到单 repo 最小权限，产品上必须展示权限摘要；后续可切 GitHub App installation 获取更细粒度授权。
 
@@ -116,7 +119,6 @@ Project
 ```text
 POST /api/v1/projects/{project_id}/mounts/github/oauth/start
 GET  /api/v1/projects/{project_id}/mounts/github/oauth/callback
-POST /api/v1/projects/{project_id}/mounts/github
 DELETE /api/v1/projects/{project_id}/mounts/{mount_id}
 ```
 

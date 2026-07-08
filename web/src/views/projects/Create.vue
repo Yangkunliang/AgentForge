@@ -2,8 +2,9 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { projectsApi } from '@/api/modules/projects'
 import { useProjectStore } from '@/stores/project'
-import type { ProjectMountType } from '@/types'
+import type { ProjectMountStatus, ProjectMountType } from '@/types'
 
 const router = useRouter()
 const projectStore = useProjectStore()
@@ -16,6 +17,10 @@ const mountLocator = ref('')
 const selectedTags = ref<string[]>([])
 const customTag = ref('')
 const submitting = ref(false)
+const completedMountMethod = ref<'cli' | 'github' | 'upload' | null>(null)
+const githubAuthorizationUrl = ref('')
+const githubOAuthState = ref('')
+const githubOAuthExpiresAt = ref('')
 
 const techTags = [
   'Vue 3', 'React', 'Angular', 'Svelte',
@@ -44,26 +49,41 @@ const mountOptions: Array<{
 
 const isStepValid = computed(() => {
   if (currentStep.value === 1) return projectName.value.trim().length > 0
-  if (currentStep.value === 2) return mountLocator.value.trim().length > 0
+  if (currentStep.value === 2) {
+    if (mountMethod.value === 'github') return isGitHubRepoInputValid(mountLocator.value)
+    return mountLocator.value.trim().length > 0
+  }
   return true
 })
 
 const mountLocatorLabel = computed(() => {
-  if (mountMethod.value === 'github') return 'GitHub 仓库地址'
+  if (mountMethod.value === 'github') return 'GitHub 仓库'
   if (mountMethod.value === 'upload') return '上传文件标识'
   return '本地目录路径'
 })
 
 const mountLocatorPlaceholder = computed(() => {
-  if (mountMethod.value === 'github') return '例如：https://github.com/acme/payment-service'
+  if (mountMethod.value === 'github') return '例如：acme/payment-service 或 https://github.com/acme/payment-service'
   if (mountMethod.value === 'upload') return '例如：payment-service.zip'
   return '例如：/Users/me/work/payment-service'
 })
 
 const mountLocatorHint = computed(() => {
-  if (mountMethod.value === 'github') return '后续接入 OAuth 后可自动同步，这里先记录用户主动授权的仓库定位。'
+  if (mountMethod.value === 'github') return '提交后会先创建项目，再生成 GitHub OAuth 授权链接；授权完成后才会创建 connected Mount。'
   if (mountMethod.value === 'upload') return '上传解析将在后续任务实现，这里先保存手动上传的上下文入口。'
   return 'AgentForge 不会自动扫描本机目录，只会使用你明确授权的路径。'
+})
+
+const completionTitle = computed(() => {
+  if (completedMountMethod.value === 'github' && githubAuthorizationUrl.value) return 'GitHub 授权已准备好'
+  return '项目创建成功'
+})
+
+const completionDescription = computed(() => {
+  if (completedMountMethod.value === 'github' && githubAuthorizationUrl.value) {
+    return `${projectName.value || '新项目'} 已创建，继续完成 GitHub 授权后，AgentForge 会把仓库作为主代码库接入项目。`
+  }
+  return `${projectName.value || '新项目'} 已创建完成`
 })
 
 function selectTag(tag: string) {
@@ -88,27 +108,64 @@ function toMountType(): ProjectMountType {
   return mountMethod.value
 }
 
+function toMountStatus(): ProjectMountStatus {
+  if (mountMethod.value === 'upload') return 'pending'
+  return 'connected'
+}
+
+function normalizeGitHubRepoFullName(value: string): string {
+  return value
+    .trim()
+    .replace(/^git@github\.com:/, '')
+    .replace(/^https?:\/\/github\.com\//, '')
+    .replace(/^github\.com\//, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/$/, '')
+    .replace(/\.git$/, '')
+}
+
+function isGitHubRepoInputValid(value: string): boolean {
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(normalizeGitHubRepoFullName(value))
+}
+
 async function submitProject() {
   if (submitting.value) return
   submitting.value = true
   try {
+    completedMountMethod.value = null
+    githubAuthorizationUrl.value = ''
+    githubOAuthState.value = ''
+    githubOAuthExpiresAt.value = ''
+
     const project = await projectStore.createProject({
       name: projectName.value,
       description: projectDescription.value,
       tech_tags: selectedTags.value,
     })
-    await projectStore.createMount(project.id, {
-      mount_type: toMountType(),
-      display_name: '主代码库',
-      locator: mountLocator.value,
-      role: 'primary',
-      status: 'connected',
-      metadata: {
-        created_from: 'project_create_wizard',
-      },
-    })
+    if (mountMethod.value === 'github') {
+      const { data } = await projectsApi.startGitHubOAuthMount(project.id, {
+        repo_full_name: normalizeGitHubRepoFullName(mountLocator.value),
+        role: 'primary',
+        redirect_uri: `${window.location.origin}/api/v1/projects/${project.id}/mounts/github/oauth/callback`,
+      })
+      githubAuthorizationUrl.value = data.authorization_url
+      githubOAuthState.value = data.state
+      githubOAuthExpiresAt.value = data.expires_at
+    } else {
+      await projectStore.createMount(project.id, {
+        mount_type: toMountType(),
+        display_name: '主代码库',
+        locator: mountLocator.value,
+        role: 'primary',
+        status: toMountStatus(),
+        metadata: {
+          created_from: 'project_create_wizard',
+        },
+      })
+    }
+    completedMountMethod.value = mountMethod.value
     currentStep.value = 4
-    ElMessage.success('项目已创建')
+    ElMessage.success(mountMethod.value === 'github' ? '项目已创建，请完成 GitHub 授权' : '项目已创建')
   } finally {
     submitting.value = false
   }
@@ -132,6 +189,11 @@ function prevStep() {
 
 function finish() {
   router.push('/chat')
+}
+
+function openGitHubAuthorization() {
+  if (!githubAuthorizationUrl.value) return
+  window.location.href = githubAuthorizationUrl.value
 }
 </script>
 
@@ -224,6 +286,11 @@ function finish() {
               <p class="cli-hint">复制命令到终端执行，将本地目录挂载到平台</p>
             </div>
 
+            <div v-else-if="mountMethod === 'github'" class="oauth-status" data-testid="github-oauth-status">
+              <div class="oauth-status__title">将跳转到 GitHub 授权</div>
+              <div class="oauth-status__desc">授权成功后，平台会保存加密凭据并创建 GitHub connected Mount。</div>
+            </div>
+
             <div class="form-group mount-locator-group">
               <label class="form-label">{{ mountLocatorLabel }} <span class="required">*</span></label>
               <input
@@ -278,13 +345,36 @@ function finish() {
                 <circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 6-6"/>
               </svg>
             </div>
-            <h2 class="step-title">项目创建成功</h2>
+            <h2 class="step-title">{{ completionTitle }}</h2>
             <p class="step-desc">
-              {{ projectName || '新项目' }} 已创建完成<br/>
+              {{ completionDescription }}<br/>
               {{ selectedTags.length > 0 ? `技术栈：${selectedTags.join('、')}` : '' }}
             </p>
-            <button class="btn-primary btn-large" @click="finish">
-              <span>开始第一次对话</span>
+            <div
+              v-if="githubAuthorizationUrl"
+              class="github-completion"
+              data-testid="github-oauth-completion"
+            >
+              <div class="github-completion__row">
+                <span>授权状态</span>
+                <strong>待 GitHub 确认</strong>
+              </div>
+              <div class="github-completion__row">
+                <span>授权 State</span>
+                <code>{{ githubOAuthState }}</code>
+              </div>
+            </div>
+            <a
+              v-if="githubAuthorizationUrl"
+              class="btn-primary btn-large github-oauth-link"
+              :href="githubAuthorizationUrl"
+              data-testid="github-oauth-link"
+              @click.prevent="openGitHubAuthorization"
+            >
+              <span>继续 GitHub 授权</span>
+            </a>
+            <button class="btn-secondary btn-large" @click="finish">
+              <span>{{ githubAuthorizationUrl ? '稍后进入对话' : '开始第一次对话' }}</span>
             </button>
           </div>
         </Transition>
@@ -561,6 +651,28 @@ function finish() {
   color: #9ca3af;
 }
 
+.oauth-status {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  text-align: left;
+}
+
+.oauth-status__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.oauth-status__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475569;
+}
+
 .mount-locator-group {
   margin-top: 16px;
 }
@@ -669,6 +781,41 @@ function finish() {
   margin-bottom: 16px;
 }
 
+.github-completion {
+  width: min(100%, 420px);
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  text-align: left;
+}
+
+.github-completion__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: #6b7280;
+
+  & + & {
+    margin-top: 8px;
+  }
+
+  strong {
+    color: #b45309;
+    font-weight: 600;
+  }
+
+  code {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #374151;
+    white-space: nowrap;
+  }
+}
+
 .btn-large {
   margin-top: 16px;
   padding: 12px 24px;
@@ -685,6 +832,9 @@ function finish() {
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 16px;
   background: #409eff;
   color: #fff;
@@ -692,6 +842,7 @@ function finish() {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+  text-decoration: none;
   cursor: pointer;
   transition: background 0.15s;
 

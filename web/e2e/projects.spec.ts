@@ -100,6 +100,7 @@ async function mockProjectApi(page: Page, options?: {
   artifactsByProject?: Record<string, Artifact[]>
   onCreateProject?: (payload: unknown) => Project
   onCreateMount?: (projectId: string, payload: unknown) => void
+  onStartGitHubOAuth?: (projectId: string, payload: unknown) => string
   sessionRequests?: string[]
 }) {
   const projects = options?.projects ?? [...baseProjects]
@@ -194,6 +195,20 @@ async function mockProjectApi(page: Page, options?: {
       }
       projects.unshift(created)
       await route.fulfill(json(created, 201))
+      return
+    }
+
+    const githubOAuthStartMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/mounts\/github\/oauth\/start$/)
+    if (githubOAuthStartMatch && method === 'POST') {
+      const projectId = githubOAuthStartMatch[1]
+      const payload = request.postDataJSON()
+      const authorizationUrl = options?.onStartGitHubOAuth?.(projectId, payload)
+        ?? 'https://github.com/login/oauth/authorize?client_id=e2e-client&state=e2e-state'
+      await route.fulfill(json({
+        authorization_url: authorizationUrl,
+        state: 'e2e-state',
+        expires_at: now,
+      }, 201))
       return
     }
 
@@ -324,5 +339,61 @@ test.describe('TASK-014 project real data flow', () => {
       role: 'primary',
       status: 'connected',
     })
+  })
+
+  test('starts GitHub OAuth instead of creating a plain GitHub mount', async ({ page }) => {
+    let createMountPayload: unknown
+    let githubOAuthPayload: unknown
+    let githubOAuthProjectId: string | undefined
+
+    await login(page)
+    await mockProjectApi(page, {
+      onCreateProject: (payload) => ({
+        id: 'project-github',
+        user_id: 'user-1',
+        name: (payload as { name: string }).name,
+        display_name: (payload as { name: string }).name,
+        description: null,
+        tech_tags: [],
+        status: 'active',
+        created_at: now,
+        updated_at: now,
+      }),
+      onCreateMount: (_projectId, payload) => {
+        createMountPayload = payload
+      },
+      onStartGitHubOAuth: (projectId, payload) => {
+        githubOAuthProjectId = projectId
+        githubOAuthPayload = payload
+        return 'https://github.com/login/oauth/authorize?client_id=e2e-client&state=e2e-state'
+      },
+    })
+
+    await page.goto('/projects/create')
+
+    await page.getByPlaceholder('例如：我的电商后端').fill('支付网关服务')
+    await page.getByRole('button', { name: '下一步' }).click()
+    await page.getByText('GitHub OAuth').click()
+    await expect(page.getByTestId('github-oauth-status')).toContainText('将跳转到 GitHub 授权')
+    await page.getByPlaceholder('例如：acme/payment-service 或 https://github.com/acme/payment-service').fill(
+      'https://github.com/acme/payment-service',
+    )
+    await page.getByRole('button', { name: '下一步' }).click()
+    await page.getByRole('button', { name: '完成' }).click()
+
+    await expect(page.getByText('GitHub 授权已准备好')).toBeVisible()
+    await expect(page.getByTestId('github-oauth-link')).toHaveAttribute(
+      'href',
+      'https://github.com/login/oauth/authorize?client_id=e2e-client&state=e2e-state',
+    )
+    expect(githubOAuthProjectId).toBe('project-github')
+    expect(githubOAuthPayload).toMatchObject({
+      repo_full_name: 'acme/payment-service',
+      role: 'primary',
+    })
+    expect((githubOAuthPayload as { redirect_uri: string }).redirect_uri).toBe(
+      'http://localhost:3000/api/v1/projects/project-github/mounts/github/oauth/callback',
+    )
+    expect(createMountPayload).toBeUndefined()
   })
 })
