@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent_forge.auth.permissions import get_admin_user
 from agent_forge.database import get_async_session
 from agent_forge.exporter.manager import ExportManager
+from agent_forge.models.export_task import ExportTask
 from agent_forge.models.user import User
 
 router = APIRouter(prefix="/exports", tags=["exports"])
@@ -31,6 +32,31 @@ class ExportStatusResponse(BaseModel):
     total_records: int
     estimated_size_mb: float
     file_path: str | None
+
+
+class ExportListResponse(BaseModel):
+    total: int
+    items: list[ExportStatusResponse]
+
+
+def _export_to_response(export_task: ExportTask) -> ExportStatusResponse:
+    return ExportStatusResponse(
+        export_id=export_task.id,
+        status=export_task.status,
+        total_records=export_task.total_records,
+        estimated_size_mb=round(export_task.estimated_size_mb, 2),
+        file_path=export_task.file_path,
+    )
+
+
+@router.get("", response_model=ExportListResponse)
+async def list_exports(
+    db: AsyncSession = Depends(get_async_session),
+    _: User = Depends(get_admin_user),
+):
+    export_tasks = await ExportManager.list_exports(db)
+    items = [_export_to_response(task) for task in export_tasks]
+    return ExportListResponse(total=len(items), items=items)
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
@@ -60,13 +86,7 @@ async def get_export_status(
     if not export_task:
         raise HTTPException(status_code=404, detail="Export task not found")
 
-    return ExportStatusResponse(
-        export_id=export_task.id,
-        status=export_task.status,
-        total_records=export_task.total_records,
-        estimated_size_mb=round(export_task.estimated_size_mb, 2),
-        file_path=export_task.file_path,
-    )
+    return _export_to_response(export_task)
 
 
 @router.get("/{export_id}/download")

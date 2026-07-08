@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.auth.jwt import create_access_token
 from agent_forge.exporter.anonymizer import DataAnonymizer
+from agent_forge.models import User
+from agent_forge.models.export_task import ExportTask
 
 
 @pytest.mark.asyncio
@@ -55,3 +60,37 @@ class TestDataAnonymizer:
         assert "[PHONE]" in result["outer"]["inner"]["phone"]
         assert "[NAME]" in result["list"][0]["name"]
         assert "[NAME]" in result["list"][1]["name"]
+
+
+class TestExportRoutes:
+    @pytest.mark.asyncio
+    async def test_list_exports_returns_existing_tasks(
+        self,
+        async_client: TestClient,
+        db: AsyncSession,
+        fake_user: User,
+    ):
+        fake_user.permissions = ["admin"]
+        token = create_access_token({"sub": fake_user.id})
+
+        task = ExportTask(
+            id="export-route-test",
+            type="training_data",
+            status="done",
+            total_records=3,
+            estimated_size_mb=1.5,
+            file_path="/tmp/export-route-test.jsonl",
+            delevel="level_1",
+        )
+        db.add(task)
+        await db.commit()
+
+        resp = async_client.get(
+            "/api/v1/exports",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] >= 1
+        assert any(item["export_id"] == "export-route-test" for item in data["items"])

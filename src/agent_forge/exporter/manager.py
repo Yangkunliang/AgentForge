@@ -54,6 +54,11 @@ class ExportManager:
         return result.scalar_one_or_none()
 
     @classmethod
+    async def list_exports(cls, db: AsyncSession) -> list[ExportTask]:
+        result = await db.execute(select(ExportTask).order_by(ExportTask.created_at.desc()))
+        return list(result.scalars().all())
+
+    @classmethod
     async def get_export_file_path(cls, db: AsyncSession, export_id: str) -> str | None:
         export = await cls.get_export(db, export_id)
         if export and export.status == "done" and export.file_path:
