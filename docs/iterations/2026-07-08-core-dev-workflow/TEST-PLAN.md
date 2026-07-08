@@ -23,7 +23,7 @@
 | TASK-016 | pytest 覆盖 Artifact CRUD | Artifact Viewer 可查看 | Artifact 类型说明 |
 | TASK-017 | pytest 覆盖 confirm_required/confirm_resolved、确认 API、等待态防绕过 | `human-confirmation.spec.ts` 覆盖确认继续和提交修改意见 | 人工介入点更新 |
 | TASK-018 | Bridge 单测和权限测试 | Mount 连接状态、文件读取 | 安全文档更新 |
-| TASK-019 | Delivery service 单测 | diff/导出/写回操作确认 | 交付边界更新 |
+| TASK-019 | Delivery API 覆盖 diff preview、confirm_write、授权 Mount 写回、敏感路径拒绝、Markdown report | Artifact Viewer 覆盖 diff 预览、确认写回、交付报告展示和导出 | 交付边界更新 |
 
 ## 3. 端到端验收目标
 
@@ -42,7 +42,12 @@ TASK-018 已补充：
 -> Chat context_files 携带 mount_id -> SkillExecutionEngine 收到真实文件内容
 ```
 
-TASK-019 继续补充 Artifact 写回、导出 diff 和交付报告路径。
+TASK-019 已补充：
+
+```text
+Artifact Viewer -> 选择 connected local Mount -> 预览 unified diff
+-> confirm_write 后写回授权 root -> 展示 Delivery report -> 导出 Markdown 报告
+```
 
 ## 4. 非阻塞警告
 

@@ -5,7 +5,7 @@
 **关联架构**：`docs/architecture/CORE-DEV-WORKFLOW.md`
 **状态**：阶段实施中
 
-> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用、人工确认与阶段继续、Bridge 授权文件读取已落地；TASK-019 继续推进 Delivery。
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018、TASK-019 已完成，Project / Mount / Artifact 数据底座、项目真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用、人工确认与阶段继续、Bridge 授权文件读取、Delivery diff 预览和确认写回已落地。
 
 ## 1. 背景
 
@@ -39,7 +39,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | CDW-04 | 我希望阶段输出成为可复用产物 | 阶段完成后保存 Artifact，并能在 Chat / Project / Viewer 中查看和加入上下文 |
 | CDW-05 | 我希望关键节点暂停确认 | PRD、技术选型、影响范围可触发 confirm_required |
 | CDW-06 | 我希望 Agent 能逐步读我的真实代码库 | connected local Mount 内选中文件可被读取并注入 Agent 上下文 |
-| CDW-07 | 我希望结果能回到我的项目 | Delivery 阶段生成 diff、写回本地或导出 |
+| CDW-07 | 我希望结果能回到我的项目 | Artifact Viewer 可预览 diff、确认写回 connected local Mount，并导出 Markdown Delivery report |
 
 ## 4. 范围
 

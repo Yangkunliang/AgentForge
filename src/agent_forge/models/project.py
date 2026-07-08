@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, ForeignKey, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, JSON_VARIANT, TimestampMixin
@@ -100,6 +101,10 @@ class Artifact(Base, TimestampMixin):
         index=True,
     )
     metadata_json: dict = Column("metadata", JSON_VARIANT, nullable=True, default=dict)
+    delivery_status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
+    delivery_target_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivery_report_json: dict | None = Column("delivery_report", JSON_VARIANT, nullable=True)
 
     project = relationship("Project", back_populates="artifacts")
     session = relationship("Session", back_populates="artifacts")

@@ -24,6 +24,10 @@ type Artifact = {
   file_type: string | null
   source_message_id: string | null
   metadata: Record<string, unknown>
+  delivery_status: string
+  delivery_target_path: string | null
+  delivered_at: string | null
+  delivery_report: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
@@ -54,6 +58,10 @@ const artifact: Artifact = {
   file_type: 'markdown',
   source_message_id: 'msg-assistant',
   metadata: { stage_id: 'design', stage_name: '架构设计' },
+  delivery_status: 'pending',
+  delivery_target_path: null,
+  delivered_at: null,
+  delivery_report: null,
   created_at: now,
   updated_at: now,
 }
@@ -74,6 +82,9 @@ async function login(page: Page) {
 }
 
 async function mockArtifactApi(page: Page) {
+  const applyRequests: Array<Record<string, unknown>> = []
+  let delivered = false
+
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -114,7 +125,69 @@ async function mockArtifactApi(page: Page) {
     }
 
     if (method === 'GET' && path === `/api/v1/artifacts/${artifact.id}`) {
-      await route.fulfill(json(artifact))
+      await route.fulfill(json(delivered
+        ? {
+            ...artifact,
+            delivery_status: 'delivered',
+            delivery_target_path: 'docs/architecture.md',
+            delivered_at: now,
+            delivery_report: {
+              mount_id: 'mount-api',
+              target_path: 'docs/architecture.md',
+              backup_path: 'docs/architecture.md.agentforge.bak',
+              bytes_written: 48,
+            },
+          }
+        : artifact))
+      return
+    }
+
+    if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/preview`) {
+      await route.fulfill(json({
+        artifact_id: artifact.id,
+        project_id: project.id,
+        mount_id: 'mount-api',
+        target_path: 'docs/architecture.md',
+        status: 'previewed',
+        has_changes: true,
+        unified_diff: '--- a/docs/architecture.md\n+++ b/docs/architecture.md\n@@ -1 +1 @@\n-旧架构\n+新架构\n',
+        report: {
+          mount_id: 'mount-api',
+          target_path: 'docs/architecture.md',
+          bytes_to_write: 48,
+        },
+      }))
+      return
+    }
+
+    if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/apply`) {
+      const payload = request.postDataJSON() as Record<string, unknown>
+      applyRequests.push(payload)
+      delivered = true
+      await route.fulfill(json({
+        artifact_id: artifact.id,
+        project_id: project.id,
+        mount_id: 'mount-api',
+        target_path: 'docs/architecture.md',
+        status: 'delivered',
+        has_changes: true,
+        unified_diff: '--- a/docs/architecture.md\n+++ b/docs/architecture.md\n@@ -1 +1 @@\n-旧架构\n+新架构\n',
+        report: {
+          mount_id: 'mount-api',
+          target_path: 'docs/architecture.md',
+          backup_path: 'docs/architecture.md.agentforge.bak',
+          bytes_written: 48,
+        },
+      }))
+      return
+    }
+
+    if (method === 'GET' && path === `/api/v1/artifacts/${artifact.id}/delivery/report`) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/markdown',
+        body: '# Delivery Report\n\n- Target Path: docs/architecture.md\n- Backup Path: docs/architecture.md.agentforge.bak\n',
+      })
       return
     }
 
@@ -150,6 +223,8 @@ async function mockArtifactApi(page: Page) {
 
     await route.fulfill(json({ detail: `Unhandled ${method} ${path}` }, 404))
   })
+
+  return { applyRequests }
 }
 
 test.describe('TASK-016 artifact viewer', () => {
@@ -181,5 +256,36 @@ test.describe('TASK-016 artifact viewer', () => {
 
     await expect(page.locator('.context-chip')).toContainText('产物')
     await expect(page.locator('.context-chip')).toContainText('架构设计.md')
+  })
+
+  test('previews delivery diff before confirmed writeback', async ({ page }) => {
+    await login(page)
+    const api = await mockArtifactApi(page)
+
+    await page.goto('/artifacts/artifact-design')
+
+    await page.getByLabel('目标代码库').selectOption('mount-api')
+    await page.getByLabel('写入路径').fill('docs/architecture.md')
+    await page.getByRole('button', { name: '预览 Diff' }).click()
+
+    await expect(page.locator('.artifact-viewer__diff')).toContainText('-旧架构')
+    await expect(page.locator('.artifact-viewer__diff')).toContainText('+新架构')
+    expect(api.applyRequests).toHaveLength(0)
+
+    await page.getByRole('button', { name: '确认写入' }).click()
+
+    expect(api.applyRequests).toHaveLength(1)
+    expect(api.applyRequests[0]).toMatchObject({
+      mount_id: 'mount-api',
+      target_path: 'docs/architecture.md',
+      confirm_write: true,
+    })
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('已交付')
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('docs/architecture.md.agentforge.bak')
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: '导出报告' }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe('架构设计.md.delivery.md')
   })
 })

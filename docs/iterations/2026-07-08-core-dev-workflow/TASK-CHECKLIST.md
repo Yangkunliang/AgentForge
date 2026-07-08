@@ -26,7 +26,7 @@
 | done | TASK-016：Artifact 产物归档与查看 | P1 | 阶段输出保存、查看、作为上下文复用 | TASK-015 |
 | done | TASK-017：人工确认与阶段继续机制 | P1 | PRD/技术选型/影响范围暂停确认后继续 | TASK-015、TASK-016 |
 | done | TASK-018：Agent Bridge / 真实代码库读取 | P1 | 本地 mount、连接状态、授权文件读取 | TASK-013、TASK-017 |
-| todo | TASK-019：写回与交付闭环 | P2 | 生成 diff、写回本地、导出交付结果 | TASK-016、TASK-018 |
+| done | TASK-019：写回与交付闭环 | P2 | 生成 diff、确认写回授权 Mount、导出 Markdown 交付报告 | TASK-016、TASK-018 |
 
 ## 依赖图
 
@@ -43,8 +43,8 @@ TASK-012
 
 ## 防遗忘机制
 
-- `docs/tasks/CHECKLIST.md` 必须保留 TASK-016 至 TASK-019 的 todo 状态。
+- `docs/tasks/CHECKLIST.md` 必须保留 TASK-016 至 TASK-019 的完成状态和依赖链，避免后续误判核心闭环缺口。
 - 每个任务有独立 `docs/tasks/TASK-NNN.md`，不得只存在于本迭代目录。
 - 每完成一个任务，只能标记该任务 done，不得顺手标记后续任务。
-- TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018 已完成；TASK-019 的依赖状态说明必须保持可见。
-- TASK-018 完成后已检查 TASK-019 仍在任务索引中。
+- TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018、TASK-019 已完成。
+- TASK-019 完成后，核心开发闭环已具备 Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery 的 MVP 主链路。

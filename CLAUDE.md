@@ -10,7 +10,7 @@
 
 > 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现；PipelineRun / StageState 阶段状态机已实现；Artifact 归档、查看和上下文复用已实现；人工确认与阶段继续机制已实现；Agent Bridge 只读授权文件上下文已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
+**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现；PipelineRun / StageState 阶段状态机已实现；Artifact 归档、查看和上下文复用已实现；人工确认与阶段继续机制已实现；Agent Bridge 授权文件上下文已实现；Delivery diff 预览与确认写回已实现。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`。
 
 ---
 
@@ -34,7 +34,7 @@
 | **代码库上下文** | 用户通过 CLI 工具（`agentforge mount`）或桌面客户端授权 Agent 访问其本地目录，或通过 GitHub OAuth 连接远程仓库。 |
 | **对话（Session）** | 归属于某个项目，历史产物（PRD、代码、测试报告）与项目绑定，可跨会话继续。 |
 | **需求类型路由** | Agent 接收需求后先做意图分类，动态决定走哪几个阶段，不强制走完整 8 步流水线。 |
-| **开发闭环** | Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery，是后续 TASK-013～TASK-019 的实现主线。 |
+| **开发闭环** | Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery，是全栈开发自动化的 MVP 主链路。 |
 
 ### 需求类型 → 流水线映射
 
@@ -69,8 +69,8 @@
 | 路径 | 一句话说明 |
 |------|-----------|
 | `docs/tech-design/ARCHITECTURE.md` | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 |
-| `docs/tech-design/API-SPEC.md` | 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） |
-| `docs/tech-design/DATABASE.md` | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
+| `docs/tech-design/API-SPEC.md` | 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） |
+| `docs/tech-design/DATABASE.md` | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
 | `docs/tech-design/SECURITY.md` | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 |
 | `docs/tech-design/LLM-CONFIG.md` | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 |
 | `docs/tech-design/FRONTEND-ARCHITECTURE.md` | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） |
@@ -105,6 +105,7 @@
 | `src/agent_forge/models/` | SQLAlchemy 数据模型（含 Project、ProjectMount、PipelineRun、PipelineStageState、Artifact 核心闭环表） |
 | `src/agent_forge/pipeline/` | Pipeline intent 配置、状态机服务与 StageRuntime |
 | `src/agent_forge/bridge/` | Agent Bridge 授权本地 Mount 文件列表和只读读取安全边界 |
+| `src/agent_forge/delivery/` | Artifact diff preview、确认写回授权 Mount、Delivery report |
 | `src/agent_forge/cli.py` | `agentforge mount <path>` CLI 入口 |
 | `src/agent_forge/tracing.py` | 分布式 tracing（span 装饰器 + 结构化 JSON 日志） |
 | `api/main.py` | FastAPI 入口 |
@@ -125,7 +126,7 @@
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
-**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；TASK-014 已完成项目管理页、创建向导、ProjectBar 和 Chat Session 的真实 Project API 接入；TASK-015 已实现 PipelineRun / StageState 状态机、StageRuntime 和 StagePreview 后端状态渲染；TASK-016 已实现阶段 Artifact 自动归档、Chat / Project / Viewer 查看和上下文复用；TASK-017 已实现 `waiting_confirmation`、ConfirmCard、确认 API、确认 SSE 和审计日志；TASK-018 已实现 `agentforge mount`、Bridge 状态/文件列表/读取 API、ContextPicker 授权文件选择和真实文件内容注入 SkillExecutionEngine。后续从 TASK-019 写回与交付闭环继续推进。
+**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery`。TASK-013 已实现 Project / Mount / Artifact 数据底座与项目维度 Session API；TASK-014 已完成项目管理页、创建向导、ProjectBar 和 Chat Session 的真实 Project API 接入；TASK-015 已实现 PipelineRun / StageState 状态机、StageRuntime 和 StagePreview 后端状态渲染；TASK-016 已实现阶段 Artifact 自动归档、Chat / Project / Viewer 查看和上下文复用；TASK-017 已实现 `waiting_confirmation`、ConfirmCard、确认 API、确认 SSE 和审计日志；TASK-018 已实现 `agentforge mount`、Bridge 状态/文件列表/读取 API、ContextPicker 授权文件选择和真实文件内容注入 SkillExecutionEngine；TASK-019 已实现 Artifact diff preview、`confirm_write` 写回 connected local Mount、写前备份、Delivery report 和 Markdown 导出。
 
 ### 计划技术栈
 

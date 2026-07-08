@@ -519,6 +519,18 @@ TASK-018 后，Agent Bridge 支持读取用户主动授权的 connected local Mo
 - 文件读取仅支持 UTF-8 文本，并按最大字节数截断，避免二进制内容或超大文件进入 LLM 上下文。
 - 只有属于当前登录用户当前 Project 的 connected local Mount 可以读取；其他用户 Project、非 local Mount 或 disconnected Mount 均拒绝。
 
+### 7.3 Artifact Delivery 本地写回
+
+TASK-019 后，Artifact 可写回用户主动授权的 connected local Mount。写回是高风险副作用操作，必须满足：
+
+- `preview` 只生成 unified diff，不写文件。
+- `apply` 必须显式传入 `confirm_write=true`，否则返回 409。
+- 写回的 `mount_id` 必须属于 Artifact 所在 Project，且 Mount 必须是 connected local。
+- 写回路径复用 Bridge 相对路径规则：拒绝绝对路径、`..` 穿越、符号链接逃逸授权 root。
+- `.env`、`.env.*`、私钥文件、`.pem`、`.key`、`.p12`、`.pfx` 等敏感文件禁止写回。
+- 目标文件存在时，写入前会在同目录生成 `.agentforge.bak` 备份路径，并写入 `delivery_report`。
+- Markdown Delivery report 只在 Artifact 已交付后导出，不包含文件正文或密钥内容。
+
 ---
 
 ## 8. Secrets 管理

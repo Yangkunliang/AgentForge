@@ -304,7 +304,73 @@ DELETE /api/v1/artifacts/{artifact_id}
 
 `artifact_type` 取值：`prd`、`architecture`、`api_spec`、`code`、`test`、`report`、`diff`。
 
+Artifact 响应包含 Delivery 状态：
+
+```json
+{
+  "delivery_status": "pending",
+  "delivery_target_path": null,
+  "delivered_at": null,
+  "delivery_report": null
+}
+```
+
 MVP 阶段 Artifact 正文保存在数据库 `content` 字段。TASK-016 已落地 Artifact Viewer、Chat ArtifactCard、Project 最近产物列表和作为 `context_files[type=artifact]` 复用；对象存储和多人共享权限不在本阶段范围内。
+
+### Artifact Delivery
+
+```http
+POST /api/v1/artifacts/{artifact_id}/delivery/preview
+POST /api/v1/artifacts/{artifact_id}/delivery/apply
+GET  /api/v1/artifacts/{artifact_id}/delivery/report
+```
+
+预览请求：
+
+```json
+{
+  "mount_id": "mount-001",
+  "target_path": "src/main.py"
+}
+```
+
+预览响应：
+
+```json
+{
+  "artifact_id": "artifact-001",
+  "project_id": "project-001",
+  "mount_id": "mount-001",
+  "target_path": "src/main.py",
+  "status": "previewed",
+  "has_changes": true,
+  "unified_diff": "--- a/src/main.py\\n+++ b/src/main.py\\n@@ -1 +1 @@\\n-old\\n+new\\n",
+  "report": {
+    "mount_id": "mount-001",
+    "target_path": "src/main.py",
+    "bytes_to_write": 128
+  }
+}
+```
+
+写回请求必须显式确认：
+
+```json
+{
+  "mount_id": "mount-001",
+  "target_path": "src/main.py",
+  "confirm_write": true
+}
+```
+
+规则：
+
+- `preview` 只生成 unified diff，不写入文件。
+- `apply` 在 `confirm_write` 非 `true` 时返回 409。
+- `mount_id` 必须属于 Artifact 所在 Project，并且是 connected local Mount。
+- `target_path` 必须位于授权 root 内；绝对路径、`..` 穿越、`.env` 和私钥类敏感文件会被拒绝。
+- 写回前若目标文件存在，会在同目录生成 `.agentforge.bak` 备份路径并写入 `delivery_report`。
+- `GET /delivery/report` 在 Artifact 已交付后返回 `text/markdown`，用于导出 Delivery report；未交付返回 409。
 
 ### 会话消息中的 Artifact
 

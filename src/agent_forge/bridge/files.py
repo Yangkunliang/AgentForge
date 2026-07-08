@@ -130,7 +130,48 @@ def read_mount_file(
     }
 
 
-def _resolve_under_root(root: Path, relative_path: str, *, allow_root: bool) -> Path:
+def normalize_mount_relative_path(mount: ProjectMount, relative_path: str) -> str:
+    """Validate and normalize a file path under an authorized mount root."""
+    root = root_path_for_mount(mount)
+    target = _resolve_under_root(root, relative_path, allow_root=False, operation_label="accessed")
+    return target.relative_to(root).as_posix()
+
+
+def write_mount_file(mount: ProjectMount, relative_path: str, content: str) -> dict[str, Any]:
+    """Write UTF-8 text content to a file under an authorized mount root."""
+    root = root_path_for_mount(mount)
+    target = _resolve_under_root(root, relative_path, allow_root=False, operation_label="written")
+    if target.exists() and not target.is_file():
+        raise BridgeAccessError(400, "Path must be a file")
+    if target.parent.exists() and not target.parent.is_dir():
+        raise BridgeAccessError(400, "Parent path must be a directory")
+
+    created = not target.exists()
+    backup_relative_path: str | None = None
+    if target.exists():
+        backup = _backup_path_for(target)
+        backup.write_bytes(target.read_bytes())
+        backup_relative_path = backup.relative_to(root).as_posix()
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+
+    return {
+        "path": target.relative_to(root).as_posix(),
+        "backup_path": backup_relative_path,
+        "bytes_written": len(content.encode("utf-8")),
+        "created": created,
+        "updated_at": datetime.now(timezone.utc),
+    }
+
+
+def _resolve_under_root(
+    root: Path,
+    relative_path: str,
+    *,
+    allow_root: bool,
+    operation_label: str = "read",
+) -> Path:
     value = (relative_path or "").strip()
     if value in ("", ".") and allow_root:
         return root
@@ -147,8 +188,17 @@ def _resolve_under_root(root: Path, relative_path: str, *, allow_root: bool) -> 
     if target != root and not target.is_relative_to(root):
         raise BridgeAccessError(400, "Path traversal is not allowed")
     if _is_sensitive_path(target):
-        raise BridgeAccessError(403, "Sensitive files cannot be read through Agent Bridge")
+        raise BridgeAccessError(403, f"Sensitive files cannot be {operation_label} through Agent Bridge")
     return target
+
+
+def _backup_path_for(target: Path) -> Path:
+    backup = target.with_name(f"{target.name}.agentforge.bak")
+    if not backup.exists():
+        return backup
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    return target.with_name(f"{target.name}.agentforge.{timestamp}.bak")
 
 
 def _is_sensitive_path(path: Path) -> bool:

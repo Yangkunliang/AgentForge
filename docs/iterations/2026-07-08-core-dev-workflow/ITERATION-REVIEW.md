@@ -4,7 +4,7 @@
 **任务**：TASK-012
 **结论**：本迭代只完成路线图与任务拆分，不实现业务代码。
 
-> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018 已完成；Project 真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用、人工确认与阶段继续、Bridge 授权文件读取已可用。后续提醒从 TASK-019 Delivery 继续。
+> 2026-07-08 状态更新：TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018、TASK-019 已完成；Project 真实数据流、PipelineRun / StageState 状态机、Artifact 归档查看与上下文复用、人工确认与阶段继续、Bridge 授权文件读取、Delivery diff 预览与确认写回已可用。
 
 ## 完成内容
 
@@ -20,7 +20,7 @@
 - TASK-013 先做数据底座，不抢跑 Bridge。
 - intent 必须在 TASK-015 后成为 PipelineRun，而不是只写入 prompt。
 - Artifact 必须成为独立实体，不能只存在于聊天消息。
-- Bridge 和写回能力放到后段，避免拖慢 Project/Artifact/Pipeline 底座。
+- Bridge 和写回能力放到后段，避免拖慢 Project/Artifact/Pipeline 底座；TASK-018/TASK-019 已按该顺序落地。
 
 ## 后续提醒
 
@@ -28,4 +28,5 @@
 - TASK-015 已完成，需求类型已经生成可持久化 PipelineRun / StageState。
 - TASK-016 已完成，阶段输出已成为可查看、可复用、可作为上下文引用的 Artifact；但完整开发闭环仍依赖确认机制、Bridge 和 Delivery。
 - TASK-017 已完成，关键阶段可以进入 `waiting_confirmation`，用户确认后继续、提出修改意见后回到同阶段重新执行、取消后终止 run。
-- TASK-018 已完成，Agent 可读取用户在 connected local Mount 中选中的授权文件；但还不能声称已具备写回、生成 diff 或 PR 的 Delivery 闭环。
+- TASK-018 已完成，Agent 可读取用户在 connected local Mount 中选中的授权文件。
+- TASK-019 已完成，Artifact Viewer 可生成 diff、确认写回 connected local Mount、写前备份、保存 Delivery report 并导出 Markdown；GitHub PR 和 zip 交付仍是后续增强。

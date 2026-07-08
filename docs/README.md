@@ -37,8 +37,8 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 | ✅ |
-| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
-| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
+| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
+| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
 | [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
 | [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
 | [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（Project Store、SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
@@ -93,6 +93,7 @@ docs/
 | TASK-016 | 2026-07-08 | Artifact 产物归档与查看 | ✅ 已完成 |
 | TASK-017 | 2026-07-08 | 人工确认与阶段继续机制 | ✅ 已完成 |
 | TASK-018 | 2026-07-08 | Agent Bridge / 真实代码库读取 | ✅ 已完成 |
+| TASK-019 | 2026-07-08 | 写回与交付闭环 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -157,6 +158,10 @@ docs/
 ### TASK-018 详细信息
 - **核心功能**：`agentforge mount <path>` CLI；Bridge 状态 API；授权 root 内目录列表与 UTF-8 文本读取；路径穿越和敏感文件拒绝；ContextPicker 浏览 connected local Mount 文件；Chat 请求携带 `mount_id` 后读取真实文件内容并注入 SkillExecutionEngine
 - **验证**：`uv run --extra dev pytest tests/api/test_projects.py tests/api/test_bridge_cli.py tests/skills/test_engine_context.py` 通过；`npm run test:e2e -- bridge-context.spec.ts` 通过；`npm run build` 通过
+
+### TASK-019 详细信息
+- **核心功能**：`DeliveryService`；Artifact delivery 状态字段；Artifact Viewer 交付面板；unified diff 预览；`confirm_write` 后写回 connected local Mount；写前 `.agentforge.bak` 备份；Delivery report 保存和 Markdown 导出
+- **验证**：`uv run --extra dev pytest tests/api/test_delivery.py` 通过；`npm run test:e2e -- artifact-viewer.spec.ts` 通过
 
 ## 版本号规范
 

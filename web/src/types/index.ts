@@ -458,6 +458,10 @@ export interface Artifact {
   file_type?: 'markdown' | 'code' | 'text' | string | null
   source_message_id?: string | null
   metadata: Record<string, unknown>
+  delivery_status: 'pending' | 'previewed' | 'delivered' | 'failed' | string
+  delivery_target_path?: string | null
+  delivered_at?: string | null
+  delivery_report?: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
@@ -472,6 +476,26 @@ export interface CreateArtifactForm {
   file_type?: string | null
   source_message_id?: string | null
   metadata?: Record<string, unknown>
+}
+
+export interface DeliveryTargetPayload {
+  mount_id: string
+  target_path: string
+}
+
+export interface DeliveryApplyPayload extends DeliveryTargetPayload {
+  confirm_write: boolean
+}
+
+export interface DeliveryResponse {
+  artifact_id: string
+  project_id: string
+  mount_id: string
+  target_path: string
+  status: 'previewed' | 'delivered' | string
+  has_changes: boolean
+  unified_diff: string
+  report: Record<string, unknown>
 }
 
 // ToolCall 已迁移为 ExecutionStep，此旧接口仅兼容历史消息

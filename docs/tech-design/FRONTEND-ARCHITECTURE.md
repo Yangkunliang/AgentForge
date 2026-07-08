@@ -166,6 +166,12 @@ TASK-017 已补充：
 - `web/src/composables/useChat.ts`：处理 `confirm_required` / `confirm_resolved` SSE，刷新 PipelineRun 和待确认 Artifact。
 - `web/src/views/chat/Index.vue`：按当前 `PipelineRun.stages[].status=waiting_confirmation` 渲染 ConfirmCard，并从 Project Artifact 缓存匹配待确认产物。
 
+TASK-019 已补充：
+
+- `web/src/api/modules/artifacts.ts`：新增 `previewDelivery`、`applyDelivery`、`exportDeliveryReport`。
+- `web/src/views/artifacts/Detail.vue`：Artifact Viewer 新增交付面板，支持选择 connected local Mount、输入目标路径、预览 unified diff、确认写回、展示交付报告和导出 Markdown。
+- `web/e2e/artifact-viewer.spec.ts`：覆盖 diff 预览、确认写回 payload、Delivery report 展示和 Markdown 下载。
+
 ---
 
 ## 3. 路由设计

@@ -9,8 +9,8 @@
 
 ## 技术设计文档 (docs/tech-design/)
 - [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
-- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
-- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、Project/Mount/PipelineRun/StageState/Artifact 核心闭环表、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
+- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
+- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
 - [SECURITY.md](docs/tech-design/SECURITY.md) — 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测 + tool_call 分级）、Skill 沙箱分级、审计日志
 - [SANDBOX-RESEARCH.md](docs/tech-design/SANDBOX-RESEARCH.md) — 沙箱机制技术调研报告（方案一 Docker vs 方案二 CubeSandbox，含对比表格与选型依据）
 - [INTEGRATION-CUBESANDBOX.md](docs/tech-design/INTEGRATION-CUBESANDBOX.md) — CubeSandbox 集成详细设计（抽象层、E2B SDK / REST API 两种对接路径、API 设计、分级策略、实施计划）
@@ -33,7 +33,7 @@
 - [TASK-016.md](docs/tasks/TASK-016.md) — Artifact 产物归档与查看，已完成
 - [TASK-017.md](docs/tasks/TASK-017.md) — 人工确认与阶段继续机制，已完成
 - [TASK-018.md](docs/tasks/TASK-018.md) — Agent Bridge / 真实代码库读取，已完成
-- [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，todo
+- [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，已完成
 
 ## 迭代记录 (docs/iterations/)
 - [2026-06-17-architecture-design/](docs/iterations/2026-06-17-architecture-design/) — 架构设计迭代记录
@@ -72,7 +72,7 @@
 - TASK-016 已完成：`src/agent_forge/artifacts/service.py` 负责阶段到 Artifact 类型映射；StageRuntime 阶段完成后创建 Artifact 并发 `artifact_created` SSE；`GET /sessions/{id}/messages` 会回带关联 artifacts；前端新增 `artifactsApi`、`useArtifactStore`、`ArtifactCard`、`/artifacts/:artifactId` Viewer，Project 页展示最近产物，Artifact 可作为 `context_files[type=artifact]` 加入下一轮上下文。
 - TASK-017 已完成：`PipelineStageState` 新增确认动作、反馈和处理时间字段；确认阶段完成后进入 `waiting_confirmation` 并发 `confirm_required`；`POST /pipeline-runs/{run_id}/stages/{stage_id}/confirm` 支持 approve/revise/cancel；StageRuntime 等待确认时停止调用 SkillExecutionEngine，revise 反馈会注入下一次同阶段执行；Chat ConfirmCard 已接真实 API 和 Artifact。
 - TASK-018 已完成：新增 `agentforge mount <path>` CLI、Bridge 状态和文件列表/读取 API、授权 root 内路径校验、敏感文件拒绝、ContextPicker 挂载文件选择，以及 Chat `context_files[type=file].mount_id` 真实内容注入 SkillExecutionEngine。
-- 下一步保持 TASK-019：写回与交付闭环仍未完成，不要提前声称 Agent 已能生成 diff 或写回用户本地项目。
+- TASK-019 已完成：新增 `agent_forge.delivery`、Artifact delivery 字段、diff preview、`confirm_write` 写回 connected local Mount、写前 `.agentforge.bak` 备份、Delivery report 和 Markdown 导出；Artifact Viewer 已接交付面板。
 
 ---
 

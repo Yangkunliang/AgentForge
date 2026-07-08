@@ -6,13 +6,14 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.bridge.files import BridgeAccessError, list_mount_files, read_mount_file, root_path_for_mount
 from agent_forge.database import get_async_session
+from agent_forge.delivery import apply_artifact_delivery, build_delivery_report_markdown, preview_artifact_delivery
 from agent_forge.models import Artifact, Project, ProjectMount, User
 from agent_forge.models.session import Session
 from middleware.auth import get_current_user
@@ -172,8 +173,32 @@ class ArtifactResponse(BaseModel):
     file_type: str | None
     source_message_id: str | None
     metadata: dict
+    delivery_status: str
+    delivery_target_path: str | None
+    delivered_at: datetime | None
+    delivery_report: dict | None
     created_at: datetime
     updated_at: datetime
+
+
+class DeliveryPreviewRequest(BaseModel):
+    mount_id: str = Field(..., min_length=1, max_length=50)
+    target_path: str = Field(..., min_length=1, max_length=2000)
+
+
+class DeliveryApplyRequest(DeliveryPreviewRequest):
+    confirm_write: bool = False
+
+
+class DeliveryResponse(BaseModel):
+    artifact_id: str
+    project_id: str
+    mount_id: str
+    target_path: str
+    status: Literal["previewed", "delivered"]
+    has_changes: bool
+    unified_diff: str
+    report: dict
 
 
 def _clean_tags(tags: list[str]) -> list[str]:
@@ -242,6 +267,10 @@ def _artifact_to_dict(artifact: Artifact) -> dict:
         "file_type": artifact.file_type,
         "source_message_id": artifact.source_message_id,
         "metadata": artifact.metadata_json or {},
+        "delivery_status": artifact.delivery_status,
+        "delivery_target_path": artifact.delivery_target_path,
+        "delivered_at": artifact.delivered_at,
+        "delivery_report": artifact.delivery_report_json,
         "created_at": artifact.created_at,
         "updated_at": artifact.updated_at,
     }
@@ -643,6 +672,17 @@ async def _get_artifact_or_404(db: AsyncSession, artifact_id: str, user_id: str)
     return artifact
 
 
+async def _get_delivery_mount_or_404(
+    db: AsyncSession,
+    artifact: Artifact,
+    mount_id: str,
+    user_id: str,
+) -> ProjectMount:
+    mount = await _get_mount_or_404(db, artifact.project_id, mount_id, user_id)
+    _ensure_connected_local_mount(mount)
+    return mount
+
+
 @artifact_router.get("/{artifact_id}", response_model=ArtifactResponse)
 async def get_artifact(
     artifact_id: str,
@@ -650,6 +690,60 @@ async def get_artifact(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     return _artifact_to_dict(await _get_artifact_or_404(db, artifact_id, current_user.id))
+
+
+@artifact_router.post("/{artifact_id}/delivery/preview", response_model=DeliveryResponse)
+async def preview_artifact_delivery_api(
+    artifact_id: str,
+    body: DeliveryPreviewRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    mount = await _get_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
+    try:
+        return preview_artifact_delivery(artifact, mount, body.target_path)
+    except BridgeAccessError as exc:
+        _raise_bridge_error(exc)
+
+
+@artifact_router.post("/{artifact_id}/delivery/apply", response_model=DeliveryResponse)
+async def apply_artifact_delivery_api(
+    artifact_id: str,
+    body: DeliveryApplyRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    mount = await _get_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
+    if not body.confirm_write:
+        raise HTTPException(status_code=409, detail="Write confirmation is required before delivery")
+
+    try:
+        delivery = await apply_artifact_delivery(db, artifact, mount, body.target_path)
+    except BridgeAccessError as exc:
+        _raise_bridge_error(exc)
+    await db.commit()
+    await db.refresh(artifact)
+    return delivery
+
+
+@artifact_router.get("/{artifact_id}/delivery/report")
+async def get_artifact_delivery_report(
+    artifact_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    if artifact.delivery_status != "delivered" or not artifact.delivery_report_json:
+        raise HTTPException(status_code=409, detail="Artifact has not been delivered")
+
+    filename = f"{artifact.name}.delivery.md".replace('"', "")
+    return Response(
+        content=build_delivery_report_markdown(artifact),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @artifact_router.patch("/{artifact_id}", response_model=ArtifactResponse)
