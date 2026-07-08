@@ -389,6 +389,9 @@ POST /api/v1/artifacts/{artifact_id}/delivery/preview
 POST /api/v1/artifacts/{artifact_id}/delivery/apply
 POST /api/v1/artifacts/{artifact_id}/delivery/github/preview
 POST /api/v1/artifacts/{artifact_id}/delivery/github/apply
+POST /api/v1/artifacts/{artifact_id}/delivery/zip/preview
+POST /api/v1/artifacts/{artifact_id}/delivery/zip/apply
+GET  /api/v1/artifacts/{artifact_id}/delivery/zip/download
 GET  /api/v1/artifacts/{artifact_id}/delivery/report
 ```
 
@@ -527,6 +530,86 @@ GitHub PR apply 成功后，Artifact `delivery_report` 包含：
 - 成功 apply 依次创建 branch、commit 和 PR；阶段事件写入 `AuditLog.resource=artifact_delivery`。
 - 审计事件包括 `delivery.github.preview.succeeded`、`delivery.github.apply.denied`、`delivery.github.apply.branch_created`、`delivery.github.apply.commit_created`、`delivery.github.apply.pr_created`、`delivery.github.apply.conflict`、`delivery.github.apply.failed`、`delivery.github.apply.succeeded`。
 - API 响应、Delivery report 和 AuditLog details 不包含明文 GitHub token 或 Artifact 正文。
+
+zip Delivery preview 请求：
+
+```json
+{
+  "target_path": "src/main.py",
+  "files": [
+    {
+      "path": "src/main.py",
+      "content": "print('hello')\n"
+    }
+  ]
+}
+```
+
+`target_path` 和 `files` 都可选。未传 `files` 时，后端默认把当前 Artifact 内容打包到 `target_path`；未传 `target_path` 时使用 Artifact 名称或 `artifact-<id>.txt`。
+
+zip Delivery preview 响应：
+
+```json
+{
+  "artifact_id": "artifact-001",
+  "project_id": "project-001",
+  "mount_id": "zip",
+  "target_path": "src/main.py",
+  "status": "previewed",
+  "has_changes": true,
+  "unified_diff": "",
+  "report": {
+    "delivery_channel": "zip",
+    "package_name": "artifact-001-delivery.zip",
+    "file_count": 1,
+    "total_bytes": 15,
+    "package_sha256": "zip-sha256",
+    "files": [
+      {
+        "path": "src/main.py",
+        "size": 15,
+        "sha256": "file-sha256"
+      }
+    ]
+  }
+}
+```
+
+zip Delivery apply 请求必须显式确认：
+
+```json
+{
+  "target_path": "src/main.py",
+  "confirm_write": true
+}
+```
+
+apply 成功后，Artifact `delivery_report` 包含：
+
+```json
+{
+  "delivery_channel": "zip",
+  "package_id": "pkg-001",
+  "package_name": "artifact-001-delivery.zip",
+  "download_url": "/api/v1/artifacts/artifact-001/delivery/zip/download",
+  "file_count": 1,
+  "total_bytes": 15,
+  "package_sha256": "zip-sha256",
+  "expires_at": "2026-07-09T10:00:00Z",
+  "recovery_hint": "Download the zip package before it expires."
+}
+```
+
+规则：
+
+- zip Delivery 不写入用户本地目录，不调用远程仓库 API。
+- 包内路径必须是相对路径，拒绝空路径、绝对路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径。
+- zip 包固定包含 `manifest.json`、`delivery-report.md` 和 `files/<relative path>`。
+- `preview` 只计算 deterministic zip sha256 和包结构，不写服务端下载文件。
+- `apply` 在 `confirm_write` 非 `true` 时返回 409。
+- `GET /delivery/zip/download` 必须通过 Artifact 所属 Project 权限校验；其他用户访问返回 404。
+- API 响应、Delivery report 和 AuditLog details 不暴露服务器临时路径，也不记录 Artifact 正文。
+- 审计事件包括 `delivery.zip.preview.succeeded`、`delivery.zip.preview.failed`、`delivery.zip.apply.denied`、`delivery.zip.apply.succeeded`、`delivery.zip.apply.failed`。
 
 ### 会话消息中的 Artifact
 

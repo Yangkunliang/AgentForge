@@ -39,7 +39,7 @@
 - [TASK-022.md](docs/tasks/TASK-022.md) — 交付能力扩展设计与实现，已完成
 - [TASK-023.md](docs/tasks/TASK-023.md) — GitHub OAuth Mount 授权底座，已完成
 - [TASK-024.md](docs/tasks/TASK-024.md) — GitHub PR Delivery，已完成
-- [TASK-025.md](docs/tasks/TASK-025.md) — zip Delivery Package，待开始
+- [TASK-025.md](docs/tasks/TASK-025.md) — zip Delivery Package，已完成
 - [TASK-026.md](docs/tasks/TASK-026.md) — Upload Mount 上下文兜底，待开始
 
 ## 迭代记录 (docs/iterations/)
@@ -74,7 +74,7 @@
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md) — Delivery fingerprint、一致性校验、失败报告、审计日志、GitHub PR、zip、upload 扩展边界
   - [UI-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/UI-REVIEW.md) — TASK-021 核心交互入口复盘、设计约束和 E2E 验收覆盖
   - [TEST-PLAN.md](docs/iterations/2026-07-08-core-strengthening/TEST-PLAN.md) — 服务端、UI、交付扩展验证矩阵
-  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020～TASK-022 完成内容、风险修正和验证结果
+  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020～TASK-025 完成内容、风险修正和验证结果
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -91,7 +91,8 @@
 - TASK-021 已完成：Project 页按 Mount、PipelineRun、Artifact 聚合下一步动作；Chat 空状态展示当前项目和代码库连接状态；StagePreview 展示当前阶段摘要；ConfirmCard 增加“查看产物并交付”；ArtifactCard 展示交付状态。
 - TASK-022 已完成：GitHub OAuth Mount、GitHub PR Delivery、zip Delivery、Upload Mount 的授权边界、数据流、失败状态和审计点已写入技术设计，并拆出 TASK-023～TASK-026。
 - TASK-023 已完成：GitHub OAuth start/callback、`oauth_credentials`/`oauth_states`、服务端加密凭据、connected GitHub Mount 创建、删除撤销 credential、Project 创建向导 OAuth 授权入口已落地；callback 通过一次性 state 找回用户和项目，不依赖浏览器重定向携带 JWT header。
-- TASK-024 已完成：GitHub PR Delivery preview/apply API、`expected_base_sha` 二次校验、branch/commit/PR 创建、失败报告、`delivery.github.*` 审计事件和 Artifact Viewer GitHub PR 模式已落地；下一步从 TASK-025 zip Delivery Package 开始。
+- TASK-024 已完成：GitHub PR Delivery preview/apply API、`expected_base_sha` 二次校验、branch/commit/PR 创建、失败报告、`delivery.github.*` 审计事件和 Artifact Viewer GitHub PR 模式已落地。
+- TASK-025 已完成：zip Delivery preview/apply/download API、deterministic zip sha256、manifest/report、下载权限隔离、过期清理、`delivery.zip.*` 审计事件和 Artifact Viewer zip 包模式已落地；下一步从 TASK-026 Upload Mount 上下文兜底开始。
 
 ---
 

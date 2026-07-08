@@ -1,8 +1,8 @@
 # 核心能力增强迭代复盘
 
 **日期**：2026-07-08
-**当前完成任务**：TASK-020、TASK-021、TASK-022、TASK-023、TASK-024
-**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计、GitHub OAuth Mount 授权底座和 GitHub PR Delivery 已完成，下一步进入 TASK-025 zip Delivery Package。
+**当前完成任务**：TASK-020、TASK-021、TASK-022、TASK-023、TASK-024、TASK-025
+**结论**：服务端可信交付巩固、核心交互入口优化、交付扩展设计、GitHub OAuth Mount 授权底座、GitHub PR Delivery 和 zip Delivery Package 已完成，下一步进入 TASK-026 Upload Mount 上下文兜底。
 
 ## 完成内容
 
@@ -50,6 +50,16 @@
 - GitHub client 通过 fake client 覆盖后端测试，单元测试不访问真实 GitHub API。
 - Artifact Viewer 新增“本地写回 / GitHub PR”交付方式切换，GitHub 模式提交 `expected_base_sha` 并展示 PR URL / commit sha。
 
+### TASK-025
+
+- 新增 zip Delivery preview/apply/download API，作为不写本地目录、不调用远程仓库 API 的交付兜底。
+- preview 计算包内路径、文件数量、总字节数和 deterministic zip sha256，不落地下载文件。
+- apply 必须 `confirm_write=true`，生成 `manifest.json`、`delivery-report.md` 和 `files/<relative path>`，并保存 `delivery_channel=zip` 的 Delivery report。
+- 下载接口按 Artifact 所属 Project 权限校验，不暴露服务器临时路径。
+- 包内路径拒绝绝对路径、`..`、空路径、反斜杠、Windows 盘符、控制字符和重复路径。
+- 新增过期 zip 清理配置 `DELIVERY_PACKAGE_DIR`、`DELIVERY_PACKAGE_TTL_HOURS`。
+- Artifact Viewer 新增“zip 包”交付模式，可预览包信息、生成 zip 并下载。
+
 ## 发现并修正的风险
 
 | 风险 | 修正 |
@@ -67,6 +77,9 @@
 | 客户端可控 redirect_uri 可能把 OAuth code 带到外部域名 | start API 只接受当前 Project 的 AgentForge callback path |
 | GitHub 远程 base branch 在 preview 后变化可能导致覆盖或错 PR | apply 强制提交 `expected_base_sha` 并二次读取 base sha，变化时拒绝交付 |
 | GitHub token 可能被错误写进交付报告或审计 | token 只在服务端解密后传给 client，测试断言响应和 AuditLog details 不包含明文 token |
+| zip 包内路径如果直接信任 Artifact 元数据，可能产生 Zip Slip 风险 | 统一校验相对路径，拒绝绝对路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径 |
+| zip 下载如果暴露服务端临时路径，会泄露部署目录 | report 只保存 `download_url`、package id 和 sha256，下载接口内部解析文件路径 |
+| zip 文件长期堆积会放大磁盘风险 | 新增 TTL 配置，并在 apply 前清理过期包 |
 
 ## 验证结果
 
@@ -83,8 +96,9 @@
 - `uv run --extra dev pytest tests/api/test_github_delivery.py`：4 passed
 - `uv run --extra dev pytest tests/api/test_delivery.py tests/api/test_github_delivery.py tests/api/test_github_mount.py`：15 passed
 - `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium`：4 passed
+- `uv run --extra dev pytest tests/api/test_zip_delivery.py`：5 passed
+- `npm run build`：通过，保留既有 Sass deprecation 和 chunk size warning
 
 ## 下一步
 
-- TASK-025：实现 zip Delivery Package。
 - TASK-026：实现 Upload Mount 上下文兜底。

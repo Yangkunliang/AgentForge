@@ -38,7 +38,7 @@ PRODUCT-REQUIREMENTS / PRD
 | CDW-04 | 阶段输出沉淀为 Artifact，可查看、复用和追溯 | [TASK-012](TASK-012.md)、[TASK-013](TASK-013.md)、[TASK-016](TASK-016.md) |
 | CDW-05 | PRD、技术选型、影响范围等关键节点必须暂停确认 | [TASK-012](TASK-012.md)、[TASK-017](TASK-017.md) |
 | CDW-06 | Agent 能读取用户授权的真实代码库上下文 | [TASK-012](TASK-012.md)、[TASK-018](TASK-018.md) |
-| CDW-07 | 结果能回到项目，形成 diff、写回或导出交付物 | [TASK-012](TASK-012.md)、[TASK-019](TASK-019.md)、[TASK-024](TASK-024.md) |
+| CDW-07 | 结果能回到项目，形成 diff、写回或导出交付物 | [TASK-012](TASK-012.md)、[TASK-019](TASK-019.md)、[TASK-024](TASK-024.md)、[TASK-025](TASK-025.md) |
 | CDW-08 | 写回用户项目必须可审计、可解释、可恢复 | [TASK-020](TASK-020.md)、[TASK-024](TASK-024.md) |
 | CDW-09 | 核心工作流下一步动作必须可见 | [TASK-021](TASK-021.md) |
 | CDW-10 | 交付方式覆盖本地、远程和兜底上传 | [TASK-022](TASK-022.md)、[TASK-023](TASK-023.md)、[TASK-024](TASK-024.md)、[TASK-025](TASK-025.md)、[TASK-026](TASK-026.md) |
@@ -70,7 +70,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-022：交付能力扩展设计与实现](TASK-022.md) | P2 | CDW-10、CDW-02、CDW-07 | TASK-021 | GitHub PR、zip、upload 等交付扩展设计与拆分 |
 | [x] | [TASK-023：GitHub OAuth Mount 授权底座](TASK-023.md) | P1 | CDW-02、CDW-10 | TASK-022 | 用户主动授权 GitHub repo，token 服务端加密存储 |
 | [x] | [TASK-024：GitHub PR Delivery](TASK-024.md) | P1 | CDW-07、CDW-08、CDW-10 | TASK-023 | branch、commit、PR、base ref 校验、失败报告和审计 |
-| [ ] | [TASK-025：zip Delivery Package](TASK-025.md) | P2 | CDW-07、CDW-10 | TASK-022 | zip manifest、sha256、下载权限和过期清理 |
+| [x] | [TASK-025：zip Delivery Package](TASK-025.md) | P2 | CDW-07、CDW-10 | TASK-022 | zip manifest、sha256、下载权限和过期清理 |
 | [ ] | [TASK-026：Upload Mount 上下文兜底](TASK-026.md) | P2 | CDW-02、CDW-06、CDW-10 | TASK-022 | upload manifest 范围读取、路径安全、ContextPicker 接入 |
 
 ## 执行顺序

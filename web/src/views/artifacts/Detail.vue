@@ -13,7 +13,7 @@ const props = defineProps<{
   artifactId: string
 }>()
 
-type DeliveryMode = 'local' | 'github'
+type DeliveryMode = 'local' | 'github' | 'zip'
 
 const router = useRouter()
 const artifactStore = useArtifactStore()
@@ -69,39 +69,51 @@ const deliveryStatusLabel = computed(() => {
 const canPreviewDelivery = computed(() =>
   Boolean(
     artifact.value
-      && selectedMountId.value
+      && (deliveryMode.value === 'zip' || selectedMountId.value)
       && targetPath.value.trim()
-      && (deliveryMode.value === 'local' || githubTargetBranch.value.trim())
+      && (deliveryMode.value !== 'github' || githubTargetBranch.value.trim())
       && !deliveryLoading.value
   )
 )
 const canApplyDelivery = computed(() =>
   Boolean(
     deliveryPreview.value
-      && selectedMountId.value
+      && (deliveryMode.value === 'zip' || selectedMountId.value)
       && targetPath.value.trim()
-      && (deliveryMode.value === 'local' || previewBaseSha())
+      && (deliveryMode.value !== 'github' || previewBaseSha())
       && !deliveryLoading.value
   )
 )
 const canExportDelivery = computed(() =>
   artifact.value?.delivery_status === 'delivered' || deliveryPreview.value?.status === 'delivered'
 )
+const canDownloadZip = computed(() =>
+  reportText('delivery_channel') === 'zip' && Boolean(reportText('download_url')) && !deliveryLoading.value
+)
 const previewButtonLabel = computed(() =>
-  deliveryMode.value === 'github' ? '预览 PR Diff' : '预览 Diff'
+  deliveryMode.value === 'github'
+    ? '预览 PR Diff'
+    : deliveryMode.value === 'zip'
+      ? '预览 zip'
+      : '预览 Diff'
 )
 const applyButtonLabel = computed(() =>
-  deliveryMode.value === 'github' ? '创建 PR' : '确认写入'
+  deliveryMode.value === 'github'
+    ? '创建 PR'
+    : deliveryMode.value === 'zip'
+      ? '生成 zip'
+      : '确认写入'
 )
 
 async function loadArtifact() {
   const loaded = await artifactStore.fetchArtifact(props.artifactId)
   await projectStore.fetchProjectMounts(loaded.project_id)
-  deliveryMode.value = artifact.value?.delivery_report?.delivery_channel === 'github_pr' ? 'github' : 'local'
+  const channel = artifact.value?.delivery_report?.delivery_channel
+  deliveryMode.value = channel === 'github_pr' ? 'github' : channel === 'zip' ? 'zip' : 'local'
   selectedMountId.value = artifact.value?.delivery_report?.mount_id as string
     || deliveryMounts.value[0]?.id
     || ''
-  targetPath.value = artifact.value?.delivery_target_path || artifact.value?.name || ''
+  targetPath.value = reportTextFromArtifact('target_path') || artifact.value?.delivery_target_path || artifact.value?.name || ''
   if (deliveryMode.value === 'github') {
     targetPath.value = githubTargetPath(targetPath.value)
   }
@@ -133,7 +145,11 @@ async function previewDelivery() {
           target_branch: githubTargetBranch.value.trim(),
           pr_title: githubPrTitle.value.trim(),
         })
-      : await artifactsApi.previewDelivery(artifact.value.id, {
+      : deliveryMode.value === 'zip'
+        ? await artifactsApi.previewZipDelivery(artifact.value.id, {
+            target_path: targetPath.value.trim(),
+          })
+        : await artifactsApi.previewDelivery(artifact.value.id, {
           mount_id: selectedMountId.value,
           target_path: targetPath.value.trim(),
         })
@@ -162,7 +178,12 @@ async function applyDelivery() {
           confirm_write: true,
           expected_base_sha: previewBaseSha() ?? '',
         })
-      : await artifactsApi.applyDelivery(artifact.value.id, {
+      : deliveryMode.value === 'zip'
+        ? await artifactsApi.applyZipDelivery(artifact.value.id, {
+            target_path: targetPath.value.trim(),
+            confirm_write: true,
+          })
+        : await artifactsApi.applyDelivery(artifact.value.id, {
           mount_id: selectedMountId.value,
           target_path: targetPath.value.trim(),
           confirm_write: true,
@@ -171,6 +192,26 @@ async function applyDelivery() {
     deliveryPreview.value = data
     targetPath.value = data.target_path
     await artifactStore.fetchArtifact(artifact.value.id)
+  } catch (error) {
+    deliveryError.value = deliveryErrorMessage(error)
+  } finally {
+    deliveryLoading.value = false
+  }
+}
+
+async function downloadZipPackage() {
+  if (!artifact.value || !canDownloadZip.value) return
+  deliveryLoading.value = true
+  deliveryError.value = ''
+  try {
+    const { data } = await artifactsApi.downloadZipPackage(artifact.value.id)
+    const blob = new Blob([data], { type: 'application/zip' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = reportText('package_name') || `${artifact.value.name}.zip`
+    link.click()
+    URL.revokeObjectURL(url)
   } catch (error) {
     deliveryError.value = deliveryErrorMessage(error)
   } finally {
@@ -225,13 +266,21 @@ function reportText(key: string): string {
   return ''
 }
 
+function reportTextFromArtifact(key: string): string {
+  const value = artifact.value?.delivery_report?.[key]
+  if (typeof value === 'string' || typeof value === 'number') {
+    return String(value)
+  }
+  return ''
+}
+
 function selectDeliveryMode(mode: DeliveryMode) {
   if (deliveryMode.value === mode) return
   deliveryMode.value = mode
 }
 
 function resetSelectedMountForMode() {
-  selectedMountId.value = deliveryMounts.value[0]?.id || ''
+  selectedMountId.value = deliveryMode.value === 'zip' ? '' : deliveryMounts.value[0]?.id || ''
   deliveryPreview.value = null
   deliveryError.value = ''
   resetGitHubDefaults(true)
@@ -340,10 +389,22 @@ watch(selectedMountId, () => {
           >
             GitHub PR
           </button>
+          <button
+            :class="{ 'is-active': deliveryMode === 'zip' }"
+            :disabled="deliveryLoading"
+            type="button"
+            @click="selectDeliveryMode('zip')"
+          >
+            zip 包
+          </button>
         </div>
 
         <div class="artifact-viewer__delivery-form">
-          <label class="artifact-viewer__field" for="delivery-mount">
+          <label
+            v-if="deliveryMode !== 'zip'"
+            class="artifact-viewer__field"
+            for="delivery-mount"
+          >
             <span>目标代码库</span>
             <select
               id="delivery-mount"
@@ -439,6 +500,14 @@ watch(selectedMountId, () => {
             >
               导出报告
             </button>
+            <button
+              v-if="reportText('delivery_channel') === 'zip'"
+              class="artifact-viewer__secondary"
+              :disabled="!canDownloadZip"
+              @click="downloadZipPackage"
+            >
+              下载 zip
+            </button>
           </div>
         </div>
 
@@ -461,6 +530,9 @@ watch(selectedMountId, () => {
           <span v-if="reportText('target_branch')">分支：{{ reportText('target_branch') }}</span>
           <span v-if="reportText('backup_path')">备份：{{ reportText('backup_path') }}</span>
           <span v-if="reportText('bytes_written')">写入：{{ reportText('bytes_written') }} bytes</span>
+          <span v-if="reportText('package_name')">包：{{ reportText('package_name') }}</span>
+          <span v-if="reportText('file_count')">文件：{{ reportText('file_count') }}</span>
+          <span v-if="reportText('package_sha256')">SHA256：{{ reportText('package_sha256') }}</span>
           <a
             v-if="reportText('pr_url')"
             :href="reportText('pr_url')"

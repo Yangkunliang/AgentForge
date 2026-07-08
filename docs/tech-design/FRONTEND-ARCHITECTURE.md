@@ -168,9 +168,9 @@ TASK-017 已补充：
 
 TASK-019 已补充：
 
-- `web/src/api/modules/artifacts.ts`：新增 `previewDelivery`、`applyDelivery`、`previewGitHubDelivery`、`applyGitHubDelivery`、`exportDeliveryReport`。
-- `web/src/views/artifacts/Detail.vue`：Artifact Viewer 新增交付面板，支持本地写回与 GitHub PR Delivery 两种模式；本地模式选择 connected local Mount、输入目标路径、预览 unified diff、确认写回；GitHub 模式选择 connected GitHub Mount、输入 base branch / 交付分支 / PR 标题，预览远程 diff 后带 `expected_base_sha` 创建 PR。
-- `web/e2e/artifact-viewer.spec.ts`：覆盖 diff 预览、确认写回 payload、GitHub PR Delivery payload、Delivery report 展示和 Markdown 下载。
+- `web/src/api/modules/artifacts.ts`：新增 `previewDelivery`、`applyDelivery`、`previewGitHubDelivery`、`applyGitHubDelivery`、`previewZipDelivery`、`applyZipDelivery`、`downloadZipPackage`、`exportDeliveryReport`。
+- `web/src/views/artifacts/Detail.vue`：Artifact Viewer 新增交付面板，支持本地写回、GitHub PR Delivery 与 zip 包三种模式；本地模式选择 connected local Mount、输入目标路径、预览 unified diff、确认写回；GitHub 模式选择 connected GitHub Mount、输入 base branch / 交付分支 / PR 标题，预览远程 diff 后带 `expected_base_sha` 创建 PR；zip 模式不需要 Mount，预览包结构和 sha256 后生成可下载 zip。
+- `web/e2e/artifact-viewer.spec.ts`：覆盖 diff 预览、确认写回 payload、GitHub PR Delivery payload、zip 包生成和下载、Delivery report 展示和 Markdown 下载。
 
 TASK-020 已补充：
 
@@ -179,6 +179,13 @@ TASK-020 已补充：
 - `GitHubDeliveryApplyPayload` 增加 `expected_base_sha`。
 - Artifact Viewer 在 GitHub preview 后从 `report.base_sha` 读取 base ref，并在确认创建 PR 时提交给后端。
 - 如果后端返回目标文件冲突或写回失败，交付面板沿用错误区域展示可读失败原因，用户需重新预览后再确认。
+
+TASK-025 已补充：
+
+- Artifact Viewer 的交付方式切换增加“zip 包”，用于用户不希望写入本地目录或远程仓库时导出制品。
+- zip 模式隐藏 Mount 选择器，复用目标路径输入作为包内路径；preview 展示 `package_name`、`file_count`、`package_sha256`。
+- 生成成功后读取 `delivery_report.download_url` 并通过 `downloadZipPackage` 拉取 Blob，前端使用 `URL.createObjectURL` 触发浏览器下载。
+- zip Delivery 的下载按钮只在当前 Artifact report 标记 `delivery_channel=zip` 且存在 `download_url` 时显示。
 
 ---
 

@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     github_oauth_redirect_uri: str = Field(default="", validation_alias="GITHUB_OAUTH_REDIRECT_URI")
     github_oauth_scopes: str = Field(default="repo", validation_alias="GITHUB_OAUTH_SCOPES")
 
+    # Delivery packages
+    delivery_package_dir: str = Field(
+        default="/tmp/agentforge-delivery-packages",
+        validation_alias="DELIVERY_PACKAGE_DIR",
+    )
+    delivery_package_ttl_hours: int = Field(default=24, validation_alias="DELIVERY_PACKAGE_TTL_HOURS")
+
     @property
     def cors_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]

@@ -122,6 +122,10 @@ GITHUB_OAUTH_CLIENT_SECRET=
 GITHUB_OAUTH_REDIRECT_URI=
 GITHUB_OAUTH_SCOPES=repo
 
+# ── Artifact Delivery zip 包 ────────────────────
+DELIVERY_PACKAGE_DIR=/tmp/agentforge-delivery-packages
+DELIVERY_PACKAGE_TTL_HOURS=24
+
 # ── Skill 安装目录 ───────────────────────────────
 SKILL_INSTALL_DIR=/opt/agentforge/skills
 
@@ -317,9 +321,12 @@ GITHUB_OAUTH_CLIENT_ID=<GitHub OAuth App Client ID>
 GITHUB_OAUTH_CLIENT_SECRET=<GitHub OAuth App Client Secret>
 GITHUB_OAUTH_REDIRECT_URI=
 GITHUB_OAUTH_SCOPES=repo
+DELIVERY_PACKAGE_DIR=/var/lib/agentforge/delivery-packages
+DELIVERY_PACKAGE_TTL_HOURS=24
 ```
 
 `GITHUB_OAUTH_REDIRECT_URI` 可留空，Project 创建向导会按当前项目传入 `/api/v1/projects/{project_id}/mounts/github/oauth/callback`。无前端场景才需要配置固定回调地址。
+`DELIVERY_PACKAGE_DIR` 用于保存 TASK-025 生成的临时 zip 交付包，需挂载到后端可写持久卷或可清理目录；`DELIVERY_PACKAGE_TTL_HOURS` 控制下载保留时间。
 
 ### 5.4 前端构建
 

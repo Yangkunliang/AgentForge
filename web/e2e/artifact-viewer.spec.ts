@@ -84,6 +84,7 @@ async function login(page: Page) {
 async function mockArtifactApi(page: Page) {
   const applyRequests: Array<Record<string, unknown>> = []
   const githubApplyRequests: Array<Record<string, unknown>> = []
+  const zipApplyRequests: Array<Record<string, unknown>> = []
   let deliveredArtifact: Artifact | null = null
 
   await page.route('**/api/v1/**', async (route) => {
@@ -251,6 +252,78 @@ async function mockArtifactApi(page: Page) {
       return
     }
 
+    if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/zip/preview`) {
+      await route.fulfill(json({
+        artifact_id: artifact.id,
+        project_id: project.id,
+        mount_id: 'zip',
+        target_path: 'docs/architecture.md',
+        status: 'previewed',
+        has_changes: true,
+        unified_diff: '',
+        report: {
+          delivery_channel: 'zip',
+          mount_id: 'zip',
+          target_path: 'docs/architecture.md',
+          package_name: 'architecture.md.zip',
+          file_count: 1,
+          total_bytes: 48,
+          package_sha256: 'zip-sha-256',
+          files: [
+            {
+              path: 'docs/architecture.md',
+              archive_path: 'files/docs/architecture.md',
+              size: 48,
+              sha256: 'file-sha-256',
+            },
+          ],
+        },
+      }))
+      return
+    }
+
+    if (method === 'POST' && path === `/api/v1/artifacts/${artifact.id}/delivery/zip/apply`) {
+      const payload = request.postDataJSON() as Record<string, unknown>
+      zipApplyRequests.push(payload)
+      deliveredArtifact = {
+        ...artifact,
+        delivery_status: 'delivered',
+        delivery_target_path: 'zip://package-1/architecture.md.zip',
+        delivered_at: now,
+        delivery_report: {
+          delivery_channel: 'zip',
+          mount_id: 'zip',
+          target_path: 'docs/architecture.md',
+          package_name: 'architecture.md.zip',
+          package_id: 'package-1',
+          file_count: 1,
+          total_bytes: 48,
+          package_sha256: 'zip-sha-256',
+          download_url: `/api/v1/artifacts/${artifact.id}/delivery/zip/download`,
+        },
+      }
+      await route.fulfill(json({
+        artifact_id: artifact.id,
+        project_id: project.id,
+        mount_id: 'zip',
+        target_path: 'docs/architecture.md',
+        status: 'delivered',
+        has_changes: true,
+        unified_diff: '',
+        report: deliveredArtifact.delivery_report,
+      }))
+      return
+    }
+
+    if (method === 'GET' && path === `/api/v1/artifacts/${artifact.id}/delivery/zip/download`) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/zip',
+        body: 'zip-bytes',
+      })
+      return
+    }
+
     if (method === 'GET' && path === `/api/v1/artifacts/${artifact.id}/delivery/report`) {
       await route.fulfill({
         status: 200,
@@ -293,7 +366,7 @@ async function mockArtifactApi(page: Page) {
     await route.fulfill(json({ detail: `Unhandled ${method} ${path}` }, 404))
   })
 
-  return { applyRequests, githubApplyRequests }
+  return { applyRequests, githubApplyRequests, zipApplyRequests }
 }
 
 test.describe('TASK-016 artifact viewer', () => {
@@ -389,5 +462,34 @@ test.describe('TASK-016 artifact viewer', () => {
     })
     await expect(page.locator('.artifact-viewer__delivery')).toContainText('已交付')
     await expect(page.locator('.artifact-viewer__delivery')).toContainText('https://github.com/acme/shop-api/pull/42')
+  })
+
+  test('generates and downloads zip delivery package', async ({ page }) => {
+    await login(page)
+    const api = await mockArtifactApi(page)
+
+    await page.goto('/artifacts/artifact-design')
+
+    await page.getByRole('button', { name: 'zip 包' }).click()
+    await page.getByLabel('写入路径').fill('docs/architecture.md')
+    await page.getByRole('button', { name: '预览 zip' }).click()
+
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('architecture.md.zip')
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('zip-sha-256')
+    expect(api.zipApplyRequests).toHaveLength(0)
+
+    await page.getByRole('button', { name: '生成 zip' }).click()
+
+    expect(api.zipApplyRequests).toHaveLength(1)
+    expect(api.zipApplyRequests[0]).toMatchObject({
+      target_path: 'docs/architecture.md',
+      confirm_write: true,
+    })
+    await expect(page.locator('.artifact-viewer__delivery')).toContainText('已交付')
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: '下载 zip' }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe('architecture.md.zip')
   })
 })

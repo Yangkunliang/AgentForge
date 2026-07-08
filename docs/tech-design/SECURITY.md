@@ -547,6 +547,20 @@ TASK-024 后，Artifact 可通过 connected GitHub Mount 创建远程 Pull Reque
 - 成功路径按 branch、commit、PR 分阶段写入 AuditLog；失败路径保存 `delivery_report` 和恢复提示。
 - API 响应、Delivery report、AuditLog details 不包含明文 OAuth token 或 Artifact 正文。
 
+### 7.5 Artifact Delivery zip Package
+
+TASK-025 后，Artifact 可导出为可下载 zip 包。zip Delivery 是不写用户目录、不调用远程 API 的交付兜底，但仍需要防止路径穿越、信息泄露和制品无限堆积：
+
+- `preview` 只计算 deterministic zip sha256、包内路径和总字节数，不落地下载文件。
+- `apply` 必须显式传入 `confirm_write=true`，否则返回 409。
+- zip 包固定包含 `manifest.json`、`delivery-report.md` 和 `files/<relative path>`。
+- 包内路径必须是相对路径，拒绝空路径、绝对路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径。
+- `manifest.json` 可记录文件路径、大小和 sha256，但不记录服务器临时路径。
+- 下载接口必须通过 Artifact 所属 Project 的用户权限校验；其他用户访问同一个 artifact id 返回 404。
+- Delivery report、API 响应、AuditLog details 不暴露服务器临时路径，也不记录 Artifact 正文。
+- 生成目录由 `DELIVERY_PACKAGE_DIR` 配置，保留时长由 `DELIVERY_PACKAGE_TTL_HOURS` 控制；apply 前清理过期 zip。
+- 成功、未确认拒绝和失败路径都写入 `AuditLog.resource=artifact_delivery`，事件包括 `delivery.zip.preview.succeeded`、`delivery.zip.preview.failed`、`delivery.zip.apply.denied`、`delivery.zip.apply.succeeded`、`delivery.zip.apply.failed`。
+
 ---
 
 ## 8. Secrets 管理

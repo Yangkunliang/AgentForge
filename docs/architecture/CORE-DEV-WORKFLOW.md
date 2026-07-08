@@ -18,7 +18,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | 可继续增强 Delivery 自动编排 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
-| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计 | TASK-025 扩展 zip Delivery |
+| Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | TASK-026 扩展 Upload Mount |
 
 ## 2. 用户路径
 
@@ -33,7 +33,7 @@ MVP 用户路径按以下顺序落地：
 7. Agent 执行当前阶段，阶段完成后保存 Artifact。
 8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
 9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
-10. 用户在 Artifact Viewer 中选择本地写回或 GitHub PR Delivery：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR，并导出 Markdown Delivery report。
+10. 用户在 Artifact Viewer 中选择本地写回、GitHub PR Delivery 或 zip 包交付：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR；zip 模式生成包含 manifest、delivery report 和文件树的可下载包。
 
 ## 3. 设计原则
 
@@ -85,7 +85,7 @@ TASK-012 路线图和状态纠偏
 ```text
 创建项目 -> 创建会话 -> 选择需求类型 -> 生成阶段计划
 -> 完成一个阶段 -> 保存产物 -> 人工确认 -> 进入下一阶段
--> 查看产物 -> 将结果交付到本地、GitHub PR 或导出
+-> 查看产物 -> 将结果交付到本地、GitHub PR 或 zip 包
 ```
 
 Delivery 不能绕过用户确认；只有在用户明确确认写入后，Artifact 内容才能写回授权 Mount。

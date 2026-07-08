@@ -220,6 +220,14 @@ recovery_hint
 
 ### 4.3 zip Delivery Package
 
+TASK-025 已落地该设计，对应 API 为：
+
+```text
+POST /api/v1/artifacts/{artifact_id}/delivery/zip/preview
+POST /api/v1/artifacts/{artifact_id}/delivery/zip/apply
+GET  /api/v1/artifacts/{artifact_id}/delivery/zip/download
+```
+
 zip Delivery 是不写用户目录、不调用远程 API 的交付兜底：
 
 ```text
@@ -237,7 +245,7 @@ files/<relative paths>
 路径规则：
 
 - 包内路径必须是相对路径。
-- 禁止绝对路径、空路径、`..`、控制字符和重复路径。
+- 禁止绝对路径、空路径、`..`、反斜杠、Windows 盘符、控制字符和重复路径。
 - `manifest.json` 记录 artifact、project、file_count、bytes、sha256。
 
 状态：
@@ -245,6 +253,13 @@ files/<relative paths>
 - preview：只计算包结构和 sha256，不落下载文件。
 - apply：生成 zip，保存下载引用、sha256、过期时间和 report。
 - failed：写入失败报告，删除未完成临时文件。
+
+实现约束：
+
+- apply 必须显式 `confirm_write=true`，但 zip Delivery 不写本地目录、不调用远程仓库 API。
+- 下载接口按 Artifact 所属 Project 校验用户权限，响应和 report 不暴露服务器临时路径。
+- `DELIVERY_PACKAGE_DIR` 控制 zip 临时存储目录，`DELIVERY_PACKAGE_TTL_HOURS` 控制下载保留时间。
+- 审计事件包括 `delivery.zip.preview.succeeded`、`delivery.zip.preview.failed`、`delivery.zip.apply.denied`、`delivery.zip.apply.succeeded`、`delivery.zip.apply.failed`。
 
 ### 4.4 Upload Mount
 
@@ -279,7 +294,7 @@ upload_mount.failed
 |------|------|------|------|
 | TASK-023 | GitHub OAuth Mount 授权底座 | TASK-022 | token 不下发前端，Mount 由用户显式授权创建 |
 | TASK-024 | GitHub PR Delivery | TASK-023 | preview/apply、base sha 校验、PR URL、审计日志 |
-| TASK-025 | zip Delivery Package | TASK-022 | zip manifest、sha256、下载权限和过期清理 |
+| TASK-025 | zip Delivery Package | TASK-022 | 已完成：zip manifest、sha256、下载权限和过期清理 |
 | TASK-026 | Upload Mount 上下文兜底 | TASK-022 | manifest 范围读取、路径安全、上下文选择器接入 |
 
 ## 5. 验证策略

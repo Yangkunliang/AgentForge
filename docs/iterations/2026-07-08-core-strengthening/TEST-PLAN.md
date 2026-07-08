@@ -1,7 +1,7 @@
 # 核心能力增强测试计划
 
 **日期**：2026-07-08
-**范围**：TASK-020 至 TASK-024
+**范围**：TASK-020 至 TASK-025
 
 ## TASK-020 服务端可信交付
 
@@ -58,6 +58,19 @@
 | apply 成功创建 branch、commit、PR，并保存 PR URL / commit sha | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
 | GitHub token 不进入响应或 AuditLog details | `uv run --extra dev pytest tests/api/test_github_delivery.py` |
 | Artifact Viewer 可切换到 GitHub PR Delivery 并提交 expected_base_sha | `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium` |
+| 前端构建 | `npm run build` |
+
+## TASK-025 zip Delivery Package
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| zip preview 返回 package_name、file_count、total_bytes、package_sha256 且不落地文件 | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
+| apply 未确认时返回 409，不生成 zip | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
+| apply 成功生成 manifest、delivery-report.md 和 files/ 内容，并保存 Delivery report | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
+| 包内路径拒绝绝对路径、`..`、空路径、反斜杠、Windows 盘符、控制字符和重复路径 | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
+| 下载接口按 Artifact/Project 用户权限隔离，不暴露服务器临时路径 | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
+| 过期 zip 在后续 apply 前清理 | `uv run --extra dev pytest tests/api/test_zip_delivery.py` |
+| Artifact Viewer 可切换到 zip 包模式、生成并下载 zip | `npm run test:e2e -- artifact-viewer.spec.ts --project=chromium` |
 | 前端构建 | `npm run build` |
 
 ## 非目标

@@ -6,6 +6,8 @@ import type {
   DeliveryTargetPayload,
   GitHubDeliveryApplyPayload,
   GitHubDeliveryTargetPayload,
+  ZipDeliveryApplyPayload,
+  ZipDeliveryTargetPayload,
 } from '@/types'
 
 export const artifactsApi = {
@@ -25,6 +27,17 @@ export const artifactsApi = {
 
   applyGitHubDelivery: (artifactId: string, data: GitHubDeliveryApplyPayload) =>
     request.post<DeliveryResponse>(`/artifacts/${artifactId}/delivery/github/apply`, data),
+
+  previewZipDelivery: (artifactId: string, data: ZipDeliveryTargetPayload) =>
+    request.post<DeliveryResponse>(`/artifacts/${artifactId}/delivery/zip/preview`, data),
+
+  applyZipDelivery: (artifactId: string, data: ZipDeliveryApplyPayload) =>
+    request.post<DeliveryResponse>(`/artifacts/${artifactId}/delivery/zip/apply`, data),
+
+  downloadZipPackage: (artifactId: string) =>
+    request.get<Blob>(`/artifacts/${artifactId}/delivery/zip/download`, {
+      responseType: 'blob',
+    }),
 
   exportDeliveryReport: (artifactId: string) =>
     request.get<string>(`/artifacts/${artifactId}/delivery/report`, {

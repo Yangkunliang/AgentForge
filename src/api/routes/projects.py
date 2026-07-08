@@ -6,9 +6,11 @@ import secrets
 import urllib.parse
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,13 +22,18 @@ from agent_forge.delivery import (
     DeliveryConsistencyError,
     GitHubDeliveryConsistencyError,
     GitHubDeliveryError,
+    ZipDeliveryError,
     apply_artifact_delivery,
     apply_github_pr_delivery,
+    apply_zip_delivery,
     build_delivery_report_markdown,
     create_github_delivery_client,
     mark_artifact_delivery_failed,
+    mark_zip_delivery_failed,
     preview_artifact_delivery,
     preview_github_pr_delivery,
+    preview_zip_delivery,
+    zip_download_path,
 )
 from agent_forge.integrations.github import (
     GitHubOAuthError,
@@ -239,6 +246,20 @@ class GitHubDeliveryApplyRequest(GitHubDeliveryPreviewRequest):
     commit_message: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class ZipDeliveryFileRequest(BaseModel):
+    path: str = Field(..., min_length=1, max_length=2000)
+    content: str = Field(..., min_length=1)
+
+
+class ZipDeliveryPreviewRequest(BaseModel):
+    target_path: str | None = Field(default=None, min_length=1, max_length=2000)
+    files: list[ZipDeliveryFileRequest] = Field(default_factory=list, max_length=100)
+
+
+class ZipDeliveryApplyRequest(ZipDeliveryPreviewRequest):
+    confirm_write: bool = False
+
+
 class DeliveryResponse(BaseModel):
     artifact_id: str
     project_id: str
@@ -417,6 +438,38 @@ def _add_delivery_audit(
         "artifact_id": artifact.id,
         "project_id": artifact.project_id,
         "mount_id": mount.id,
+        "target_path": target_path,
+    }
+    if details:
+        payload.update(details)
+    db.add(
+        AuditLog(
+            id=str(uuid.uuid4()),
+            action=action,
+            resource="artifact_delivery",
+            user_id=user_id,
+            trace_id=get_trace_id() or artifact.id,
+            status=status_value,
+            degraded=False,
+            details=payload,
+        )
+    )
+
+
+def _add_zip_delivery_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    status_value: str,
+    user_id: str,
+    artifact: Artifact,
+    target_path: str,
+    details: dict | None = None,
+) -> None:
+    payload = {
+        "artifact_id": artifact.id,
+        "project_id": artifact.project_id,
+        "mount_id": "zip",
         "target_path": target_path,
     }
     if details:
@@ -1389,6 +1442,164 @@ async def apply_github_pr_delivery_api(
     await db.refresh(artifact)
     delivery.pop("_audit_events", None)
     return delivery
+
+
+@artifact_router.post("/{artifact_id}/delivery/zip/preview", response_model=DeliveryResponse)
+async def preview_zip_delivery_api(
+    artifact_id: str,
+    body: ZipDeliveryPreviewRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    files = [item.model_dump() for item in body.files] if body.files else None
+    try:
+        delivery = preview_zip_delivery(artifact, target_path=body.target_path, files=files)
+    except ZipDeliveryError as exc:
+        _add_zip_delivery_audit(
+            db,
+            action="delivery.zip.preview.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            target_path=body.target_path or artifact.name,
+            details={"error_code": exc.error_code, "error_message": exc.detail, "phase": exc.phase},
+        )
+        await db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    report = delivery["report"]
+    _add_zip_delivery_audit(
+        db,
+        action="delivery.zip.preview.succeeded",
+        status_value="success",
+        user_id=current_user.id,
+        artifact=artifact,
+        target_path=delivery["target_path"],
+        details={
+            "package_name": report.get("package_name"),
+            "file_count": report.get("file_count"),
+            "total_bytes": report.get("total_bytes"),
+            "package_sha256": report.get("package_sha256"),
+        },
+    )
+    await db.commit()
+    return delivery
+
+
+@artifact_router.post("/{artifact_id}/delivery/zip/apply", response_model=DeliveryResponse)
+async def apply_zip_delivery_api(
+    artifact_id: str,
+    body: ZipDeliveryApplyRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    target_path = body.target_path or artifact.name
+    if not body.confirm_write:
+        _add_zip_delivery_audit(
+            db,
+            action="delivery.zip.apply.denied",
+            status_value="denied",
+            user_id=current_user.id,
+            artifact=artifact,
+            target_path=target_path,
+            details={"reason": "missing_confirmation"},
+        )
+        await db.commit()
+        raise HTTPException(status_code=409, detail="Write confirmation is required before zip delivery")
+
+    files = [item.model_dump() for item in body.files] if body.files else None
+    try:
+        delivery = await apply_zip_delivery(
+            db,
+            artifact,
+            target_path=body.target_path,
+            files=files,
+            package_dir=Path(settings.delivery_package_dir),
+            ttl_hours=settings.delivery_package_ttl_hours,
+        )
+    except ZipDeliveryError as exc:
+        report = await mark_zip_delivery_failed(
+            db,
+            artifact,
+            target_path=target_path,
+            phase=exc.phase,
+            error_code=exc.error_code,
+            error_message=exc.detail,
+            recovery_hint="Fix the package paths and preview the zip package again before retrying.",
+        )
+        _add_zip_delivery_audit(
+            db,
+            action="delivery.zip.apply.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            target_path=target_path,
+            details=report,
+        )
+        await db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        report = await mark_zip_delivery_failed(
+            db,
+            artifact,
+            target_path=target_path,
+            phase="apply",
+            error_code="zip_package_error",
+            error_message=str(exc) or exc.__class__.__name__,
+            recovery_hint="Retry after checking disk permissions and package storage configuration.",
+        )
+        _add_zip_delivery_audit(
+            db,
+            action="delivery.zip.apply.failed",
+            status_value="failed",
+            user_id=current_user.id,
+            artifact=artifact,
+            target_path=target_path,
+            details=report,
+        )
+        await db.commit()
+        raise HTTPException(status_code=500, detail="Zip delivery failed unexpectedly") from exc
+
+    report = delivery["report"]
+    _add_zip_delivery_audit(
+        db,
+        action="delivery.zip.apply.succeeded",
+        status_value="success",
+        user_id=current_user.id,
+        artifact=artifact,
+        target_path=delivery["target_path"],
+        details={
+            "package_id": report.get("package_id"),
+            "package_name": report.get("package_name"),
+            "file_count": report.get("file_count"),
+            "total_bytes": report.get("total_bytes"),
+            "package_sha256": report.get("package_sha256"),
+            "expires_at": report.get("expires_at"),
+        },
+    )
+    await db.commit()
+    await db.refresh(artifact)
+    return delivery
+
+
+@artifact_router.get("/{artifact_id}/delivery/zip/download")
+async def download_zip_delivery_package(
+    artifact_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
+    try:
+        package_path, package_name = zip_download_path(artifact, Path(settings.delivery_package_dir))
+    except ZipDeliveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return FileResponse(
+        package_path,
+        media_type="application/zip",
+        filename=package_name,
+    )
 
 
 @artifact_router.get("/{artifact_id}/delivery/report")

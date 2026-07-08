@@ -512,6 +512,20 @@ export interface GitHubDeliveryApplyPayload extends GitHubDeliveryTargetPayload 
   commit_message?: string | null
 }
 
+export interface ZipDeliveryFilePayload {
+  path: string
+  content: string
+}
+
+export interface ZipDeliveryTargetPayload {
+  target_path?: string | null
+  files?: ZipDeliveryFilePayload[]
+}
+
+export interface ZipDeliveryApplyPayload extends ZipDeliveryTargetPayload {
+  confirm_write: boolean
+}
+
 export interface DeliveryResponse {
   artifact_id: string
   project_id: string
