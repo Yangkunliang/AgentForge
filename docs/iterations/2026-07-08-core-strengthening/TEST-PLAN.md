@@ -1,0 +1,41 @@
+# 核心能力增强测试计划
+
+**日期**：2026-07-08
+**范围**：TASK-020 至 TASK-022
+
+## TASK-020 服务端可信交付
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| preview 返回 fingerprint | `uv run --extra dev pytest tests/api/test_delivery.py` |
+| apply 提供 expected hash 且目标被改动时返回 409 | `uv run --extra dev pytest tests/api/test_delivery.py` |
+| conflict 不覆盖用户文件 | `uv run --extra dev pytest tests/api/test_delivery.py` |
+| BridgeAccessError 会写入 failed report | `uv run --extra dev pytest tests/api/test_delivery.py` |
+| preview/apply/denied/conflict/succeeded 写入 AuditLog | `uv run --extra dev pytest tests/api/test_delivery.py` |
+| 全量回归 | `uv run --extra dev pytest` |
+| 迁移 smoke | `uv run --extra dev alembic -c migrations/alembic.ini upgrade head` |
+| FastAPI 启动 | `PYTHONPATH=/Users/yangkl/AgentForge/src uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18085` |
+
+## TASK-021 核心交互设计复盘
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| Project 首页关键入口可见 | Playwright E2E |
+| Chat 阶段完成后 Artifact/确认/交付入口可达 | Playwright E2E |
+| Delivery 冲突或失败提示可读 | Playwright E2E |
+| 前端构建 | `npm run build` |
+
+## TASK-022 交付能力扩展
+
+| 验收项 | 自动化验证 |
+|--------|------------|
+| GitHub OAuth Mount 权限边界 | 后端 API 测试 |
+| GitHub PR Delivery 不绕过确认 | 后端 API 测试 + E2E |
+| zip 交付包可下载且内容正确 | 后端 API 测试 |
+| upload Mount 不访问本地路径 | 后端 API 测试 |
+
+## 非目标
+
+- 不把外部 GitHub API 调用放进无隔离的单元测试。
+- 不使用真实用户目录做破坏性写入。
+- 不把敏感 token 或 Artifact 内容写入审计日志。

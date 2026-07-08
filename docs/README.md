@@ -61,7 +61,7 @@ docs/
 
 | 文档 | 说明 | 状态 |
 |------|------|------|
-| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-019 后续路线图 | ✅ |
+| [CHECKLIST.md](tasks/CHECKLIST.md) | 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-022 路线图 | ✅ |
 
 ## 迭代链条
 
@@ -94,6 +94,9 @@ docs/
 | TASK-017 | 2026-07-08 | 人工确认与阶段继续机制 | ✅ 已完成 |
 | TASK-018 | 2026-07-08 | Agent Bridge / 真实代码库读取 | ✅ 已完成 |
 | TASK-019 | 2026-07-08 | 写回与交付闭环 | ✅ 已完成 |
+| TASK-020 | 2026-07-08 | 服务端可信交付巩固 | 🚧 进行中 |
+| TASK-021 | 2026-07-08 | 核心交互设计复盘与关键入口优化 | ⏳ 待开始 |
+| TASK-022 | 2026-07-08 | 交付能力扩展设计与实现 | ⏳ 待开始 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -162,6 +165,15 @@ docs/
 ### TASK-019 详细信息
 - **核心功能**：`DeliveryService`；Artifact delivery 状态字段；Artifact Viewer 交付面板；unified diff 预览；`confirm_write` 后写回 connected local Mount；写前 `.agentforge.bak` 备份；Delivery report 保存和 Markdown 导出
 - **验证**：`uv run --extra dev pytest tests/api/test_delivery.py` 通过；`npm run test:e2e -- artifact-viewer.spec.ts` 通过
+
+### TASK-020～TASK-022 详细信息
+- **目录**：`docs/iterations/2026-07-08-core-strengthening/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-08-core-strengthening/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-08-core-strengthening/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-08-core-strengthening/TEST-PLAN.md)
+- **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再复盘核心交互入口；最后设计 GitHub PR、zip、upload 等交付扩展。
 
 ## 版本号规范
 

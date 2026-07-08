@@ -14,6 +14,9 @@
 | CDW-05：关键节点人工确认 | TASK-017 |
 | CDW-06：读取真实代码库 | TASK-018 |
 | CDW-07：结果回到项目 | TASK-019 |
+| CDW-08：写回必须可审计、可解释、可恢复 | TASK-020 |
+| CDW-09：核心工作流下一步动作必须可见 | TASK-021 |
+| CDW-10：交付方式覆盖本地、远程和兜底上传 | TASK-022 |
 
 ## 任务索引
 
@@ -27,6 +30,9 @@
 | done | TASK-017：人工确认与阶段继续机制 | P1 | PRD/技术选型/影响范围暂停确认后继续 | TASK-015、TASK-016 |
 | done | TASK-018：Agent Bridge / 真实代码库读取 | P1 | 本地 mount、连接状态、授权文件读取 | TASK-013、TASK-017 |
 | done | TASK-019：写回与交付闭环 | P2 | 生成 diff、确认写回授权 Mount、导出 Markdown 交付报告 | TASK-016、TASK-018 |
+| in_progress | TASK-020：服务端可信交付巩固 | P0 | preview/apply 一致性、失败落库、审计日志 | TASK-019 |
+| todo | TASK-021：核心交互设计复盘与关键入口优化 | P1 | 下一步动作可见，关键入口更贴合全栈开发任务 | TASK-020 |
+| todo | TASK-022：交付能力扩展设计与实现 | P2 | GitHub PR、zip、upload 交付扩展 | TASK-021 |
 
 ## 依赖图
 
@@ -39,6 +45,9 @@ TASK-012
       -> TASK-017
         -> TASK-018
           -> TASK-019
+            -> TASK-020
+              -> TASK-021
+                -> TASK-022
 ```
 
 ## 防遗忘机制
@@ -48,3 +57,4 @@ TASK-012
 - 每完成一个任务，只能标记该任务 done，不得顺手标记后续任务。
 - TASK-013、TASK-014、TASK-015、TASK-016、TASK-017、TASK-018、TASK-019 已完成。
 - TASK-019 完成后，核心开发闭环已具备 Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery 的 MVP 主链路。
+- TASK-020、TASK-021、TASK-022 进入核心增强排期：先服务端可信交付，再交互复盘，最后交付能力扩展。
