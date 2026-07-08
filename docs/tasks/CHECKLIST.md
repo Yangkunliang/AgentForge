@@ -40,7 +40,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-006：面向用户的对话工作台（Chat UI）](TASK-006.md) | P2 | US-1、US-2 | TASK-001、TASK-002、TASK-003 | 用户侧对话界面：会话列表、流式气泡、SSE 接入，多 Agent 细节对用户透明 |
 | [x] | [TASK-007：全栈 Agent 交互体验 — 静态页面](TASK-007.md) | P2 | US-01～US-05（PRD-全栈Agent交互体验）| TASK-005、TASK-006 | 项目管理页 + Agent 对话页新交互层，纯静态 mock，验证体验后再接后端 |
 | [x] | [TASK-008：沙箱执行层基础对接](TASK-008.md) | P2 | US-3、US-5 | TASK-004 | 完成 sandbox 包配置注入、REST API、Coder Agent 集成、TTL 回收机制（Phase 1+2） |
-| [ ] | [TASK-009：SSE 执行过程可视化](TASK-009.md) | P2 | US-6 | TASK-006、TASK-008 | thinking/工具调用/代码执行过程实时透出，专属 UI 卡片，后端事件补齐 + 前端组件全新设计 |
+| [x] | [TASK-009：SSE 执行过程可视化](TASK-009.md) | P2 | US-6 | TASK-006、TASK-008 | thinking/工具调用/代码执行过程实时透出，专属 UI 卡片，后端事件补齐 + 前端浏览器 E2E 验收完成 |
 | [x] | [TASK-011：高级设置面板功能实现](TASK-011.md) | P2 | US-1、US-2 | TASK-006 | useAdvancedSettings store + ContextChips/StagePreview 改造 + 发送时参数注入 |
 
 ## 执行顺序

@@ -39,7 +39,8 @@
 - [2026-06-22-skill-engine/](docs/iterations/2026-06-22-skill-engine/) — Skill 引擎迭代
 - [2026-07-07-task-009-sse-validation/](docs/iterations/2026-07-07-task-009-sse-validation/) — TASK-009 SSE 执行过程可视化联调验证
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-07-task-009-sse-validation/TECHNICAL-DESIGN.md) — 执行步骤收集器、code_executor 单卡展示、stdout/stderr 补全、失败/超时状态风险修正
-  - [TEST-PLAN.md](docs/iterations/2026-07-07-task-009-sse-validation/TEST-PLAN.md) — thinking、tool_call、code_executor、timeout、多步骤顺序的自动化测试和视觉验收计划
+  - [TEST-PLAN.md](docs/iterations/2026-07-07-task-009-sse-validation/TEST-PLAN.md) — thinking、tool_call、code_executor、timeout、多步骤顺序、浏览器视觉状态和移动端溢出的自动化验收计划
+  - [ITERATION-REVIEW.md](docs/iterations/2026-07-07-task-009-sse-validation/ITERATION-REVIEW.md) — TASK-009 浏览器 E2E 验收结论、验证命令和剩余边界
 - [2026-07-07-task-011-risk-fixes/](docs/iterations/2026-07-07-task-011-risk-fixes/) — TASK-011 高级设置真实透传与技术风险修正
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-07-task-011-risk-fixes/TECHNICAL-DESIGN.md) — intent/context/stage 透传、system prompt 注入、沙箱配置、API 路由前缀、依赖锁、SQLite 测试方言与全量 pytest 风险修正
 

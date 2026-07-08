@@ -109,6 +109,15 @@ const routes: RouteRecordRaw[] = [
   },
 ]
 
+if (import.meta.env.DEV) {
+  routes.push({
+    path: '/__e2e__/execution-steps',
+    name: 'E2EExecutionSteps',
+    component: () => import('@/views/e2e/ExecutionStepsHarness.vue'),
+    meta: { requiresAuth: false },
+  })
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes,

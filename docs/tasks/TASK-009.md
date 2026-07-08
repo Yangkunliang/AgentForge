@@ -1,7 +1,7 @@
 # TASK-009：SSE 执行过程可视化
 
 **优先级**：P2  
-**状态**：Phase 4 自动化验证已补充，待真实浏览器视觉验收
+**状态**：已完成（浏览器 E2E 验收通过）
 **依赖**：TASK-006（Chat UI）、TASK-008（沙箱执行层）  
 **关联设计文档**：[SSE-EXECUTION-VISUALIZATION.md](../tech-design/SSE-EXECUTION-VISUALIZATION.md)  
 **关联代码**：`src/agent_forge/api/sse.py`、`src/agent_forge/llm/provider.py`、`src/agent_forge/skills/code_executor.py`、`src/agent_forge/skills/dispatcher.py`、`web/src/`
@@ -18,12 +18,12 @@
 
 ## 验收标准
 
-- [ ] thinking 过程通过独立事件流式推送，前端 ThinkingBlock 实时展示文字，结束后自动折叠并显示耗时
-- [ ] 工具调用（weather、web_search、http_request 等）展示专属摘要卡片，不再裸 JSON
-- [ ] code_executor 有独立 CodeExecutionCard，展示代码块 + 运行中动画 + stdout/stderr 分区
-- [ ] 多步骤（thinking → tool_call → thinking → tool_call）顺序正确，按事件到达时序排列
-- [ ] 超时、失败等异常状态在卡片内明确展示
-- [ ] 旧 `tool_calls` 字段向后兼容（历史消息不报错）
+- [x] thinking 过程通过独立事件流式推送，前端 ThinkingBlock 实时展示文字，结束后自动折叠并显示耗时
+- [x] 工具调用（weather、web_search、http_request 等）展示专属摘要卡片，不再裸 JSON
+- [x] code_executor 有独立 CodeExecutionCard，展示代码块 + 运行中动画 + stdout/stderr 分区
+- [x] 多步骤（thinking → tool_call → thinking → tool_call）顺序正确，按事件到达时序排列
+- [x] 超时、失败等异常状态在卡片内明确展示
+- [x] 旧 `tool_calls` 字段向后兼容（历史消息不报错）
 
 ---
 
@@ -125,24 +125,24 @@
 
 ## Phase 4：联调验证
 
-### 4.1 核心场景测试
-- [ ] **纯对话**：只有 llm_response，无 ExecutionStepList，气泡正常流式
-- [ ] **天气查询**：thinking → get_weather tool_call → llm_response，3步顺序正确
+### 4.1 核心场景测试 ✅
+- [x] **纯对话**：只有 llm_response，无 ExecutionStepList，气泡正常流式；浏览器 E2E 覆盖 `scenario=pure`
+- [x] **天气查询**：thinking → get_weather tool_call → llm_response，3步顺序正确；浏览器 E2E 覆盖 `scenario=mixed`
 - [x] **代码执行**：thinking → code_executor（含代码预览 + 输出）→ llm_response；自动化覆盖 code_executor 单 CodeExecutionStep 与 stdout/stderr 补全
 - [x] **多工具穿插**：thinking → tool_call_1 → thinking → tool_call_2，顺序保留；自动化覆盖 execution_steps 按事件到达顺序落库
 - [x] **代码执行失败**：CodeExecutionCard 显示 stderr；自动化覆盖无 sandbox 事件的安全拦截失败兜底
 
-### 4.2 异常场景测试
+### 4.2 异常场景测试 ✅
 - [x] 代码执行超时（30s）：timeout 状态卡片，整体任务不崩溃；自动化覆盖 `sandbox_timeout` 状态收集
 - [x] 工具调用失败：failed 状态卡片，有错误文字；自动化覆盖 `result.error` → failed
-- [ ] SSE 中断：streaming 状态正确 finalize
-- [ ] 历史消息加载：旧 `tool_calls` 格式不报错，有兜底渲染
+- [x] SSE 中断：streaming 状态正确 finalize；浏览器 E2E 覆盖无 spinner/无进度条残留
+- [x] 历史消息加载：旧 `tool_calls` 格式不报错，有兜底渲染；浏览器 E2E 覆盖旧 JSON 展示
 
-### 4.3 视觉验收
-- [ ] thinking → tool_call 切换时动画流畅
-- [ ] 多步骤时间线连接线对齐
-- [ ] 折叠/展开动画 < 300ms
-- [ ] 移动端（375px）各卡片不溢出
+### 4.3 视觉验收 ✅
+- [x] thinking → tool_call 切换时动画流畅；浏览器 E2E 覆盖 streaming 场景下自动展开、进度条和 spinner 可见
+- [x] 多步骤时间线连接线对齐；浏览器 E2E 量测 connector 横向中心一致
+- [x] 折叠/展开动画 < 300ms；浏览器 E2E 读取 CSS transition duration 校验
+- [x] 移动端（375px）各卡片不溢出；浏览器 E2E 校验页面无横向滚动
 
 ### 4.4 本轮风险修正与自动化覆盖 ✅
 - [x] 抽取 `ExecutionStepCollector`，避免 `sessions.py` 内联收集逻辑不可测试
@@ -150,6 +150,7 @@
 - [x] 前端 `tool_call_start/end` 对 `code_executor` 只补全 CodeExecutionStep，不再创建 ToolCallStep
 - [x] 修复 `sandbox_completed` 先到后，`tool_call_end` 无法补齐 stdout/stderr 的状态更新问题
 - [x] 补充 `tests/api/test_execution_steps.py` 覆盖 thinking、普通工具、code_executor、超时和多步骤顺序
+- [x] 补充 `web/e2e/execution-steps.spec.ts` 覆盖纯对话、weather/code 顺序、历史消息、SSE 中断、运行中视觉反馈、折叠动画、时间线对齐和 375px 移动端溢出
 
 ---
 
@@ -174,6 +175,8 @@
 | CodeExecutionCard | `web/src/components/chat/CodeExecutionCard.vue` | ✅ |
 | ExecutionStepList | `web/src/components/chat/ExecutionStepList.vue` | ✅ |
 | AssistantMessage | `web/src/components/chat/AssistantMessage.vue` | ✅ |
+| 浏览器 E2E 验收 | `web/e2e/execution-steps.spec.ts` | ✅ |
+| Dev-only E2E Harness | `web/src/views/e2e/ExecutionStepsHarness.vue` | ✅ |
 
 ---
 
@@ -184,3 +187,4 @@
 - `_suffix_match()` 处理跨 chunk 标签拆断问题，覆盖 `<thi`、`</think` 等不完整前缀
 - `on_event` 注入到 Skill 时 `_emit()` 辅助函数做了异常守卫，回调失败不影响主流程
 - `code_executor` 是代码执行专属卡片，不再作为普通 ToolCallCard 展示；若没有 `sandbox_executing` 事件，`tool_call_end` 会兜底生成失败的 CodeExecutionStep
+- `/__e2e__/execution-steps` 只在 Vite DEV 环境注册，用于浏览器验收，不进入生产路由
