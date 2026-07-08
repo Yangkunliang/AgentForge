@@ -24,7 +24,7 @@
 | 状态 | 任务 | 优先级 | 目标 | 依赖 |
 |------|------|--------|------|------|
 | done | TASK-020：服务端可信交付巩固 | P0 | preview/apply 一致性、失败落库、审计日志和启动/迁移验证 | TASK-019 |
-| todo | TASK-021：核心交互设计复盘与关键入口优化 | P1 | Project/Chat/Stage/Artifact/Delivery 下一步动作可见 | TASK-020 |
+| done | TASK-021：核心交互设计复盘与关键入口优化 | P1 | Project/Chat/Stage/Artifact/Delivery 下一步动作可见 | TASK-020 |
 | todo | TASK-022：交付能力扩展设计与实现 | P2 | GitHub PR、zip、upload 等交付扩展设计与拆分 | TASK-021 |
 
 ## 依赖图
@@ -39,5 +39,5 @@ TASK-019
 ## 防遗忘机制
 
 - TASK-020 已完成；合并 main 后立即开启 TASK-021。
-- TASK-021 完成并合并 main 后，立即开启 TASK-022。
+- TASK-021 已完成；合并 main 后立即开启 TASK-022。
 - 如果 TASK-022 设计后拆出更多实现任务，必须继续写入 `docs/tasks/CHECKLIST.md` 和独立 `TASK-NNN.md`。

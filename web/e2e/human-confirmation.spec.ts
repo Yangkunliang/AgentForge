@@ -287,6 +287,7 @@ test.describe('TASK-017 human confirmation gate', () => {
 
     await expect(page.getByTestId('confirm-card')).toContainText('需求分析等待确认')
     await expect(page.getByTestId('confirm-card')).toContainText('需求分析.md')
+    await expect(page.getByTestId('confirm-card').getByRole('link', { name: /查看产物并交付/ })).toBeVisible()
 
     await page.getByRole('button', { name: '确认继续' }).click()
 
@@ -309,5 +310,19 @@ test.describe('TASK-017 human confirmation gate', () => {
       { action: 'revise', feedback: '补充异常场景和验收标准' },
     ])
     await expect(page.getByTestId('confirm-card')).toHaveCount(0)
+  })
+
+  test('opens the generated artifact from the confirmation card', async ({ page }) => {
+    const confirmRequests: Array<{ action: string; feedback: string | null }> = []
+    await login(page)
+    await mockConfirmationApi(page, { confirmRequests })
+
+    await page.goto('/chat/session-confirm')
+
+    await page.getByTestId('confirm-card').getByRole('link', { name: /查看产物并交付/ }).click()
+
+    await expect(page).toHaveURL('/artifacts/artifact-analysis')
+    await expect(page.locator('.artifact-viewer')).toContainText('需求分析')
+    expect(confirmRequests).toHaveLength(0)
   })
 })

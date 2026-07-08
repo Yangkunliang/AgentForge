@@ -22,6 +22,22 @@ type ProjectSession = {
   updated_at: string
 }
 
+type Artifact = {
+  id: string
+  project_id: string
+  session_id: string | null
+  pipeline_run_id: string | null
+  stage_state_id: string | null
+  artifact_type: string
+  name: string
+  content: string
+  file_type: string | null
+  source_message_id: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
 const now = '2026-07-08T09:00:00.000Z'
 
 const baseProjects: Project[] = [
@@ -49,6 +65,22 @@ const baseProjects: Project[] = [
   },
 ]
 
+const projectArtifact: Artifact = {
+  id: 'artifact-analysis',
+  project_id: 'project-api',
+  session_id: 'session-api',
+  pipeline_run_id: 'run-analysis',
+  stage_state_id: 'stage-analysis',
+  artifact_type: 'prd',
+  name: '需求分析.md',
+  content: '# 需求分析\n\n退款流程需要补充状态机。',
+  file_type: 'markdown',
+  source_message_id: 'msg-analysis',
+  metadata: { stage_id: 'analysis', stage_name: '需求分析' },
+  created_at: now,
+  updated_at: now,
+}
+
 function json(data: unknown, status = 200) {
   return {
     status,
@@ -65,6 +97,7 @@ async function login(page: Page) {
 
 async function mockProjectApi(page: Page, options?: {
   projects?: Project[]
+  artifactsByProject?: Record<string, Artifact[]>
   onCreateProject?: (payload: unknown) => Project
   onCreateMount?: (projectId: string, payload: unknown) => void
   sessionRequests?: string[]
@@ -139,6 +172,13 @@ async function mockProjectApi(page: Page, options?: {
       return
     }
 
+    const projectArtifactsMatch = path.match(/^\/api\/v1\/projects\/([^/]+)\/artifacts$/)
+    if (projectArtifactsMatch && method === 'GET') {
+      const projectId = projectArtifactsMatch[1]
+      await route.fulfill(json(options?.artifactsByProject?.[projectId] ?? []))
+      return
+    }
+
     if (method === 'POST' && path === '/api/v1/projects') {
       const payload = request.postDataJSON()
       const created = options?.onCreateProject?.(payload) ?? {
@@ -191,11 +231,13 @@ test.describe('TASK-014 project real data flow', () => {
     await page
       .locator('.project-card')
       .filter({ hasText: '设计系统前端' })
-      .getByRole('button', { name: /开始对话/ })
+      .getByRole('button', { name: /开始需求/ })
       .click()
 
     await expect(page).toHaveURL('/chat')
     await expect(page.locator('.project-bar')).toContainText('设计系统前端')
+    await expect(page.getByTestId('welcome-project-summary')).toContainText('设计系统前端')
+    await expect(page.getByTestId('welcome-project-summary')).toContainText('代码库已连接')
     await expect(page.locator('.session-list')).toContainText('前端颜色系统')
     expect(sessionRequests).toContain('project-web')
 
@@ -208,6 +250,25 @@ test.describe('TASK-014 project real data flow', () => {
 
     await page.reload()
     await expect(page.locator('.project-bar')).toContainText('订单中台 API')
+  })
+
+  test('surfaces project next actions and recent artifacts on project cards', async ({ page }) => {
+    await login(page)
+    await mockProjectApi(page, {
+      artifactsByProject: {
+        'project-api': [projectArtifact],
+        'project-web': [],
+      },
+    })
+
+    await page.goto('/projects')
+
+    const apiCard = page.locator('.project-card').filter({ hasText: '订单中台 API' })
+    await expect(apiCard.getByTestId('project-next-action')).toContainText('复用最近产物继续推进')
+    await expect(apiCard.getByRole('link', { name: /需求分析\.md/ })).toBeVisible()
+
+    const webCard = page.locator('.project-card').filter({ hasText: '设计系统前端' })
+    await expect(webCard.getByTestId('project-next-action')).toContainText('生成第一份阶段产物')
   })
 
   test('creates a project and a primary mount before showing success', async ({ page }) => {

@@ -35,7 +35,7 @@
 - [TASK-018.md](docs/tasks/TASK-018.md) — Agent Bridge / 真实代码库读取，已完成
 - [TASK-019.md](docs/tasks/TASK-019.md) — 写回与交付闭环，已完成
 - [TASK-020.md](docs/tasks/TASK-020.md) — 服务端可信交付巩固，已完成
-- [TASK-021.md](docs/tasks/TASK-021.md) — 核心交互设计复盘与关键入口优化，待开始
+- [TASK-021.md](docs/tasks/TASK-021.md) — 核心交互设计复盘与关键入口优化，已完成
 - [TASK-022.md](docs/tasks/TASK-022.md) — 交付能力扩展设计与实现，待开始
 
 ## 迭代记录 (docs/iterations/)
@@ -68,8 +68,9 @@
   - [PRODUCT-REQUIREMENTS.md](docs/iterations/2026-07-08-core-strengthening/PRODUCT-REQUIREMENTS.md) — 可信写回、下一步动作清楚、多交付方式
   - [TASK-CHECKLIST.md](docs/iterations/2026-07-08-core-strengthening/TASK-CHECKLIST.md) — TASK-020～TASK-022 优先级、依赖和防遗忘机制
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-08-core-strengthening/TECHNICAL-DESIGN.md) — Delivery fingerprint、一致性校验、失败报告、审计日志和扩展边界
+  - [UI-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/UI-REVIEW.md) — TASK-021 核心交互入口复盘、设计约束和 E2E 验收覆盖
   - [TEST-PLAN.md](docs/iterations/2026-07-08-core-strengthening/TEST-PLAN.md) — 服务端、UI、交付扩展验证矩阵
-  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020 完成内容、风险修正和验证结果
+  - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020～TASK-021 完成内容、风险修正和验证结果
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -82,7 +83,8 @@
 - TASK-017 已完成：`PipelineStageState` 新增确认动作、反馈和处理时间字段；确认阶段完成后进入 `waiting_confirmation` 并发 `confirm_required`；`POST /pipeline-runs/{run_id}/stages/{stage_id}/confirm` 支持 approve/revise/cancel；StageRuntime 等待确认时停止调用 SkillExecutionEngine，revise 反馈会注入下一次同阶段执行；Chat ConfirmCard 已接真实 API 和 Artifact。
 - TASK-018 已完成：新增 `agentforge mount <path>` CLI、Bridge 状态和文件列表/读取 API、授权 root 内路径校验、敏感文件拒绝、ContextPicker 挂载文件选择，以及 Chat `context_files[type=file].mount_id` 真实内容注入 SkillExecutionEngine。
 - TASK-019 已完成：新增 `agent_forge.delivery`、Artifact delivery 字段、diff preview、`confirm_write` 写回 connected local Mount、写前 `.agentforge.bak` 备份、Delivery report 和 Markdown 导出；Artifact Viewer 已接交付面板。
-- TASK-020 已完成：Delivery preview/apply 一致性校验、失败报告、`AuditLog.resource=artifact_delivery` 审计、默认不预热远程 E2B 沙箱；TASK-021、TASK-022 继续按交互复盘和交付扩展推进。
+- TASK-020 已完成：Delivery preview/apply 一致性校验、失败报告、`AuditLog.resource=artifact_delivery` 审计、默认不预热远程 E2B 沙箱。
+- TASK-021 已完成：Project 页按 Mount、PipelineRun、Artifact 聚合下一步动作；Chat 空状态展示当前项目和代码库连接状态；StagePreview 展示当前阶段摘要；ConfirmCard 增加“查看产物并交付”；ArtifactCard 展示交付状态；TASK-022 继续按交付扩展推进。
 
 ---
 

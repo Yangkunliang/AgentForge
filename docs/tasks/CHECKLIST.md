@@ -66,7 +66,7 @@ PRODUCT-REQUIREMENTS / PRD
 | [x] | [TASK-018：Agent Bridge / 真实代码库读取](TASK-018.md) | P1 | CDW-02、CDW-06 | TASK-013、TASK-017 | 本地 mount、连接状态、授权范围和只读文件读取已落地 |
 | [x] | [TASK-019：写回与交付闭环](TASK-019.md) | P2 | CDW-07 | TASK-016、TASK-018 | Artifact 可预览 diff、确认写回授权 Mount、生成并导出 Delivery report |
 | [x] | [TASK-020：服务端可信交付巩固](TASK-020.md) | P0 | CDW-08、CDW-07 | TASK-019 | preview/apply 一致性、失败落库、审计日志、迁移与启动验证 |
-| [ ] | [TASK-021：核心交互设计复盘与关键入口优化](TASK-021.md) | P1 | CDW-09、CDW-01、CDW-04、CDW-05 | TASK-020 | Project/Chat/Stage/Artifact/Delivery 下一步动作可见 |
+| [x] | [TASK-021：核心交互设计复盘与关键入口优化](TASK-021.md) | P1 | CDW-09、CDW-01、CDW-04、CDW-05 | TASK-020 | Project/Chat/Stage/Artifact/Delivery 下一步动作可见 |
 | [ ] | [TASK-022：交付能力扩展设计与实现](TASK-022.md) | P2 | CDW-10、CDW-02、CDW-07 | TASK-021 | GitHub PR、zip、upload 等交付扩展设计与拆分 |
 
 ## 执行顺序

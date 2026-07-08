@@ -62,12 +62,33 @@ const localOverrideStageIds = computed(() =>
 )
 
 const statusLabels: Partial<Record<PipelineStageStatus, string>> = {
+  pending: '待处理',
   running: '运行中',
   waiting_confirmation: '待确认',
   completed: '完成',
   skipped: '跳过',
   failed: '失败',
 }
+
+const activeStage = computed(() => {
+  if (!props.pipelineRun) return null
+  return stages.value.find((stage) => isCurrent(stage))
+    ?? stages.value.find((stage) => ['running', 'waiting_confirmation', 'failed'].includes(stage.status))
+    ?? null
+})
+
+const stageSummary = computed(() => {
+  if (!props.pipelineRun) {
+    return `计划：${stages.value.length} 个阶段`
+  }
+  if (activeStage.value) {
+    return `当前：${activeStage.value.label} · ${statusLabels[activeStage.value.status] ?? '待处理'}`
+  }
+  if (props.pipelineRun.status === 'completed') return '流程已完成'
+  if (props.pipelineRun.status === 'failed') return '流程失败'
+  if (props.pipelineRun.status === 'cancelled') return '流程已终止'
+  return '阶段已就绪'
+})
 
 function isSkipped(stage: StageView): boolean {
   return stage.status === 'skipped'
@@ -101,6 +122,9 @@ function stageTitle(stage: StageView): string {
 
 <template>
   <div class="stage-preview">
+    <div class="stage-summary" data-testid="stage-preview-summary">
+      {{ stageSummary }}
+    </div>
     <div class="stage-list">
       <template v-for="(stage, index) in stages" :key="stage.id">
         <div
@@ -150,6 +174,19 @@ function stageTitle(stage: StageView): string {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.stage-summary {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .stage-list {

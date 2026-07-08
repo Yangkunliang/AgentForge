@@ -112,8 +112,14 @@ const agentInfo = computed(() => ({
   avatarUrl: agentStore.myAgentSettings.avatar_url || undefined,
 }))
 
+async function syncProjectMounts(projectId?: string | null) {
+  if (!projectId) return
+  await projectStore.fetchProjectMounts(projectId).catch(() => undefined)
+}
+
 onMounted(async () => {
   await projectStore.fetchProjects()
+  await syncProjectMounts(projectStore.currentProjectId)
   await sessionStore.fetchSessions(projectStore.currentProjectId)
   await agentStore.fetchMyAgentSettings()
   if (sessionId.value) {
@@ -279,6 +285,7 @@ watch(
   () => projectStore.currentProjectId,
   async (projectId, oldProjectId) => {
     if (projectId === oldProjectId) return
+    await syncProjectMounts(projectId)
     await sessionStore.fetchSessions(projectId)
     if (sessionId.value && !sessionStore.sessions.some((session) => session.id === sessionId.value)) {
       sessionId.value = undefined

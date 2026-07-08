@@ -202,6 +202,8 @@ test.describe('TASK-015 pipeline stage state', () => {
 
     await page.locator('.intent-pill').click()
 
+    await expect(page.getByTestId('stage-preview-summary')).toContainText('当前：后端开发')
+    await expect(page.getByTestId('stage-preview-summary')).toContainText('运行中')
     await expect(page.locator('.stage-pill').filter({ hasText: '前端开发' })).toHaveClass(/skipped/)
     expect(pipelineGets).toContain('run-iteration')
 

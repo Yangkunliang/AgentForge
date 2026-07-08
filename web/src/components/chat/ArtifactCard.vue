@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdvancedSettingsStore } from '@/stores/advancedSettings'
 import type { Artifact } from '@/types'
@@ -10,6 +11,32 @@ const props = defineProps<{
 
 const router = useRouter()
 const advancedSettings = useAdvancedSettingsStore()
+
+const deliveryLabel = computed(() => {
+  switch (props.artifact.delivery_status) {
+    case 'previewed':
+      return '已预览'
+    case 'delivered':
+      return '已交付'
+    case 'failed':
+      return '交付失败'
+    default:
+      return '待交付'
+  }
+})
+
+const deliveryTone = computed(() => {
+  switch (props.artifact.delivery_status) {
+    case 'delivered':
+      return 'delivered'
+    case 'failed':
+      return 'failed'
+    case 'previewed':
+      return 'previewed'
+    default:
+      return 'pending'
+  }
+})
 
 function openArtifact() {
   router.push(`/artifacts/${props.artifact.id}`)
@@ -46,12 +73,15 @@ function addAsContext() {
       <div class="artifact-card__meta">
         <span>{{ artifactStageLabel(artifact) }}</span>
         <span v-if="artifact.file_type">{{ artifact.file_type }}</span>
+        <span class="artifact-card__delivery" :class="`artifact-card__delivery--${deliveryTone}`">
+          {{ deliveryLabel }}
+        </span>
       </div>
     </div>
 
     <div class="artifact-card__actions">
       <button class="artifact-card__ghost" @click="addAsContext">加入上下文</button>
-      <button class="artifact-card__primary" @click="openArtifact">查看</button>
+      <button class="artifact-card__primary" @click="openArtifact">查看产物</button>
     </div>
   </div>
 </template>
@@ -124,6 +154,29 @@ function addAsContext() {
   margin-top: 3px;
   color: #64748b;
   font-size: 11px;
+}
+
+.artifact-card__delivery {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 700;
+
+  &--previewed {
+    background: #fffbeb;
+    color: #a16207;
+  }
+
+  &--delivered {
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  &--failed {
+    background: #fef2f2;
+    color: #b91c1c;
+  }
 }
 
 .artifact-card__actions {

@@ -10,11 +10,22 @@
  *   prompt(text) — 用户点击引导卡，父组件把 text 填入输入框
  */
 
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
+import {
+  Brush,
+  Connection,
+  DocumentChecked,
+  MagicStick,
+  Refresh,
+  Tools,
+  Warning,
+} from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
 
 const emit = defineEmits<{ prompt: [text: string] }>()
 
@@ -31,10 +42,30 @@ const greeting = computed(() => {
 
 const displayName = computed(() => authStore.displayName)
 const avatarUrl = computed(() => authStore.avatarUrl)
+const currentProject = computed(() => projectStore.currentProject)
+const primaryMount = computed(() =>
+  currentProject.value ? projectStore.primaryMountFor(currentProject.value.id) : null
+)
+const mountConnected = computed(() => primaryMount.value?.status === 'connected')
+const projectSummary = computed(() => {
+  if (!currentProject.value) {
+    return {
+      name: '未选择项目',
+      status: '先选择或新建项目',
+      connected: false,
+    }
+  }
+
+  return {
+    name: currentProject.value.name,
+    status: mountConnected.value ? '代码库已连接' : '待确认代码库连接',
+    connected: mountConnected.value,
+  }
+})
 
 // ── 引导卡片 ─────────────────────────────────────────────────
 interface PromptCard {
-  icon: string
+  icon: Component
   title: string
   desc: string
   prompt: string
@@ -43,44 +74,44 @@ interface PromptCard {
 
 const cards: PromptCard[] = [
   {
-    icon: '🐛',
-    title: '帮我 Debug',
-    desc: '粘贴报错信息，AI 秒速定位根因',
+    icon: Warning,
+    title: '定位 Bug',
+    desc: '从报错、复现到影响范围',
     prompt: '帮我 debug，我来粘贴代码和报错信息：\n\n```\n// 粘贴你的代码或错误堆栈\n```',
-    color: '#f0fdf4',
+    color: '#fff7ed',
   },
   {
-    icon: '✨',
-    title: '新功能开发',
-    desc: '描述需求，AI 拆解任务到可执行代码',
+    icon: MagicStick,
+    title: '开发新功能',
+    desc: '先确认需求，再拆 API/UI/测试',
     prompt: '我需要开发一个新功能，请帮我分析需求、拆解任务并生成代码：\n\n【功能描述】：',
     color: '#eff6ff',
   },
   {
-    icon: '🔄',
+    icon: Refresh,
     title: '迭代优化',
-    desc: '改现有功能，AI 分析影响范围再动手',
+    desc: '改现有逻辑，先看 Diff 和影响',
     prompt: '我需要对现有功能做迭代优化，请先分析改动范围和影响点，再给出实现方案：\n\n【要改的内容】：',
     color: '#f0f9ff',
   },
   {
-    icon: '🎨',
+    icon: Brush,
     title: 'UI / 交互调整',
-    desc: '描述或上传设计稿，直接生成组件代码',
+    desc: '对齐交互方案并落到组件',
     prompt: '我需要调整 UI 或交互，请帮我生成对应的前端组件代码：\n\n【调整描述】：',
     color: '#fdf4ff',
   },
   {
-    icon: '🏗️',
-    title: '架构 & 技术选型',
-    desc: '描述系统需求，AI 给出架构方案',
+    icon: Connection,
+    title: '架构与选型',
+    desc: '明确模块、数据流和风险点',
     prompt: '我需要设计一个系统，请给出架构方案（技术选型、模块划分、数据流）：\n\n【系统需求】：',
     color: '#fefce8',
   },
   {
-    icon: '📝',
+    icon: DocumentChecked,
     title: '代码 Review',
-    desc: '从可读性、性能、安全性三个维度分析',
+    desc: '找上线风险和回归缺口',
     prompt: '请帮我做 Code Review，从可读性、性能、安全性三个维度分析，并给出具体改进建议：\n\n```\n// 粘贴你的代码\n```',
     color: '#fff7ed',
   },
@@ -101,7 +132,7 @@ const cards: PromptCard[] = [
       />
       <div class="greeting-text">
         <p class="greeting-sub">{{ greeting }}，</p>
-        <h1 class="greeting-name">{{ displayName }} 👋</h1>
+        <h1 class="greeting-name">{{ displayName }}</h1>
       </div>
     </div>
 
@@ -113,7 +144,16 @@ const cards: PromptCard[] = [
         </svg>
       </div>
       <h2>有什么可以帮你的？</h2>
-      <p class="headline-sub">点击卡片快速开始，或直接描述你的需求</p>
+      <p class="headline-sub">围绕当前项目描述需求，阶段产物会持续沉淀到项目下</p>
+      <div
+        class="project-summary"
+        :class="{ 'project-summary--connected': projectSummary.connected }"
+        data-testid="welcome-project-summary"
+      >
+        <Tools class="project-summary__icon" />
+        <span>当前项目：{{ projectSummary.name }}</span>
+        <strong>{{ projectSummary.status }}</strong>
+      </div>
     </div>
 
     <!-- 引导卡片网格 -->
@@ -124,7 +164,9 @@ const cards: PromptCard[] = [
         class="prompt-card"
         @click="emit('prompt', card.prompt)"
       >
-        <span class="card-icon" :style="{ background: card.color }">{{ card.icon }}</span>
+        <span class="card-icon" :style="{ background: card.color }">
+          <component :is="card.icon" />
+        </span>
         <div class="card-body">
           <span class="card-title">{{ card.title }}</span>
           <span class="card-desc">{{ card.desc }}</span>
@@ -193,7 +235,7 @@ const cards: PromptCard[] = [
   width: 40px;
   height: 40px;
   background: #eff6ff;
-  border-radius: 12px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -214,6 +256,43 @@ h2 {
   margin: 0;
 }
 
+.project-summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+
+  strong {
+    color: #b45309;
+    font-weight: 800;
+  }
+
+  &--connected {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+
+    strong {
+      color: #047857;
+    }
+  }
+}
+
+.project-summary__icon {
+  width: 14px;
+  height: 14px;
+  color: #409eff;
+  flex-shrink: 0;
+}
+
 // ── 卡片网格 ──────────────────────────────────────────────────
 .cards-grid {
   display: grid;
@@ -229,7 +308,7 @@ h2 {
   padding: 12px 14px;
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
@@ -248,12 +327,17 @@ h2 {
 .card-icon {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
   flex-shrink: 0;
+  color: #2563eb;
+
+  :deep(svg) {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .card-body {

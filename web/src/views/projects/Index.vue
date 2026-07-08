@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 import { useSessionStore } from '@/stores/session'
 import { useArtifactStore } from '@/stores/artifact'
-import type { Artifact, Project, ProjectMount } from '@/types'
+import { sessionsApi } from '@/api/modules/sessions'
+import type { Artifact, Project, ProjectMount, Session } from '@/types'
 import { artifactTypeLabel } from '@/utils/artifacts'
 
 const router = useRouter()
@@ -13,6 +14,7 @@ const sessionStore = useSessionStore()
 const artifactStore = useArtifactStore()
 
 const projects = computed(() => projectStore.projects)
+const sessionsByProject = ref<Record<string, Session[]>>({})
 
 onMounted(async () => {
   const data = await projectStore.fetchProjects()
@@ -25,6 +27,22 @@ onMounted(async () => {
     data.map((project) =>
       artifactStore.fetchProjectArtifacts(project.id).catch(() => [])
     )
+  )
+  await Promise.all(
+    data.map(async (project) => {
+      try {
+        const { data: sessions } = await sessionsApi.list(project.id)
+        sessionsByProject.value = {
+          ...sessionsByProject.value,
+          [project.id]: sessions,
+        }
+      } catch {
+        sessionsByProject.value = {
+          ...sessionsByProject.value,
+          [project.id]: [],
+        }
+      }
+    })
   )
 })
 
@@ -84,6 +102,49 @@ function latestArtifacts(project: Project): Artifact[] {
 
 function artifactCount(project: Project): number {
   return artifactStore.artifactsForProject(project.id).length
+}
+
+function activePipelineSession(project: Project): Session | null {
+  return sessionsByProject.value[project.id]?.find((session) => session.current_pipeline_run_id) ?? null
+}
+
+function projectNextAction(project: Project) {
+  const activeSession = activePipelineSession(project)
+  const count = artifactCount(project)
+
+  if (!isConnected(project)) {
+    return {
+      tone: 'blocked',
+      title: '补充代码库连接',
+      detail: '主代码库还不可用，先确认本地目录或远程仓库授权。',
+      cta: '进入对话',
+    }
+  }
+
+  if (activeSession) {
+    return {
+      tone: 'running',
+      title: '继续进行中的流水线',
+      detail: `当前会话：${activeSession.title}`,
+      cta: '继续推进',
+    }
+  }
+
+  if (count > 0) {
+    return {
+      tone: 'ready',
+      title: '复用最近产物继续推进',
+      detail: `已有 ${count} 个阶段产物，可查看、加入上下文或交付。`,
+      cta: '继续对话',
+    }
+  }
+
+  return {
+    tone: 'ready',
+    title: '生成第一份阶段产物',
+    detail: '描述需求后先做意图分类，再进入需求确认和任务拆解。',
+    cta: '开始需求',
+  }
 }
 
 function handleNewProject() {
@@ -176,6 +237,18 @@ async function handleContinueChat(project: Project) {
             <span class="mount-path">{{ mountPath(project) }}</span>
           </div>
 
+          <div
+            class="next-action"
+            :class="`next-action--${projectNextAction(project).tone}`"
+            data-testid="project-next-action"
+          >
+            <span class="next-action__label">下一步</span>
+            <div class="next-action__body">
+              <strong>{{ projectNextAction(project).title }}</strong>
+              <span>{{ projectNextAction(project).detail }}</span>
+            </div>
+          </div>
+
           <!-- 技术栈标签 -->
           <div class="tech-tags">
             <span
@@ -226,14 +299,20 @@ async function handleContinueChat(project: Project) {
               </div>
             </div>
             <div class="card-actions">
-              <button class="action-ghost" title="项目设置">
+              <RouterLink
+                v-if="latestArtifacts(project).length > 0"
+                class="action-ghost"
+                :to="`/artifacts/${latestArtifacts(project)[0].id}`"
+                title="查看最近产物"
+              >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="8" y1="13" x2="16" y2="13"/>
                 </svg>
-              </button>
+              </RouterLink>
               <button class="action-primary" @click="handleContinueChat(project)">
-                开始对话
+                {{ projectNextAction(project).cta }}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
                 </svg>
@@ -505,6 +584,70 @@ async function handleContinueChat(project: Project) {
   border: 1px solid #f1f5f9;
 }
 
+.next-action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+
+  &--blocked {
+    border-color: #fed7aa;
+    background: #fff7ed;
+
+    .next-action__label {
+      color: #c2410c;
+      background: #ffedd5;
+    }
+  }
+
+  &--running {
+    border-color: #fde68a;
+    background: #fffbeb;
+
+    .next-action__label {
+      color: #a16207;
+      background: #fef3c7;
+    }
+  }
+}
+
+.next-action__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.next-action__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  strong {
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  span {
+    color: #64748b;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+}
+
 // ── 技术栈标签 ────────────────────────────────────────────────
 .tech-tags {
   display: flex;
@@ -661,6 +804,7 @@ async function handleContinueChat(project: Project) {
   background: transparent;
   color: #94a3b8;
   cursor: pointer;
+  text-decoration: none;
   transition: all 0.15s;
 
   &:hover {

@@ -75,15 +75,24 @@ async function submit(action: StageConfirmationAction) {
 
     <div class="confirm-card__body">
       <div class="artifact-row">
-        <span class="artifact-row__label">待确认产物</span>
+        <div class="artifact-row__main">
+          <span class="artifact-row__label">待确认产物</span>
+          <RouterLink
+            v-if="artifact"
+            class="artifact-row__link"
+            :to="`/artifacts/${artifact.id}`"
+          >
+            {{ artifactName }}
+          </RouterLink>
+          <span v-else class="artifact-row__placeholder">{{ artifactName }}</span>
+        </div>
         <RouterLink
           v-if="artifact"
-          class="artifact-row__link"
+          class="artifact-row__action"
           :to="`/artifacts/${artifact.id}`"
         >
-          {{ artifactName }}
+          查看产物并交付
         </RouterLink>
-        <span v-else class="artifact-row__placeholder">{{ artifactName }}</span>
       </div>
 
       <div v-if="showRevision" class="revision-box">
@@ -182,12 +191,20 @@ async function submit(action: StageConfirmationAction) {
 .artifact-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
   padding: 8px 10px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(244, 198, 105, 0.54);
+}
+
+.artifact-row__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .artifact-row__label {
@@ -213,6 +230,26 @@ async function submit(action: StageConfirmationAction) {
   &:hover {
     color: #92400e;
     text-decoration: underline;
+  }
+}
+
+.artifact-row__action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid #d97706;
+  color: #92400e;
+  background: #fff7df;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover {
+    background: #ffefd0;
+    border-color: #b45309;
   }
 }
 
@@ -307,6 +344,15 @@ async function submit(action: StageConfirmationAction) {
   .confirm-card__actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .artifact-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .artifact-row__action {
+    justify-content: center;
   }
 }
 </style>

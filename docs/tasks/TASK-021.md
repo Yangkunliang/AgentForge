@@ -1,6 +1,6 @@
 # TASK-021：核心交互设计复盘与关键入口优化
 
-**状态**：todo
+**状态**：done
 **优先级**：P1
 **创建日期**：2026-07-08
 **关联 Epic**：EPIC-CORE-STRENGTHENING
@@ -19,19 +19,26 @@
 
 ## 技术子项
 
-- [ ] 新增 `docs/iterations/2026-07-08-core-strengthening/UI-REVIEW.md`
-- [ ] 复盘 Project 首页、Chat、StagePreview、Artifact Viewer、Delivery 面板的信息层级
-- [ ] 阶段完成卡片明确展示 Artifact、确认和交付入口
-- [ ] Project 首页展示当前进行中的 PipelineRun、最近 Artifact 和 Mount 健康状态
-- [ ] Chat 空状态根据 Project/Mount/Session 状态给出面向开发任务的快捷动作
-- [ ] 补充浏览器 E2E 验证关键入口可达
+- [x] 新增 `docs/iterations/2026-07-08-core-strengthening/UI-REVIEW.md`
+- [x] 复盘 Project 首页、Chat、StagePreview、Artifact Viewer、Delivery 面板的信息层级
+- [x] 阶段完成卡片明确展示 Artifact、确认和交付入口
+- [x] Project 首页展示当前进行中的 PipelineRun、最近 Artifact 和 Mount 健康状态
+- [x] Chat 空状态根据 Project/Mount/Session 状态给出面向开发任务的快捷动作
+- [x] 补充浏览器 E2E 验证关键入口可达
 
 ## acceptance
 
-- [ ] 用户从 Project 进入后能看到当前项目的下一步动作
-- [ ] 用户完成阶段后不用猜测 Artifact 和 Delivery 在哪里
-- [ ] 用户在 Chat 中能理解当前阶段是否等待确认、已完成或可交付
-- [ ] UI 文案不解释内部实现，不暴露 AgentForge 开发视角
+- [x] 用户从 Project 进入后能看到当前项目的下一步动作
+- [x] 用户完成阶段后不用猜测 Artifact 和 Delivery 在哪里
+- [x] 用户在 Chat 中能理解当前阶段是否等待确认、已完成或可交付
+- [x] UI 文案不解释内部实现，不暴露 AgentForge 开发视角
+
+## completion
+
+- Project 页新增 `project-next-action`，按 Mount、进行中 PipelineRun、Artifact 数量给出下一步动作。
+- Chat 空状态展示当前项目与代码库连接状态，快捷动作改成面向开发任务的入口。
+- StagePreview 新增当前阶段摘要，ConfirmCard 增加“查看产物并交付”入口，ArtifactCard 展示交付状态。
+- E2E 覆盖 `projects.spec.ts`、`human-confirmation.spec.ts`、`pipeline-stage-state.spec.ts`。
 
 ## 不做
 
