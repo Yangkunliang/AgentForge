@@ -53,6 +53,9 @@ class PipelineStageStateResponse(BaseModel):
     confirmation_action: str | None
     confirmation_feedback: str | None
     confirmation_resolved_at: datetime | None
+    agent_profile_id: str | None
+    agent_profile_name: str | None
+    agent_profile_source: str | None
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime

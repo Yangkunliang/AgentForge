@@ -735,7 +735,7 @@ Authorization: Bearer <token>
 | `stages[].required` | 是否为必需阶段；只有 `false` 阶段允许 skip/restore。 |
 | `stages[].confirmation_policy` | 当前阶段确认策略，`gate` 后续接入 GovernancePolicy。 |
 | `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
-| `stages[].default_agent_selector` | 后续 AgentResolver 的默认选择线索，TASK-029 接入真实 AgentProfile。 |
+| `stages[].default_agent_selector` | AgentResolver 的默认选择线索，StageRuntime 会据此选择 AgentProfile。 |
 | `stages[].model_route_key` | 后续 ModelRouter 的路由 key，TASK-030 接入 Provider / Model / Credential / Route。 |
 | `stages[].skill_policy_key` | 后续 SkillPolicy 的策略 key，TASK-031 接入 Skill Runtime 权限过滤。 |
 
@@ -785,6 +785,9 @@ Authorization: Bearer <token>
       "confirmation_action": null,
       "confirmation_feedback": null,
       "confirmation_resolved_at": null,
+      "agent_profile_id": null,
+      "agent_profile_name": null,
+      "agent_profile_source": null,
       "started_at": null,
       "completed_at": null,
       "created_at": "2026-07-08T10:00:00Z",
@@ -835,6 +838,8 @@ POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
 `action=approve` 会把当前阶段置为 `completed` 并推进到下一阶段；`action=revise` 会把当前阶段回到 `pending`，`feedback` 注入下一次同阶段执行上下文；`action=cancel` 会把阶段置为 `failed`、run 置为 `cancelled`。每次确认会写入 `AuditLog.action=pipeline.confirm.{action}`。
 
 StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。
+
+StageRuntime 启动阶段时会通过 AgentResolver 选择 AgentProfile，并写入当前 `PipelineStageState.agent_profile_id/name/source`。解析优先级为：用户本次阶段覆盖 → Project 默认 Agent policy → `StageDefinition.default_agent_selector` → 系统默认 Agent。第一版 Project 默认值通过运行时上下文预留，持久化项目策略后续继续扩展。
 
 ---
 
@@ -1000,7 +1005,37 @@ GET /api/v1/agents?capability=code_review&status=active
 Authorization: Bearer <token>
 ```
 
-### 4.3 更新 Agent
+### 4.3 查询运行时 Agent 候选
+
+```http
+GET /api/v1/agents/runtime/candidates?stage_selector=coder
+Authorization: Bearer <token>
+```
+
+响应：
+
+```json
+{
+  "items": [
+    {
+      "id": "agent-001",
+      "name": "coder-001",
+      "capabilities": ["code_generation", "refactoring"],
+      "model": "gpt-4",
+      "description": "代码生成专家",
+      "avatar_url": null,
+      "recommended": true
+    }
+  ]
+}
+```
+
+说明：
+
+- 仅返回 `status=active` 的 Agent；禁用 Agent 不会被 StageRuntime 或候选接口选择。
+- `recommended=true` 表示 Agent capability 与当前 `stage_selector` 匹配。
+
+### 4.4 更新 Agent
 
 ```http
 PATCH /api/v1/agents/{agent_id}
@@ -1011,7 +1046,7 @@ Authorization: Bearer <token>   (需要 admin 权限)
 }
 ```
 
-### 4.4 删除 Agent
+### 4.5 删除 Agent
 
 ```http
 DELETE /api/v1/agents/{agent_id}

@@ -68,6 +68,9 @@ class PipelineStageState(Base, TimestampMixin):
     confirmation_action: Mapped[str | None] = mapped_column(String(30), nullable=True)
     confirmation_feedback: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     confirmation_resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    agent_profile_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    agent_profile_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    agent_profile_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

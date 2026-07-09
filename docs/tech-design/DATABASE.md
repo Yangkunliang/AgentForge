@@ -201,6 +201,9 @@ TASK-023 后，GitHub Mount 的 `metadata` 只保存非敏感仓库信息和 `cr
 | confirmation_action | String | 最近一次确认动作：approve/revise/cancel |
 | confirmation_feedback | Text | 用户修改意见，下一次同阶段执行会注入上下文 |
 | confirmation_resolved_at | DateTime | 最近一次确认处理时间 |
+| agent_profile_id | UUID/String | StageRuntime 本次阶段选择的 AgentProfile ID；系统默认值为 `system-default` |
+| agent_profile_name | String | 本次阶段选择的 Agent 展示名 |
+| agent_profile_source | String | user_override/project_default/stage_default/system_default |
 | started_at | DateTime | 开始时间 |
 | completed_at | DateTime | 完成或跳过时间 |
 | created_at | DateTime | 创建时间 |
@@ -309,6 +312,7 @@ CREATE INDEX ix_pipeline_runs_status ON pipeline_runs(status);
 CREATE INDEX ix_pipeline_stage_states_pipeline_run_id ON pipeline_stage_states(pipeline_run_id);
 CREATE INDEX ix_pipeline_stage_states_stage_id ON pipeline_stage_states(stage_id);
 CREATE INDEX ix_pipeline_stage_states_status ON pipeline_stage_states(status);
+CREATE INDEX ix_pipeline_stage_states_agent_profile_id ON pipeline_stage_states(agent_profile_id);
 ```
 
 ## 5. 记忆系统表

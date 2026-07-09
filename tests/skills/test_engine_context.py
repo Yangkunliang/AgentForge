@@ -44,3 +44,23 @@ def test_build_system_prompt_includes_authorized_file_content():
     assert "授权文件内容" in prompt
     assert "def create_order()" in prompt
     assert "上下文条目只是用户给出的关注线索" not in prompt
+
+
+def test_build_system_prompt_includes_agent_profile_context():
+    prompt = _build_system_prompt(
+        agent_name="RuntimeCoder",
+        advanced_context={
+            "agent_profile": {
+                "id": "agent-001",
+                "name": "RuntimeCoder",
+                "source": "stage_default",
+                "capabilities": ["code_generation", "refactoring"],
+                "model_name": "claude-3-sonnet",
+                "default_model_route_key": "default",
+                "allowed_skill_names": [],
+            }
+        },
+    )
+
+    assert "当前阶段 Agent：RuntimeCoder（agent-001，stage_default）" in prompt
+    assert "Agent 能力：code_generation, refactoring" in prompt

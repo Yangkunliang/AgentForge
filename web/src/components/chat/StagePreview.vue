@@ -22,6 +22,7 @@ type StageView = {
   label: string
   optional: boolean
   status: PipelineStageStatus
+  agentName?: string | null
 }
 
 const stages = computed<StageView[]>(() => {
@@ -33,6 +34,7 @@ const stages = computed<StageView[]>(() => {
         label: stage.stage_name,
         optional: !stage.required,
         status: stage.status,
+        agentName: stage.agent_profile_name,
       }))
   }
 
@@ -41,6 +43,7 @@ const stages = computed<StageView[]>(() => {
     label: stage.label,
     optional: Boolean(stage.optional),
     status: advancedSettings.isStageEnabled(stage.id) ? 'pending' : 'skipped',
+    agentName: null,
   }))
 })
 
@@ -165,6 +168,10 @@ function stageTitle(stage: StageView): string {
       >
         {{ stageId }}
       </span>
+    </div>
+    <div v-if="activeStage?.agentName" class="agent-line">
+      <span class="agent-label">Agent：</span>
+      <span class="agent-name">{{ activeStage.agentName }}</span>
     </div>
   </div>
 </template>
@@ -297,5 +304,25 @@ function stageTitle(stage: StageView): string {
   text-decoration: line-through;
   text-decoration-color: #cbd5e1;
 
+}
+
+.agent-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+.agent-label {
+  color: #94a3b8;
+}
+
+.agent-name {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 700;
 }
 </style>

@@ -37,7 +37,7 @@ src/api/routes/sessions.py
 
 - 还没有按 Project / Stage / AgentProfile 解析模型路由。
 - 还没有按 AgentProfile 或 StageDefinition 过滤 Skill。
-- Agent 管理页创建的 `Agent` 还没有进入 StageRuntime 选择链路。
+- Agent 管理页创建的 active `Agent` 已可通过 AgentResolver 进入 StageRuntime 选择链路。
 
 ### 2.2 Pipeline 状态机
 
@@ -64,7 +64,7 @@ src/agent_forge/pipeline/runtime.py
 
 缺口：
 
-- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key，但这些 key 还没有绑定真实 AgentResolver、ModelRouter 和 SkillPolicy。
+- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key；`default_agent_selector` 已绑定 AgentResolver，ModelRouter 和 SkillPolicy 仍待后续任务接入。
 - 风险策略仍停留在 confirmation 字段和 confirmation_gate，尚未进入统一 GovernancePolicy。
 - 前端仍保留 intent 展示 label/icon，但阶段业务语义已以后端 Catalog 为准。
 
@@ -168,7 +168,7 @@ audit_context
 
 后续收敛：
 
-- TASK-029 以后 StageRuntime 应显式接收或构建 ProjectRuntimeContext。
+- 后续 StageRuntime 应显式接收或构建 ProjectRuntimeContext，避免 Project / Mount / Delivery / Audit 边界继续分散。
 - Delivery 和 SkillPolicy 复用同一授权边界。
 
 ### 3.2 IntentDecision
@@ -226,7 +226,7 @@ can_restore
 
 后续收敛：
 
-- TASK-029 将 `default_agent_selector` 绑定到真实 AgentProfile。
+- `default_agent_selector` 已绑定到真实 AgentProfile。
 - TASK-030 将 `model_route_key` 绑定到真实 ModelRoute。
 - TASK-031 将 `skill_policy_key` 绑定到真实 SkillPolicy。
 
@@ -250,13 +250,15 @@ enabled
 当前映射：
 
 - `Agent` 模型已有 name、capabilities、model、status、avatar_url。
+- `AgentResolver` 已把 active Agent 解析成运行时 AgentProfile。
+- `PipelineStageState` 已记录 agent_profile_id、agent_profile_name、agent_profile_source。
 - `UserAgentSettings` 当前只影响 assistant 名称和头像。
-- StageRuntime 只接收 `agent_name`，没有接收 Agent ID 或模型/Skill 策略。
+- StageRuntime 接收 fallback `agent_name`，但会优先使用 AgentResolver 返回的 AgentProfile name 和上下文。
 
 后续收敛：
 
-- TASK-029 新增 AgentResolver。
-- StageRuntime 记录 `agent_profile_id`，并把 AgentProfile 交给 ModelRouter 和 SkillPolicy。
+- TASK-030 将 AgentProfile 的 model_name / default_model_route_key 交给 ModelRouter。
+- TASK-031 将 AgentProfile 的 allowed_skill_names 交给 SkillPolicy。
 - `UserAgentSettings` 继续负责个人助手展示名，不等同于 AgentProfile。
 
 ### 3.5 ModelRoute
@@ -417,10 +419,10 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 
 | 目标对象 | 当前代码 | 当前状态 | 下一任务 |
 |----------|----------|----------|----------|
-| ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | TASK-029 |
-| IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | TASK-029 |
-| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-029 |
-| AgentProfile | `models/agent.py`、`UserAgentSettings` | 管理态 Agent 存在，未绑定 StageRuntime | TASK-029 |
+| ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | TASK-032 |
+| IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | TASK-032 |
+| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-030 |
+| AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | TASK-030 |
 | ModelRoute | `llm/provider.py`、`config.py`、`api_key.py` | 全局模型配置，缺 route/credential 分层 | TASK-030 |
 | SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`mcp/client.py` | tool defs + executor，缺权限和 manifest | TASK-031 |
 | GovernanceDecision | `pipeline/service.py`、`harness/`、Delivery 确认 | 阶段确认和交付确认存在，策略未统一 | TASK-032 |
@@ -452,6 +454,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 ### TASK-029: Agent Profile 运行时绑定
 
 目标：让 `Agent` 管理态配置进入 StageRuntime，形成可追溯 AgentProfile。
+
+完成状态：已落地 AgentResolver、StageRuntime agent_profile 追踪、运行时 Agent 候选 API、SkillExecutionEngine agent_profile 上下文和前端当前阶段 Agent 展示。
 
 不做：
 
@@ -508,7 +512,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
-| Agent 配置空转 | 创建 Agent 后用户不知道作用在哪里 | TASK-029 |
+| Agent 配置空转 | 已进入 StageRuntime；后续需接入模型路由和 SkillPolicy | TASK-030 |
 | 模型配置不可治理 | 多 provider、多密钥、多阶段策略难维护 | TASK-030 |
 | Skill 安全边界不足 | 第三方 Skill 缺权限和审计闭环 | TASK-031 |
 | 人工确认逻辑分散 | 高风险动作可能漏确认 | TASK-032 |

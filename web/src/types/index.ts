@@ -320,6 +320,9 @@ export interface PipelineStageState {
   confirmation_action?: StageConfirmationAction | null
   confirmation_feedback?: string | null
   confirmation_resolved_at?: string | null
+  agent_profile_id?: string | null
+  agent_profile_name?: string | null
+  agent_profile_source?: string | null
   started_at?: string | null
   completed_at?: string | null
   created_at: string

@@ -104,6 +104,19 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
         label = INTENT_LABELS.get(intent, "未知类型")
         lines.append(f"- 需求类型：{label}（{intent}）")
 
+    agent_profile = advanced_context.get("agent_profile")
+    if isinstance(agent_profile, dict):
+        agent_id = str(agent_profile.get("id") or "").strip()
+        agent_name = str(agent_profile.get("name") or "").strip()
+        agent_source = str(agent_profile.get("source") or "").strip()
+        if agent_id and agent_name:
+            lines.append(f"- 当前阶段 Agent：{agent_name}（{agent_id}，{agent_source or 'unknown'}）")
+        capabilities = agent_profile.get("capabilities")
+        if isinstance(capabilities, list) and capabilities:
+            capability_text = ", ".join(str(capability) for capability in capabilities if capability)
+            if capability_text:
+                lines.append(f"- Agent 能力：{capability_text}")
+
     context_files = advanced_context.get("context_files")
     has_unread_context = False
     if isinstance(context_files, list) and context_files:

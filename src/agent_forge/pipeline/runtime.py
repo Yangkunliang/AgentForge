@@ -16,6 +16,7 @@ from agent_forge.api.sse import (
     emit_stage_started,
 )
 from agent_forge.database import async_session_factory
+from agent_forge.agents.resolver import AgentProfile, resolve_agent_profile
 from agent_forge.models import PipelineRun, PipelineStageState
 from agent_forge.pipeline.catalog import get_stage_definition, stage_definition_to_dict
 from agent_forge.pipeline.service import (
@@ -60,12 +61,15 @@ class StageRuntime:
         active_stage_id: str | None = None
         confirmation_context: dict | None = None
         blocked_reason: str | None = None
+        agent_profile: AgentProfile | None = None
         stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
-            active_stage_id, confirmation_context, blocked_reason = await self._start_current_stage(
+            active_stage_id, confirmation_context, blocked_reason, agent_profile = await self._start_current_stage(
                 task_id=task_id,
                 pipeline_run_id=pipeline_run_id,
                 user_id=user_id,
+                fallback_agent_name=agent_name,
+                advanced_context=advanced_context,
             )
 
         if blocked_reason == "waiting_confirmation":
@@ -81,8 +85,8 @@ class StageRuntime:
                 config=config,
                 sse_publish=sse_publish,
                 user_id=user_id,
-                agent_name=agent_name,
-                advanced_context=_merge_confirmation_context(advanced_context, confirmation_context),
+                agent_name=agent_profile.name if agent_profile else agent_name,
+                advanced_context=_merge_runtime_context(advanced_context, confirmation_context, agent_profile),
             )
 
             async for chunk in async_gen:
@@ -110,7 +114,9 @@ class StageRuntime:
         task_id: str,
         pipeline_run_id: str,
         user_id: str,
-    ) -> tuple[str | None, dict | None, str | None]:
+        fallback_agent_name: str,
+        advanced_context: dict | None,
+    ) -> tuple[str | None, dict | None, str | None, AgentProfile | None]:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
             await emit_pipeline_started(
@@ -123,15 +129,25 @@ class StageRuntime:
 
             stage_id = run.current_stage_id
             if not stage_id:
-                return None, None, None
+                return None, None, None, None
 
             stage = _find_stage(run, stage_id)
             if stage and stage.status == "waiting_confirmation":
-                return None, None, "waiting_confirmation"
+                return None, None, "waiting_confirmation", None
 
             stage_definition = get_stage_definition(run.intent_type, stage_id)
+            agent_profile = await resolve_agent_profile(
+                db,
+                stage_definition=stage_definition,
+                user_override_agent_id=_agent_id_from_context(advanced_context, "agent_profile_id"),
+                project_default_agent_id=_agent_id_from_context(advanced_context, "project_default_agent_id"),
+                fallback_agent_name=fallback_agent_name,
+            )
             confirmation_context = _confirmation_context(stage, stage_definition)
             if stage and stage.status == "pending":
+                stage.agent_profile_id = agent_profile.id
+                stage.agent_profile_name = agent_profile.name
+                stage.agent_profile_source = agent_profile.source
                 start_stage(run, stage_id)
                 await db.commit()
 
@@ -142,7 +158,7 @@ class StageRuntime:
                 pipeline_run_id=run.id,
                 stage_id=stage_id,
             )
-            return stage_id, confirmation_context, None
+            return stage_id, confirmation_context, None, agent_profile
 
     async def _complete_stage(
         self,
@@ -236,3 +252,23 @@ def _merge_confirmation_context(base: dict | None, confirmation: dict | None) ->
     merged = dict(base or {})
     merged["confirmation_feedback"] = confirmation
     return merged
+
+
+def _merge_runtime_context(
+    base: dict | None,
+    confirmation: dict | None,
+    agent_profile: AgentProfile | None,
+) -> dict | None:
+    merged = _merge_confirmation_context(base, confirmation)
+    if not agent_profile:
+        return merged
+    runtime_context = dict(merged or {})
+    runtime_context["agent_profile"] = agent_profile.to_context()
+    return runtime_context
+
+
+def _agent_id_from_context(context: dict | None, key: str) -> str | None:
+    if not context:
+        return None
+    value = context.get(key)
+    return value if isinstance(value, str) and value else None

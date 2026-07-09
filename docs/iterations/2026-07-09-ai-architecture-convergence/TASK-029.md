@@ -17,7 +17,7 @@ acceptance:
   - Agent 创建后能被运行时选择
   - 执行记录能追溯使用的 AgentProfile
   - 支持阶段默认、项目默认、用户覆盖的优先级
-status: todo
+status: done
 ```
 
 ## 背景
@@ -66,7 +66,17 @@ uv run --extra dev pytest tests/api/test_agents.py tests/pipeline/test_runtime.p
 ```
 
 ```bash
+uv run --extra dev pytest tests/agents/test_resolver.py tests/api/test_agents.py tests/pipeline/test_runtime.py tests/skills/test_engine_context.py
+```
+
+```bash
 npm run build
 ```
 
 前端命令在 `/Users/yangkl/AgentForge/web` 下执行。
+
+后端启动验证：
+
+```bash
+JWT_SECRET_KEY=task029-local-startup-secret uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18091
+```

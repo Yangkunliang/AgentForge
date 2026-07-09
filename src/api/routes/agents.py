@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.agents.resolver import list_runtime_agent_candidates
 from agent_forge.database import get_async_session
 from agent_forge.models import Agent, User, UserAgentSettings
 from api.schemas.agent import AgentCreateRequest, AgentResponse, AgentUpdateRequest
@@ -81,6 +82,17 @@ async def list_agents(
         agents = [a for a in agents if capability in (a.capabilities or [])]
 
     return [_agent_to_dict(a) for a in agents]
+
+
+@router.get("/runtime/candidates")
+async def list_runtime_candidates(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(require_permission("read")),
+    stage_selector: str | None = Query(default=None, description="阶段默认 Agent selector"),
+) -> dict:
+    """获取 StageRuntime 可选择的 active Agent 候选。"""
+    _ = current_user
+    return {"items": await list_runtime_agent_candidates(db, stage_selector=stage_selector)}
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)

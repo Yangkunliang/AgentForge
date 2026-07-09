@@ -97,6 +97,7 @@
 - TASK-026 已完成：Upload Mount multipart 上传 API、manifest 范围读取、Bridge/Chat 上下文读取、路径/数量/大小/扩展名限制、`upload_mount.*` 审计、Project 创建向导上传模式和 ContextPicker upload 文件源已落地。
 - TASK-027 已完成：新增 AI Runtime 收敛架构基线，明确 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路、当前代码映射、目标运行时契约和 TASK-028～TASK-034 迁移边界。
 - TASK-028 已完成：新增 `src/agent_forge/pipeline/catalog.py` 和 `/api/v1/pipeline/catalog`，将 intent -> StageDefinition 收敛为后端唯一事实源；StageRuntime、PipelineService 与前端 Pipeline Store 已消费 Catalog，阶段定义包含确认策略、输出产物类型、默认 Agent selector、ModelRoute key 和 SkillPolicy key。
+- TASK-029 已完成：新增 `src/agent_forge/agents/resolver.py`，按用户覆盖、项目默认、StageDefinition.default_agent_selector、系统默认解析 AgentProfile；StageRuntime 会把 `agent_profile_id/name/source` 写入 `PipelineStageState`，并将 AgentProfile 注入 SkillExecutionEngine 上下文；新增 `/api/v1/agents/runtime/candidates` 返回运行时 active Agent 候选。
 
 ---
 
