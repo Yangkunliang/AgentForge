@@ -15,7 +15,7 @@ acceptance:
   - 明确 Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback 主链路
   - 明确当前代码模块和目标运行时契约的映射关系
   - 明确后续 TASK-028 到 TASK-034 的依赖关系
-status: todo
+status: done
 ```
 
 ## 背景

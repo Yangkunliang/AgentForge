@@ -23,6 +23,7 @@
 ## 架构蓝图 (docs/architecture/)
 - [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
 - [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery；增强阶段按 TASK-020 服务端可信交付、TASK-021 交互复盘、TASK-022 交付扩展设计、TASK-023～TASK-026 实现推进
+- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-034 的架构基线
 
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-026 路线图
@@ -94,6 +95,7 @@
 - TASK-024 已完成：GitHub PR Delivery preview/apply API、`expected_base_sha` 二次校验、branch/commit/PR 创建、失败报告、`delivery.github.*` 审计事件和 Artifact Viewer GitHub PR 模式已落地。
 - TASK-025 已完成：zip Delivery preview/apply/download API、deterministic zip sha256、manifest/report、下载权限隔离、过期清理、`delivery.zip.*` 审计事件和 Artifact Viewer zip 包模式已落地。
 - TASK-026 已完成：Upload Mount multipart 上传 API、manifest 范围读取、Bridge/Chat 上下文读取、路径/数量/大小/扩展名限制、`upload_mount.*` 审计、Project 创建向导上传模式和 ContextPicker upload 文件源已落地。
+- TASK-027 已完成：新增 AI Runtime 收敛架构基线，明确 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路、当前代码映射、目标运行时契约和 TASK-028～TASK-034 迁移边界。
 
 ---
 

@@ -31,6 +31,7 @@ docs/
 |------|------|------|
 | [AGENT-MODEL.md](architecture/AGENT-MODEL.md) | AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制 | ✅ |
 | [CORE-DEV-WORKFLOW.md](architecture/CORE-DEV-WORKFLOW.md) | AgentForge 面向全栈开发工程师的核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery | ✅ |
+| [AI-RUNTIME-CONVERGENCE.md](architecture/AI-RUNTIME-CONVERGENCE.md) | AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback | ✅ |
 
 ## 设计文档清单 (tech-design/)
 
@@ -101,7 +102,7 @@ docs/
 | TASK-024 | 2026-07-08 | GitHub PR Delivery | ✅ 已完成 |
 | TASK-025 | 2026-07-08 | zip Delivery Package | ✅ 已完成 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
-| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 📋 计划完成，待执行 |
+| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-027 已完成，TASK-028 待执行 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
