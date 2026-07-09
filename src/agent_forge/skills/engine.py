@@ -117,6 +117,23 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
             if capability_text:
                 lines.append(f"- Agent 能力：{capability_text}")
 
+    model_route = advanced_context.get("model_route")
+    if isinstance(model_route, dict):
+        route_key = str(model_route.get("route_key") or "").strip()
+        route_name = str(model_route.get("name") or "").strip()
+        route_source = str(model_route.get("source") or "").strip()
+        model_name = str(model_route.get("model_name") or "").strip()
+        provider_key = str(model_route.get("provider_key") or "").strip()
+        if route_key and route_name:
+            lines.append(f"- 当前阶段模型路由：{route_name}（{route_key}，{route_source or 'unknown'}）")
+        if model_name:
+            lines.append(f"- 模型：{model_name}，Provider：{provider_key or 'unknown'}")
+        fallback_route_keys = model_route.get("fallback_route_keys")
+        if isinstance(fallback_route_keys, list) and fallback_route_keys:
+            fallback_text = ", ".join(str(route) for route in fallback_route_keys if route)
+            if fallback_text:
+                lines.append(f"- 模型路由兜底：{fallback_text}")
+
     context_files = advanced_context.get("context_files")
     has_unread_context = False
     if isinstance(context_files, list) and context_files:

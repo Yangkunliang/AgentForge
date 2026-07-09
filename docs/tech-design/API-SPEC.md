@@ -736,7 +736,7 @@ Authorization: Bearer <token>
 | `stages[].confirmation_policy` | 当前阶段确认策略，`gate` 后续接入 GovernancePolicy。 |
 | `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
 | `stages[].default_agent_selector` | AgentResolver 的默认选择线索，StageRuntime 会据此选择 AgentProfile。 |
-| `stages[].model_route_key` | 后续 ModelRouter 的路由 key，TASK-030 接入 Provider / Model / Credential / Route。 |
+| `stages[].model_route_key` | StageRuntime 实际解析到的 ModelRoute key。 |
 | `stages[].skill_policy_key` | 后续 SkillPolicy 的策略 key，TASK-031 接入 Skill Runtime 权限过滤。 |
 
 ---
@@ -788,6 +788,10 @@ Authorization: Bearer <token>
       "agent_profile_id": null,
       "agent_profile_name": null,
       "agent_profile_source": null,
+      "model_route_key": null,
+      "model_route_name": null,
+      "model_name": null,
+      "model_route_source": null,
       "started_at": null,
       "completed_at": null,
       "created_at": "2026-07-08T10:00:00Z",
@@ -840,6 +844,92 @@ POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
 StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。
 
 StageRuntime 启动阶段时会通过 AgentResolver 选择 AgentProfile，并写入当前 `PipelineStageState.agent_profile_id/name/source`。解析优先级为：用户本次阶段覆盖 → Project 默认 Agent policy → `StageDefinition.default_agent_selector` → 系统默认 Agent。第一版 Project 默认值通过运行时上下文预留，持久化项目策略后续继续扩展。
+
+StageRuntime 启动阶段时也会通过 ModelRouter 选择 ModelRoute，并写入 `PipelineStageState.model_route_key/name/source` 和 `model_name`。解析优先级为：用户本次 `model_route_key` 覆盖 → AgentProfile 默认 route → `StageDefinition.model_route_key` → legacy settings fallback。Credential 明文只用于服务端调用 LLM，不进入 API 响应和 prompt 上下文。
+
+---
+
+## LLM 设置 API
+
+结构化 LLM 配置按当前登录用户隔离，写接口需要 `admin` 权限，读接口需要 `read` 权限。
+
+### 配置快照
+
+```http
+GET /api/v1/llm
+Authorization: Bearer <token>
+```
+
+响应包含旧版全局配置和结构化对象列表：
+
+```json
+{
+  "api_key_set": true,
+  "default_model": "openai/gpt-4o-mini",
+  "default_temperature": 0.7,
+  "max_tokens": 4096,
+  "model_routes": {"vision": "openai/gpt-4o"},
+  "providers": [],
+  "models": [],
+  "credentials": [],
+  "routes": []
+}
+```
+
+### Provider / Model / Credential / Route
+
+```http
+POST /api/v1/llm/providers
+GET /api/v1/llm/providers
+POST /api/v1/llm/models
+GET /api/v1/llm/models
+POST /api/v1/llm/credentials
+GET /api/v1/llm/credentials
+POST /api/v1/llm/routes
+GET /api/v1/llm/routes
+```
+
+Credential 创建请求：
+
+```json
+{
+  "provider_id": "provider-001",
+  "name": "prod-key",
+  "secret": "sk-...",
+  "active": true
+}
+```
+
+Credential 响应永不返回明文：
+
+```json
+{
+  "id": "cred-001",
+  "provider_id": "provider-001",
+  "provider_key": "openai",
+  "name": "prod-key",
+  "secret_set": true,
+  "masked_secret": "sk-a...1234",
+  "active": true
+}
+```
+
+Route 创建请求：
+
+```json
+{
+  "route_key": "default",
+  "name": "默认路由",
+  "provider_id": "provider-001",
+  "model_id": "model-001",
+  "credential_id": "cred-001",
+  "temperature": 0.7,
+  "max_tokens": 4096,
+  "timeout_seconds": 60,
+  "fallback_route_keys": ["safe"],
+  "active": true
+}
+```
 
 ---
 

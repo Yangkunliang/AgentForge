@@ -16,7 +16,7 @@ acceptance:
   - 后台能配置模型供应商、密钥、模型路由
   - StageRuntime 能解析模型路由
   - API 不返回明文密钥
-status: todo
+status: done
 ```
 
 ## 背景
@@ -33,13 +33,13 @@ AgentForge 需要长期支持多个模型供应商和不同阶段模型策略。
 
 ## 实施 checklist
 
-- 盘点现有 `src/agent_forge/llm/provider.py` 和 `src/agent_forge/models/api_key.py`。
-- 确定复用还是新增模型表。
-- 新增 ModelRouter。
-- 迁移旧 LLM 配置为默认 route。
-- StageRuntime 接入 ModelRouter。
-- LLM 设置页从“单模型配置”升级为“Provider / Credential / Route”。
-- 增加密钥 masked 返回和日志防泄漏测试。
+- [x] 盘点现有 `src/agent_forge/llm/provider.py` 和 `src/agent_forge/models/api_key.py`。
+- [x] 确定新增 LLM Provider / Model / Credential / Route 表，不复用服务端访问 `APIKey`。
+- [x] 新增 `src/agent_forge/llm/router.py` ModelRouter。
+- [x] 保留旧全局 LLM 配置作为 legacy fallback route。
+- [x] StageRuntime 接入 ModelRouter，并记录 `model_route_key/name/source` 与 `model_name`。
+- [x] LLM 设置页从“单模型配置”升级为“Provider / Model / Credential / Route”。
+- [x] 增加密钥 masked 返回、API 不泄漏明文和 fallback route 测试。
 
 ## 验收标准
 
@@ -63,3 +63,12 @@ npm run build
 ```
 
 前端命令在 `/Users/yangkl/AgentForge/web` 下执行。
+
+## 完成说明
+
+- 新增 `llm_providers`、`llm_models`、`llm_credentials`、`llm_routes` 结构化配置表。
+- `LLMCredential.encrypted_secret` 使用服务端加密，API 仅返回 `masked_secret`。
+- `ModelRouter` 按 requested route 解析，route 不可用时尝试 `fallback_route_keys`，最终退回 legacy settings。
+- `LLMConfig` 增加 `api_key`、`api_base`、`provider_key`，LiteLLM 调用按 route 注入配置。
+- `/api/v1/llm/providers`、`/api/v1/llm/models`、`/api/v1/llm/credentials`、`/api/v1/llm/routes` 已落地。
+- StageRuntime 会将 ModelRoute 上下文注入 SkillExecutionEngine，且不包含明文 key。

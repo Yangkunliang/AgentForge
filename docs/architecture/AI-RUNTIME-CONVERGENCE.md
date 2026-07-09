@@ -98,7 +98,8 @@ src/agent_forge/skills/dispatcher.py
 
 ```text
 src/agent_forge/llm/provider.py
-  -> LLMConfig(model, temperature, max_tokens, timeout)
+src/agent_forge/llm/router.py
+  -> LLMConfig(model, temperature, max_tokens, timeout, api_key, api_base)
   -> LiteLLMProvider
   -> FallbackLLMProvider
 ```
@@ -107,14 +108,15 @@ src/agent_forge/llm/provider.py
 
 - LLMProvider 支持 complete、chat_complete、stream_complete、tool_use_complete。
 - stream_complete 支持 thinking 事件拆分。
-- LiteLLMProvider 使用 settings 中的 base_url、api_key 和 default_model。
+- LiteLLMProvider 可使用 ModelRouter 解析出的 model、api_key、api_base，也保留 settings legacy fallback。
 - FallbackLLMProvider 能在 litellm 不可用时降级。
+- `ModelRouter` 会按 requested route 解析 Provider / Model / Credential / Route，不可用时尝试 fallback_route_keys，最后退回 legacy settings。
+- LLM Credential 服务端加密存储，API 和运行时 prompt 只使用 masked 或非敏感引用。
 
 缺口：
 
-- Provider、Model、Credential、Route 没有拆成可管理对象。
-- API Key 还没有和模型路由、项目、AgentProfile 建立可治理关系。
-- StageRuntime 不能按阶段或 Agent 选择模型。
+- 预算和重试策略字段已预留，尚未纳入统一 Governance / Eval 统计。
+- Artifact 尚未记录生成它的 ModelRoute 引用。
 
 ### 2.5 Artifact 和 Delivery
 
@@ -227,7 +229,7 @@ can_restore
 后续收敛：
 
 - `default_agent_selector` 已绑定到真实 AgentProfile。
-- TASK-030 将 `model_route_key` 绑定到真实 ModelRoute。
+- `model_route_key` 已绑定到真实 ModelRoute。
 - TASK-031 将 `skill_policy_key` 绑定到真实 SkillPolicy。
 
 ### 3.4 AgentProfile
@@ -257,7 +259,7 @@ enabled
 
 后续收敛：
 
-- TASK-030 将 AgentProfile 的 model_name / default_model_route_key 交给 ModelRouter。
+- AgentProfile 的 model_name / default_model_route_key 已交给 ModelRouter 做 fallback。
 - TASK-031 将 AgentProfile 的 allowed_skill_names 交给 SkillPolicy。
 - `UserAgentSettings` 继续负责个人助手展示名，不等同于 AgentProfile。
 
@@ -281,14 +283,15 @@ enabled
 
 当前映射：
 
-- `LLMConfig` 保存单次调用的 model、temperature、max_tokens、timeout。
-- `settings.api_key` 和 `settings.default_model` 是当前全局配置。
+- `LLMConfig` 保存单次调用的 model、temperature、max_tokens、timeout、api_key、api_base、provider_key。
+- `LLMProviderSetting`、`LLMModelSetting`、`LLMCredential`、`LLMRoute` 已保存 Provider / Model / Credential / Route。
+- `LLMCredential.encrypted_secret` 服务端加密，API 只返回 `masked_secret`。
+- `StageRuntime` 会解析当前阶段的 ModelRoute，写入 `PipelineStageState.model_route_key/name/source` 和 `model_name`。
 
 后续收敛：
 
-- TASK-030 拆分 Provider / Model / Credential / Route。
-- 旧全局配置迁移成 default ModelRoute。
-- API 只返回 masked credential，不返回明文。
+- 旧全局配置作为 legacy fallback 保留，后续可提供一键迁移成 default route。
+- `budget_policy` 和 `retry_policy` 字段已预留，后续接入 Governance / Eval。
 
 ### 3.6 SkillRuntimeSpec
 
@@ -421,9 +424,9 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 |----------|----------|----------|----------|
 | ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | TASK-032 |
 | IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | TASK-032 |
-| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-030 |
-| AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | TASK-030 |
-| ModelRoute | `llm/provider.py`、`config.py`、`api_key.py` | 全局模型配置，缺 route/credential 分层 | TASK-030 |
+| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-031 |
+| AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | TASK-031 |
+| ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | TASK-033 |
 | SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`mcp/client.py` | tool defs + executor，缺权限和 manifest | TASK-031 |
 | GovernanceDecision | `pipeline/service.py`、`harness/`、Delivery 确认 | 阶段确认和交付确认存在，策略未统一 | TASK-032 |
 | EvalFeedback | tracing、LLMResponse、Delivery report | 有零散指标，缺结构化 EvalEvent | TASK-033 |
@@ -465,6 +468,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 ### TASK-030: ModelRoute
 
 目标：拆分 Provider / Model / Credential / Route，并让 StageRuntime 通过 ModelRouter 解析模型。
+
+完成状态：已落地 `src/agent_forge/llm/router.py`、`src/agent_forge/models/llm.py`、`016_llm_model_routes.py`、结构化 `/api/v1/llm/*`、LLM 设置页、StageRuntime model route 追踪和非敏感 prompt 上下文。
 
 不做：
 
@@ -512,8 +517,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
-| Agent 配置空转 | 已进入 StageRuntime；后续需接入模型路由和 SkillPolicy | TASK-030 |
-| 模型配置不可治理 | 多 provider、多密钥、多阶段策略难维护 | TASK-030 |
+| Agent 配置空转 | 已进入 StageRuntime；后续需接入 SkillPolicy | TASK-031 |
+| 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | TASK-033 |
 | Skill 安全边界不足 | 第三方 Skill 缺权限和审计闭环 | TASK-031 |
 | 人工确认逻辑分散 | 高风险动作可能漏确认 | TASK-032 |
 | 长期优化无数据 | 无法知道哪个阶段慢、贵、失败率高 | TASK-033 |

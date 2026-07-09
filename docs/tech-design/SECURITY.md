@@ -580,9 +580,11 @@ TASK-026 后，Upload Mount 支持用户主动上传 UTF-8 文本文件作为只
 
 ### 8.1 LLM API Key 存储
 
-- 不在数据库中明文存储
-- 通过环境变量注入，生产环境使用密钥管理服务（如 HashiCorp Vault）
-- 支持多 Key 轮换，自动切换
+- 不在数据库中明文存储。
+- legacy 单 Key 仍可通过环境变量注入，生产环境可继续使用密钥管理服务（如 HashiCorp Vault）。
+- TASK-030 后，结构化 LLM Credential 写入 `llm_credentials.encrypted_secret`，使用 `agent_forge.security.credentials` 加密。
+- API 响应只返回 `secret_set` 和 `masked_secret`，StageRuntime 注入 prompt 的 ModelRoute 上下文不包含明文 secret。
+- 多 Key 轮换通过新增 Credential + 切换 Route 实现，后续可接入自动切换策略。
 
 ### 8.2 MCP Server 凭证
 

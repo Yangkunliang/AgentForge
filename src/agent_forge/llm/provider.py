@@ -71,6 +71,9 @@ class LLMConfig:
     temperature: float = 0.7
     max_tokens: int = 2048
     timeout: int = 60
+    api_key: str | None = None
+    api_base: str | None = None
+    provider_key: str | None = None
 
 
 @dataclass
@@ -109,6 +112,30 @@ class LLMProvider(ABC):
     async def chat_complete(self, messages: list[dict], config: LLMConfig | None = None) -> LLMResponse: ...
 
 
+def _completion_kwargs(
+    config: LLMConfig,
+    *,
+    messages: list[dict],
+    tools: list[dict] | None = None,
+    stream: bool = False,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {
+        "model": config.model,
+        "messages": messages,
+        "temperature": config.temperature,
+        "max_tokens": config.max_tokens,
+    }
+    if tools is not None:
+        kwargs["tools"] = tools
+    if stream:
+        kwargs["stream"] = True
+    if config.api_key:
+        kwargs["api_key"] = config.api_key
+    if config.api_base:
+        kwargs["api_base"] = config.api_base
+    return kwargs
+
+
 class LiteLLMProvider(LLMProvider):
     """LiteLLM Provider，关键方法均加了 @span 自动 tracing"""
 
@@ -141,8 +168,7 @@ class LiteLLMProvider(LLMProvider):
         messages = _build_messages(prompt, DEFAULT_SYSTEM_PROMPT)
         try:
             response = await self.litellm.acompletion(
-                model=config.model, messages=messages,
-                temperature=config.temperature, max_tokens=config.max_tokens,
+                **_completion_kwargs(config, messages=messages),
             )
             result = LLMResponse(
                 content=response["choices"][0]["message"]["content"],
@@ -166,8 +192,7 @@ class LiteLLMProvider(LLMProvider):
         t0 = time.time()
         try:
             response = await self.litellm.acompletion(
-                model=config.model, messages=messages,
-                temperature=config.temperature, max_tokens=config.max_tokens,
+                **_completion_kwargs(config, messages=messages),
             )
             result = LLMResponse(
                 content=response["choices"][0]["message"]["content"],
@@ -203,9 +228,7 @@ class LiteLLMProvider(LLMProvider):
 
         try:
             response: Any = await self.litellm.acompletion(
-                model=config.model, messages=messages,
-                temperature=config.temperature, max_tokens=config.max_tokens,
-                tools=tools,
+                **_completion_kwargs(config, messages=messages, tools=tools),
             )
             latency_ms = int((time.time() - t0) * 1000)
             choice = response["choices"][0]["message"]
@@ -260,9 +283,7 @@ class LiteLLMProvider(LLMProvider):
             t0 = time.monotonic()
             try:
                 response = await self.litellm.acompletion(
-                    model=config.model, messages=messages,
-                    temperature=config.temperature, max_tokens=config.max_tokens,
-                    stream=True,
+                    **_completion_kwargs(config, messages=messages, stream=True),
                 )
                 async for chunk in _stream_with_thinking(
                     response,
@@ -297,9 +318,7 @@ class LiteLLMProvider(LLMProvider):
         config = config or LLMConfig(model="gpt-4o")
         try:
             response = await self.litellm.acompletion(
-                model=config.model, messages=messages,
-                temperature=config.temperature, max_tokens=config.max_tokens,
-                tools=tools, stream=True,
+                **_completion_kwargs(config, messages=messages, tools=tools, stream=True),
             )
             pending: dict[str, ToolCall] = {}
             async for chunk in response:

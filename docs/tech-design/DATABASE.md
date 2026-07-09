@@ -204,12 +204,74 @@ TASK-023 后，GitHub Mount 的 `metadata` 只保存非敏感仓库信息和 `cr
 | agent_profile_id | UUID/String | StageRuntime 本次阶段选择的 AgentProfile ID；系统默认值为 `system-default` |
 | agent_profile_name | String | 本次阶段选择的 Agent 展示名 |
 | agent_profile_source | String | user_override/project_default/stage_default/system_default |
+| model_route_key | String | StageRuntime 本次阶段解析到的 ModelRoute key |
+| model_route_name | String | ModelRoute 展示名称 |
+| model_name | String | 实际传给 LLMConfig 的模型名 |
+| model_route_source | String | database/fallback/legacy_settings |
 | started_at | DateTime | 开始时间 |
 | completed_at | DateTime | 完成或跳过时间 |
 | created_at | DateTime | 创建时间 |
 | updated_at | DateTime | 更新时间 |
 
-### 1.17 产物 (Artifact)
+### 1.17 LLM Provider / Model / Credential / Route
+
+TASK-030 后，LLM 配置由四类用户级对象组成，旧 `.env` 全局配置保留为 legacy fallback。
+
+#### LLMProviderSetting
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| provider_key | String | provider 标识，如 openai/anthropic |
+| name | String | 展示名称 |
+| base_url | String | 兼容 API base URL，可为空 |
+| status | String | active/inactive |
+| metadata_json | JSON | 扩展元数据 |
+
+#### LLMModelSetting
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| provider_id | UUID | 外键 → LLMProviderSetting(id) ON DELETE CASCADE |
+| model_key | String | LiteLLM 模型路由名，如 `openai/gpt-4o-mini` |
+| name | String | 展示名称 |
+| capabilities | JSON | 能力标签，如 text/code/vision |
+| context_window | Int | 上下文窗口 |
+| input_price_per_1m | Float | 输入价格元数据 |
+| output_price_per_1m | Float | 输出价格元数据 |
+| status | String | active/inactive |
+
+#### LLMCredential
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| provider_id | UUID | 外键 → LLMProviderSetting(id) ON DELETE CASCADE |
+| name | String | 展示名称 |
+| encrypted_secret | Text | 服务端加密后的 API Key，永不下发前端 |
+| secret_hint | String | 脱敏展示，如 `sk-a...1234` |
+| active | Boolean | 是否启用 |
+
+#### LLMRoute
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| user_id | UUID | 外键 → User(id) ON DELETE CASCADE |
+| route_key | String | 阶段或 Agent 引用的稳定 route key |
+| name | String | 展示名称 |
+| provider_id | UUID | 外键 → LLMProviderSetting(id) |
+| model_id | UUID | 外键 → LLMModelSetting(id) |
+| credential_id | UUID | 外键 → LLMCredential(id) ON DELETE SET NULL |
+| temperature | Float | 调用温度 |
+| max_tokens | Int | 最大输出 tokens |
+| timeout_seconds | Int | 调用超时 |
+| fallback_route_keys | JSON | 兜底 route key 列表 |
+| budget_policy | JSON | 预算策略预留 |
+| retry_policy | JSON | 重试策略预留 |
+| active | Boolean | 是否启用 |
+
+### 1.18 产物 (Artifact)
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | UUID | 主键 |
@@ -243,6 +305,10 @@ User 1───n Task
 User 1───n Project
 User 1───n OAuthCredential
 User 1───n OAuthState
+User 1───n LLMProviderSetting
+User 1───n LLMModelSetting
+User 1───n LLMCredential
+User 1───n LLMRoute
 Project 1───n ProjectMount
 Project 1───n OAuthState
 Project 1───n Session
@@ -252,6 +318,11 @@ ProjectMount n───1 OAuthCredential (via metadata.credential_id)
 Session 1───n PipelineRun
 Session 1───n Artifact
 PipelineRun 1───n PipelineStageState
+LLMProviderSetting 1───n LLMModelSetting
+LLMProviderSetting 1───n LLMCredential
+LLMProviderSetting 1───n LLMRoute
+LLMModelSetting 1───n LLMRoute
+LLMCredential 1───n LLMRoute
 Task 1───n SubTask
 Task 1───n TaskExecution
 Task 1───n Conversation

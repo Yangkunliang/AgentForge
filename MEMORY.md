@@ -98,6 +98,7 @@
 - TASK-027 已完成：新增 AI Runtime 收敛架构基线，明确 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路、当前代码映射、目标运行时契约和 TASK-028～TASK-034 迁移边界。
 - TASK-028 已完成：新增 `src/agent_forge/pipeline/catalog.py` 和 `/api/v1/pipeline/catalog`，将 intent -> StageDefinition 收敛为后端唯一事实源；StageRuntime、PipelineService 与前端 Pipeline Store 已消费 Catalog，阶段定义包含确认策略、输出产物类型、默认 Agent selector、ModelRoute key 和 SkillPolicy key。
 - TASK-029 已完成：新增 `src/agent_forge/agents/resolver.py`，按用户覆盖、项目默认、StageDefinition.default_agent_selector、系统默认解析 AgentProfile；StageRuntime 会把 `agent_profile_id/name/source` 写入 `PipelineStageState`，并将 AgentProfile 注入 SkillExecutionEngine 上下文；新增 `/api/v1/agents/runtime/candidates` 返回运行时 active Agent 候选。
+- TASK-030 已完成：新增 `src/agent_forge/llm/router.py`、`src/agent_forge/models/llm.py` 和 `016_llm_model_routes.py`；LLM 设置页和 `/api/v1/llm/*` 支持 Provider / Model / Credential / Route，Credential 加密存储且 API 只返回 masked 信息；StageRuntime 会解析 ModelRoute、写入 StageState 模型追踪字段并将非敏感 route 上下注入 SkillExecutionEngine。
 
 ---
 

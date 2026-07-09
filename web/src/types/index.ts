@@ -323,6 +323,10 @@ export interface PipelineStageState {
   agent_profile_id?: string | null
   agent_profile_name?: string | null
   agent_profile_source?: string | null
+  model_route_key?: string | null
+  model_route_name?: string | null
+  model_name?: string | null
+  model_route_source?: string | null
   started_at?: string | null
   completed_at?: string | null
   created_at: string

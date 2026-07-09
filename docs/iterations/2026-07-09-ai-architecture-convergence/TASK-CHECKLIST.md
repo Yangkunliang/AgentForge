@@ -17,7 +17,7 @@
 | [TASK-027](TASK-027.md) | AI Runtime Baseline 与契约文档 | architecture | P0 | none | done |
 | [TASK-028](TASK-028.md) | Pipeline Stage Catalog 后端唯一事实源 | pipeline | P0 | TASK-027 | done |
 | [TASK-029](TASK-029.md) | Agent Profile 运行时绑定 | agents, pipeline | P0 | TASK-027, TASK-028 | done |
-| [TASK-030](TASK-030.md) | LLM Provider / Model / Credential / Route | llm, settings | P0 | TASK-027, TASK-029 | todo |
+| [TASK-030](TASK-030.md) | LLM Provider / Model / Credential / Route | llm, settings | P0 | TASK-027, TASK-029 | done |
 | [TASK-031](TASK-031.md) | 第三方 Skill 导入与运行时闭环 | skills | P1 | TASK-027, TASK-030 | todo |
 | [TASK-032](TASK-032.md) | Governance 与人工确认策略引擎 | governance, pipeline | P1 | TASK-028, TASK-031 | todo |
 | [TASK-033](TASK-033.md) | Eval Feedback 执行质量反馈闭环 | evaluation, dashboard | P1 | TASK-029, TASK-030, TASK-031, TASK-032 | todo |

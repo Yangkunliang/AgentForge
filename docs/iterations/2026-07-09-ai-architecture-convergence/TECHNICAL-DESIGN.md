@@ -242,18 +242,17 @@ src/agent_forge/models/pipeline.py
 - 密钥只保存密文或受保护引用。
 - StageRuntime 根据 StageDefinition 和 AgentProfile 解析模型。
 
-建议新增或调整：
+实际新增或调整：
 
 ```text
 src/agent_forge/llm/router.py
-src/agent_forge/models/llm_provider.py
-src/agent_forge/models/llm_model.py
-src/agent_forge/models/llm_credential.py
-src/agent_forge/models/model_route.py
+src/agent_forge/models/llm.py
 src/api/routes/llm.py
+web/src/api/modules/llm.ts
+web/src/views/settings/LLMConfig.vue
 ```
 
-如果已有 `api_key.py` 能承载部分能力，应优先扩展现有表，避免重复概念。
+结论：`api_key.py` 语义是 AgentForge 服务端访问密钥，不复用为 LLM 供应商 Credential，避免认证密钥和模型密钥混淆。
 
 ### 4.4 Skill Runtime Registry
 

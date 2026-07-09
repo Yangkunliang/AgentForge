@@ -23,6 +23,8 @@ type StageView = {
   optional: boolean
   status: PipelineStageStatus
   agentName?: string | null
+  modelRouteName?: string | null
+  modelName?: string | null
 }
 
 const stages = computed<StageView[]>(() => {
@@ -35,6 +37,8 @@ const stages = computed<StageView[]>(() => {
         optional: !stage.required,
         status: stage.status,
         agentName: stage.agent_profile_name,
+        modelRouteName: stage.model_route_name,
+        modelName: stage.model_name,
       }))
   }
 
@@ -44,6 +48,8 @@ const stages = computed<StageView[]>(() => {
     optional: Boolean(stage.optional),
     status: advancedSettings.isStageEnabled(stage.id) ? 'pending' : 'skipped',
     agentName: null,
+    modelRouteName: null,
+    modelName: null,
   }))
 })
 
@@ -172,6 +178,10 @@ function stageTitle(stage: StageView): string {
     <div v-if="activeStage?.agentName" class="agent-line">
       <span class="agent-label">Agent：</span>
       <span class="agent-name">{{ activeStage.agentName }}</span>
+    </div>
+    <div v-if="activeStage?.modelName" class="agent-line">
+      <span class="agent-label">模型：</span>
+      <span class="model-name">{{ activeStage.modelRouteName || activeStage.modelName }}</span>
     </div>
   </div>
 </template>
@@ -323,6 +333,14 @@ function stageTitle(stage: StageView): string {
   border-radius: 4px;
   background: #eef2ff;
   color: #4338ca;
+  font-weight: 700;
+}
+
+.model-name {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #ecfeff;
+  color: #0e7490;
   font-weight: 700;
 }
 </style>

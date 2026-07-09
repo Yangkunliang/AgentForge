@@ -71,6 +71,10 @@ class PipelineStageState(Base, TimestampMixin):
     agent_profile_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     agent_profile_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     agent_profile_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    model_route_key: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    model_route_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    model_route_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

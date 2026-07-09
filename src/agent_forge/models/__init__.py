@@ -8,6 +8,7 @@ from .api_key import APIKey
 from .audit_log import AuditLog
 from .conversation import Conversation
 from .export_task import ExportTask
+from .llm import LLMCredential, LLMModelSetting, LLMProviderSetting, LLMRoute
 from .memory_entry import MemoryEntry
 from .oauth import OAuthCredential, OAuthState
 from .pipeline import PipelineRun, PipelineStageState
@@ -32,6 +33,10 @@ __all__ = [
     "Conversation",
     "ExportTask",
     "Artifact",
+    "LLMCredential",
+    "LLMModelSetting",
+    "LLMProviderSetting",
+    "LLMRoute",
     "MemoryEntry",
     "Message",
     "OAuthCredential",

@@ -17,6 +17,7 @@ from agent_forge.api.sse import (
 )
 from agent_forge.database import async_session_factory
 from agent_forge.agents.resolver import AgentProfile, resolve_agent_profile
+from agent_forge.llm.router import ModelRouteResolution, resolve_model_route
 from agent_forge.models import PipelineRun, PipelineStageState
 from agent_forge.pipeline.catalog import get_stage_definition, stage_definition_to_dict
 from agent_forge.pipeline.service import (
@@ -62,9 +63,10 @@ class StageRuntime:
         confirmation_context: dict | None = None
         blocked_reason: str | None = None
         agent_profile: AgentProfile | None = None
+        model_route: ModelRouteResolution | None = None
         stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
-            active_stage_id, confirmation_context, blocked_reason, agent_profile = await self._start_current_stage(
+            active_stage_id, confirmation_context, blocked_reason, agent_profile, model_route = await self._start_current_stage(
                 task_id=task_id,
                 pipeline_run_id=pipeline_run_id,
                 user_id=user_id,
@@ -82,11 +84,16 @@ class StageRuntime:
                 conversation_history=conversation_history,
                 tools=tools,
                 llm=llm,
-                config=config,
+                config=model_route.config if model_route else config,
                 sse_publish=sse_publish,
                 user_id=user_id,
                 agent_name=agent_profile.name if agent_profile else agent_name,
-                advanced_context=_merge_runtime_context(advanced_context, confirmation_context, agent_profile),
+                advanced_context=_merge_runtime_context(
+                    advanced_context,
+                    confirmation_context,
+                    agent_profile,
+                    model_route,
+                ),
             )
 
             async for chunk in async_gen:
@@ -116,7 +123,7 @@ class StageRuntime:
         user_id: str,
         fallback_agent_name: str,
         advanced_context: dict | None,
-    ) -> tuple[str | None, dict | None, str | None, AgentProfile | None]:
+    ) -> tuple[str | None, dict | None, str | None, AgentProfile | None, ModelRouteResolution | None]:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
             await emit_pipeline_started(
@@ -129,11 +136,11 @@ class StageRuntime:
 
             stage_id = run.current_stage_id
             if not stage_id:
-                return None, None, None, None
+                return None, None, None, None, None
 
             stage = _find_stage(run, stage_id)
             if stage and stage.status == "waiting_confirmation":
-                return None, None, "waiting_confirmation", None
+                return None, None, "waiting_confirmation", None, None
 
             stage_definition = get_stage_definition(run.intent_type, stage_id)
             agent_profile = await resolve_agent_profile(
@@ -143,11 +150,21 @@ class StageRuntime:
                 project_default_agent_id=_agent_id_from_context(advanced_context, "project_default_agent_id"),
                 fallback_agent_name=fallback_agent_name,
             )
+            model_route = await resolve_model_route(
+                db,
+                user_id=user_id,
+                requested_key=_requested_model_route_key(advanced_context, stage_definition, agent_profile),
+                fallback_model_name=agent_profile.model_name,
+            )
             confirmation_context = _confirmation_context(stage, stage_definition)
             if stage and stage.status == "pending":
                 stage.agent_profile_id = agent_profile.id
                 stage.agent_profile_name = agent_profile.name
                 stage.agent_profile_source = agent_profile.source
+                stage.model_route_key = model_route.route_key
+                stage.model_route_name = model_route.name
+                stage.model_name = model_route.model_name
+                stage.model_route_source = model_route.source
                 start_stage(run, stage_id)
                 await db.commit()
 
@@ -158,7 +175,7 @@ class StageRuntime:
                 pipeline_run_id=run.id,
                 stage_id=stage_id,
             )
-            return stage_id, confirmation_context, None, agent_profile
+            return stage_id, confirmation_context, None, agent_profile, model_route
 
     async def _complete_stage(
         self,
@@ -258,12 +275,16 @@ def _merge_runtime_context(
     base: dict | None,
     confirmation: dict | None,
     agent_profile: AgentProfile | None,
+    model_route: ModelRouteResolution | None,
 ) -> dict | None:
     merged = _merge_confirmation_context(base, confirmation)
-    if not agent_profile:
+    if not agent_profile and not model_route:
         return merged
     runtime_context = dict(merged or {})
-    runtime_context["agent_profile"] = agent_profile.to_context()
+    if agent_profile:
+        runtime_context["agent_profile"] = agent_profile.to_context()
+    if model_route:
+        runtime_context["model_route"] = model_route.to_context()
     return runtime_context
 
 
@@ -272,3 +293,17 @@ def _agent_id_from_context(context: dict | None, key: str) -> str | None:
         return None
     value = context.get(key)
     return value if isinstance(value, str) and value else None
+
+
+def _requested_model_route_key(
+    context: dict | None,
+    stage_definition: Any,
+    agent_profile: AgentProfile,
+) -> str:
+    if context:
+        value = context.get("model_route_key")
+        if isinstance(value, str) and value:
+            return value
+    if agent_profile.default_model_route_key:
+        return agent_profile.default_model_route_key
+    return getattr(stage_definition, "model_route_key", "default")

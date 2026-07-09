@@ -8,10 +8,20 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_forge.models import Agent, Artifact, Project, User
+from agent_forge.models import (
+    Agent,
+    Artifact,
+    LLMCredential,
+    LLMModelSetting,
+    LLMProviderSetting,
+    LLMRoute,
+    Project,
+    User,
+)
 from agent_forge.models.session import Message, Session
 from agent_forge.pipeline.service import create_pipeline_run_for_session, get_pipeline_run_for_user_or_404
 from agent_forge.pipeline.runtime import StageRuntime
+from agent_forge.security.credentials import encrypt_secret
 
 
 class FakeSkillEngine:
@@ -36,6 +46,8 @@ async def test_stage_runtime_calls_skill_engine_and_advances_current_stage(
     fake_user: User,
 ):
     user_id = fake_user.id
+    provider_key = f"anthropic-{uuid.uuid4().hex[:8]}"
+    route_key = f"runtime-{uuid.uuid4().hex[:8]}"
     project = Project(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -97,6 +109,9 @@ async def test_stage_runtime_records_resolved_agent_profile(
     fake_user: User,
 ):
     user_id = fake_user.id
+    provider_key = f"anthropic-{uuid.uuid4().hex[:8]}"
+    model_key = f"anthropic/claude-3-5-sonnet-{uuid.uuid4().hex[:8]}"
+    route_key = f"runtime-{uuid.uuid4().hex[:8]}"
     project = Project(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -164,6 +179,125 @@ async def test_stage_runtime_records_resolved_agent_profile(
     stage_by_id = {stage.stage_id: stage for stage in refreshed.stages}
     assert stage_by_id["locate"].agent_profile_id == agent_id
     assert stage_by_id["locate"].agent_profile_name == agent_name
+
+
+@pytest.mark.asyncio
+async def test_stage_runtime_records_resolved_model_route_and_passes_config(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+):
+    user_id = fake_user.id
+    provider_key = f"anthropic-{uuid.uuid4().hex[:8]}"
+    model_key = f"anthropic/claude-3-5-sonnet-{uuid.uuid4().hex[:8]}"
+    route_key = f"runtime-{uuid.uuid4().hex[:8]}"
+    project = Project(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="model-runtime-test",
+        tech_tags=["FastAPI"],
+        status="active",
+    )
+    session = Session(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        project_id=project.id,
+        title="模型路由运行时会话",
+        intent_type="bug_fix",
+    )
+    provider = LLMProviderSetting(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        provider_key=provider_key,
+        name="Anthropic",
+        base_url="https://api.anthropic.com",
+        status="active",
+    )
+    model = LLMModelSetting(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        provider_id=provider.id,
+        model_key=model_key,
+        name="Claude 3.5 Sonnet",
+        capabilities=["text", "code"],
+        context_window=200000,
+        status="active",
+    )
+    credential = LLMCredential(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        provider_id=provider.id,
+        name="runtime-key",
+        encrypted_secret=encrypt_secret("sk-ant-runtime-secret"),
+        secret_hint="sk-ant...cret",
+        active=True,
+    )
+    route = LLMRoute(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        route_key=route_key,
+        name="Default Runtime Route",
+        provider_id=provider.id,
+        model_id=model.id,
+        credential_id=credential.id,
+        temperature=0.15,
+        max_tokens=4096,
+        timeout_seconds=30,
+        fallback_route_keys=[],
+        active=True,
+    )
+    db_session.add_all([project, session, provider, model, credential, route])
+    await db_session.commit()
+
+    run = await create_pipeline_run_for_session(db_session, session, "bug_fix")
+    await db_session.commit()
+    run_id = run.id
+
+    fake_engine = FakeSkillEngine()
+    runtime = StageRuntime(engine=fake_engine, session_factory=test_session_factory)
+
+    chunks = []
+    async for chunk in runtime.run_current_stage(
+        task_id="task-model-runtime",
+        pipeline_run_id=run_id,
+        user_id=user_id,
+        user_message="分析错误",
+        conversation_history=[],
+        tools=[],
+        llm=object(),
+        config=object(),
+        sse_publish=lambda _event_type, _data: None,
+        agent_name="CodeSoul",
+        advanced_context={"intent": "bug_fix", "model_route_key": route_key},
+    ):
+        chunks.append(chunk)
+
+    assert chunks == ["stage output"]
+    assert fake_engine.kwargs is not None
+    resolved_config = fake_engine.kwargs["config"]
+    assert resolved_config.model == model_key
+    assert resolved_config.temperature == 0.15
+    assert resolved_config.max_tokens == 4096
+    assert resolved_config.api_key == "sk-ant-runtime-secret"
+    assert fake_engine.kwargs["advanced_context"]["model_route"] == {
+        "route_key": route_key,
+        "name": "Default Runtime Route",
+        "source": "database",
+        "provider_key": provider_key,
+        "model_name": model_key,
+        "credential_id": credential.id,
+        "credential_name": "runtime-key",
+        "fallback_route_keys": [],
+        "requested_route_key": route_key,
+    }
+
+    db_session.expire_all()
+    refreshed = await get_pipeline_run_for_user_or_404(db_session, run_id, user_id)
+    stage_by_id = {stage.stage_id: stage for stage in refreshed.stages}
+    assert stage_by_id["locate"].model_route_key == route_key
+    assert stage_by_id["locate"].model_route_name == "Default Runtime Route"
+    assert stage_by_id["locate"].model_name == model_key
+    assert stage_by_id["locate"].model_route_source == "database"
 
 
 @pytest.mark.asyncio

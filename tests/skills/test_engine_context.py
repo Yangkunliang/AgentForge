@@ -64,3 +64,26 @@ def test_build_system_prompt_includes_agent_profile_context():
 
     assert "当前阶段 Agent：RuntimeCoder（agent-001，stage_default）" in prompt
     assert "Agent 能力：code_generation, refactoring" in prompt
+
+
+def test_build_system_prompt_includes_model_route_context():
+    prompt = _build_system_prompt(
+        agent_name="RuntimeCoder",
+        advanced_context={
+            "model_route": {
+                "route_key": "default",
+                "name": "Default Runtime Route",
+                "source": "database",
+                "provider_key": "anthropic",
+                "model_name": "anthropic/claude-3-5-sonnet",
+                "credential_id": "cred-001",
+                "credential_name": "prod-key",
+                "fallback_route_keys": ["safe"],
+                "requested_route_key": "default",
+            }
+        },
+    )
+
+    assert "当前阶段模型路由：Default Runtime Route（default，database）" in prompt
+    assert "模型：anthropic/claude-3-5-sonnet，Provider：anthropic" in prompt
+    assert "模型路由兜底：safe" in prompt

@@ -8,6 +8,7 @@ from .provider import (
     FallbackLLMProvider,
     get_llm_provider,
 )
+from .router import ModelRouteResolution, ModelRouteUnavailable, resolve_model_route
 
 __all__ = [
     "LLMProvider",
@@ -16,4 +17,7 @@ __all__ = [
     "LiteLLMProvider",
     "FallbackLLMProvider",
     "get_llm_provider",
+    "ModelRouteResolution",
+    "ModelRouteUnavailable",
+    "resolve_model_route",
 ]

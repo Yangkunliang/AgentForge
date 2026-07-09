@@ -8,11 +8,13 @@ LLM 相关代码集中在 `src/agent_forge/llm/`：
 
 ```
 src/agent_forge/llm/
-├── __init__.py          # 统一导出：Provider / Config / Response / Fallback
-└── provider.py          # 核心实现：接口 + LiteLLM + Fallback + Tracing
+├── __init__.py          # 统一导出：Provider / Config / Response / Fallback / ModelRouter
+├── provider.py          # 核心实现：接口 + LiteLLM + Fallback + Tracing
+└── router.py            # Provider / Model / Credential / Route 解析
 ```
 
 Skill 执行引擎在 `src/agent_forge/skills/engine.py`，负责 LLM ↔ Skill 的多轮 `tool_use` 循环。
+结构化配置模型在 `src/agent_forge/models/llm.py`，API 在 `src/api/routes/llm.py`。
 
 ### 1.2 Provider 接口
 
@@ -60,7 +62,10 @@ class LLMProvider(ABC):
 SkillExecutionEngine (ReAct 循环)
     │
     ▼
-LLMProvider.tool_use_complete (路由决策)
+ModelRouter.resolve_model_route (阶段模型路由)
+    │
+    ▼
+LLMProvider.tool_use_complete (工具路由决策)
     │
     ├─ has_tool_calls=True  → SkillDispatcher.invoke → 追加 tool result → 下一轮
     │
@@ -84,9 +89,9 @@ def get_llm_provider() -> LLMProvider:
 
 ## 2. 配置管理
 
-### 2.1 配置文件位置
+### 2.1 legacy 配置文件位置
 
-所有 LLM 相关配置集中在 `src/agent_forge/config.py`（Pydantic `BaseSettings`），从 `.env` 和环境变量加载：
+旧版全局配置仍集中在 `src/agent_forge/config.py`（Pydantic `BaseSettings`），从 `.env` 和环境变量加载，并作为 ModelRouter 的 legacy fallback：
 
 ```python
 # LLM
@@ -106,7 +111,23 @@ embedding_model: str       # EMBEDDING_MODEL
 embedding_dimension: int   # EMBEDDING_DIM
 ```
 
-### 2.2 模型路由
+### 2.2 结构化 ModelRoute
+
+TASK-030 后，后台 LLM 设置页和 `/api/v1/llm/*` 维护四类用户级对象：
+
+| 对象 | 表 | 作用 |
+|------|----|------|
+| Provider | `llm_providers` | 供应商和 base_url |
+| Model | `llm_models` | 模型名、能力、上下文窗口和价格元数据 |
+| Credential | `llm_credentials` | 加密保存 API Key，API 只返回 masked 信息 |
+| Route | `llm_routes` | 阶段/Agent 引用的 route_key、模型、密钥、超时和 fallback |
+
+StageRuntime 会用以下优先级解析模型：
+
+1. 本次请求上下文中的 `model_route_key`
+2. AgentProfile 的 `default_model_route_key`
+3. StageDefinition 的 `model_route_key`
+4. legacy settings fallback
 
 `config.Settings.model_routes_map` 属性自动合并用户自定义路由 + 多模态模型：
 
@@ -115,7 +136,7 @@ settings.model_routes_map
 # 示例返回: {"claude": "anthropic/claude-3-5-sonnet", "vision": "openai/gpt-4o", "image_gen": "dall-e-3"}
 ```
 
-**不使用的 YAML 文件方式**。所有路由通过环境变量或 `.env` 中的 JSON 字符串配置。
+**不使用的 YAML 文件方式**。新路由优先存数据库；环境变量 JSON 只作为兼容兜底。
 
 ### 2.3 环境变量速查
 
@@ -128,6 +149,13 @@ settings.model_routes_map
 | `T2I_MODEL` | (空) | 文生图模型 |
 | `MODEL_ROUTES` | `{}` | 多模型路由 JSON |
 | `EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Embedding 模型 |
+
+### 2.4 Credential 安全
+
+- 创建 Credential 时只接收一次明文 `secret`。
+- 服务端使用 `agent_forge.security.credentials.encrypt_secret()` 加密存储。
+- API 响应只返回 `secret_set` 和 `masked_secret`。
+- SkillExecutionEngine 的 prompt 上下文只包含 route、provider、model 和 credential 名称，不包含明文 secret。
 
 ---
 
@@ -409,7 +437,10 @@ GET /api/v1/cost?date=2026-06-28
 | 路径 | 内容 |
 |------|------|
 | `src/agent_forge/llm/provider.py` | Provider 接口 + LiteLLM + Fallback + Thinking 拆分 + Tracing |
+| `src/agent_forge/llm/router.py` | ModelRoute 解析、fallback 和 legacy settings 兜底 |
 | `src/agent_forge/llm/__init__.py` | 统一导出 |
+| `src/agent_forge/models/llm.py` | LLM Provider / Model / Credential / Route 数据模型 |
+| `src/api/routes/llm.py` | LLM 设置 API，含 Credential 脱敏响应 |
 | `src/agent_forge/config.py` | LLM 配置（Settings + CubeSandboxConfig） |
 | `src/agent_forge/skills/engine.py` | ReAct 执行引擎 + Prompt 定义 + tool_use 循环 |
 | `src/agent_forge/api/routes/cost.py` | Cost 统计 API |

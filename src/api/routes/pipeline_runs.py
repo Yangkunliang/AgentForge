@@ -56,6 +56,10 @@ class PipelineStageStateResponse(BaseModel):
     agent_profile_id: str | None
     agent_profile_name: str | None
     agent_profile_source: str | None
+    model_route_key: str | None
+    model_route_name: str | None
+    model_name: str | None
+    model_route_source: str | None
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
