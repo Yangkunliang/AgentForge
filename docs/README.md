@@ -101,6 +101,7 @@ docs/
 | TASK-024 | 2026-07-08 | GitHub PR Delivery | ✅ 已完成 |
 | TASK-025 | 2026-07-08 | zip Delivery Package | ✅ 已完成 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
+| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 📋 计划完成，待执行 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -180,6 +181,23 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-08-core-strengthening/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md)
 - **核心功能**：先加固 Delivery preview/apply 一致性、失败落库和审计日志；再让 Project、Chat、Stage、Artifact 的下一步动作可见；然后设计并落地 GitHub OAuth Mount、GitHub PR Delivery、zip Delivery Package 和 Upload Mount 上下文兜底。
+
+### TASK-027～TASK-034 详细信息
+- **目录**：`docs/iterations/2026-07-09-ai-architecture-convergence/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-09-ai-architecture-convergence/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-09-ai-architecture-convergence/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-09-ai-architecture-convergence/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-09-ai-architecture-convergence/TEST-PLAN.md)
+  - [TASK-027.md](iterations/2026-07-09-ai-architecture-convergence/TASK-027.md)
+  - [TASK-028.md](iterations/2026-07-09-ai-architecture-convergence/TASK-028.md)
+  - [TASK-029.md](iterations/2026-07-09-ai-architecture-convergence/TASK-029.md)
+  - [TASK-030.md](iterations/2026-07-09-ai-architecture-convergence/TASK-030.md)
+  - [TASK-031.md](iterations/2026-07-09-ai-architecture-convergence/TASK-031.md)
+  - [TASK-032.md](iterations/2026-07-09-ai-architecture-convergence/TASK-032.md)
+  - [TASK-033.md](iterations/2026-07-09-ai-architecture-convergence/TASK-033.md)
+  - [TASK-034.md](iterations/2026-07-09-ai-architecture-convergence/TASK-034.md)
+- **核心功能**：把 AgentForge 的长期 AI 架构收敛为 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路，按运行时契约、Pipeline Catalog、Agent 绑定、模型路由、Skill 导入、治理确认、评估反馈和文档收敛拆成 8 个可独立提交的后续任务。
 
 ## 版本号规范
 
