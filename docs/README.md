@@ -102,7 +102,7 @@ docs/
 | TASK-024 | 2026-07-08 | GitHub PR Delivery | ✅ 已完成 |
 | TASK-025 | 2026-07-08 | zip Delivery Package | ✅ 已完成 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
-| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-030 已完成，TASK-031 待执行 |
+| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-031 已完成，TASK-032 待执行 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -198,7 +198,7 @@ docs/
   - [TASK-032.md](iterations/2026-07-09-ai-architecture-convergence/TASK-032.md)
   - [TASK-033.md](iterations/2026-07-09-ai-architecture-convergence/TASK-033.md)
   - [TASK-034.md](iterations/2026-07-09-ai-architecture-convergence/TASK-034.md)
-- **核心功能**：把 AgentForge 的长期 AI 架构收敛为 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路，按运行时契约、Pipeline Catalog、Agent 绑定、模型路由、Skill 导入、治理确认、评估反馈和文档收敛拆成 8 个可独立提交的后续任务。
+- **核心功能**：把 AgentForge 的长期 AI 架构收敛为 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路。TASK-027～TASK-031 已完成运行时契约、Pipeline Catalog、Agent 绑定、模型路由和第三方 Skill 导入闭环；后续继续推进 Governance、Eval Feedback 和文档收敛。
 
 ## 版本号规范
 

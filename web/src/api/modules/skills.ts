@@ -1,5 +1,5 @@
 import request from '../request'
-import type { Skill, InstallSkillForm, MarketplaceResponse } from '@/types'
+import type { Skill, InstallSkillForm, MarketplaceResponse, SkillImportPreview } from '@/types'
 
 export const skillsApi = {
   // ── 已安装 Skill ──────────────────────────────────────────
@@ -28,6 +28,21 @@ export const skillsApi = {
       '/skills/install/url',
       data,
     )
+  },
+
+  previewImport: (data: InstallSkillForm) => {
+    return request.post<SkillImportPreview>('/skills/import/preview', data)
+  },
+
+  installImport: (data: InstallSkillForm) => {
+    return request.post<{
+      install_id: string
+      skill_name: string
+      status: string
+      manifest_hash?: string
+      permissions: string[]
+      risk_level?: string
+    }>('/skills/import/install', data)
   },
 
   getInstallStatus: (installId: string) => {

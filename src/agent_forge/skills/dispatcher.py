@@ -21,9 +21,14 @@ import inspect
 import json
 import logging
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from agent_forge.models import AuditLog
+from agent_forge.skills.policy import DEFAULT_SKILL_PERMISSION_POLICY, SkillPermissionPolicy
 from agent_forge.skills.registry import get_skill_registry
 from agent_forge.tracing import get_current_span, span
 
@@ -45,6 +50,8 @@ class SkillDispatcher:
         arguments: dict[str, Any],
         on_event: Callable[[str, dict], Awaitable[None]] | None = None,
         user_id: str | None = None,
+        db: AsyncSession | None = None,
+        permission_policy: SkillPermissionPolicy | None = None,
     ) -> str:
         """执行一次 tool_call，返回结果 JSON 字符串。
 
@@ -63,6 +70,42 @@ class SkillDispatcher:
             if sp:
                 sp.tags["error"] = "not_found"
             return json.dumps({"error": err}, ensure_ascii=False)
+
+        skill_name = self._registry.get_skill_name_for_tool(tool_name)
+        runtime_spec = self._registry.get_runtime_spec(skill_name) if skill_name else None
+        permissions = list((runtime_spec or {}).get("permissions") or [])
+        effective_policy = permission_policy or DEFAULT_SKILL_PERMISSION_POLICY
+        if permissions:
+            decision = effective_policy.evaluate(permissions)
+            if not decision.allowed:
+                err = f"工具 '{tool_name}' 权限不足：{', '.join(decision.denied_permissions)}。"
+                logger.warning("SkillDispatcher: permission denied for '%s': %s", tool_name, decision.denied_permissions)
+                if sp:
+                    sp.tags.update({"error": "permission_denied", "skill": skill_name or ""})
+                await _add_skill_audit(
+                    db=db,
+                    user_id=user_id,
+                    action="skill.invoke.denied",
+                    status="denied",
+                    tool_name=tool_name,
+                    tool_call_id=tool_call_id,
+                    runtime_spec=runtime_spec,
+                    permissions=permissions,
+                    details={"denied_permissions": decision.denied_permissions},
+                )
+                if on_event:
+                    await on_event("skill_result", {
+                        "tool": tool_name,
+                        "error": "permission_denied",
+                        "tool_call_id": tool_call_id,
+                    })
+                    await on_event("skill_eval", {
+                        "tool": tool_name,
+                        "skill_name": skill_name,
+                        "status": "denied",
+                        "permission": permissions,
+                    })
+                return json.dumps({"error": err}, ensure_ascii=False)
 
         if on_event:
             await on_event("skill_called", {
@@ -103,6 +146,25 @@ class SkillDispatcher:
                     "elapsed_ms": elapsed_ms,
                     "tool_call_id": tool_call_id,
                 })
+                await on_event("skill_eval", {
+                    "tool": tool_name,
+                    "skill_name": skill_name,
+                    "status": "success",
+                    "elapsed_ms": elapsed_ms,
+                    "permission": permissions,
+                })
+
+            await _add_skill_audit(
+                db=db,
+                user_id=user_id,
+                action="skill.invoke.succeeded",
+                status="success",
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                runtime_spec=runtime_spec,
+                permissions=permissions,
+                details={"elapsed_ms": elapsed_ms},
+            )
 
             return result_str
 
@@ -117,6 +179,24 @@ class SkillDispatcher:
                     "tool": tool_name, "error": "timeout",
                     "elapsed_ms": elapsed_ms, "tool_call_id": tool_call_id,
                 })
+                await on_event("skill_eval", {
+                    "tool": tool_name,
+                    "skill_name": skill_name,
+                    "status": "timeout",
+                    "elapsed_ms": elapsed_ms,
+                    "permission": permissions,
+                })
+            await _add_skill_audit(
+                db=db,
+                user_id=user_id,
+                action="skill.invoke.failed",
+                status="timeout",
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                runtime_spec=runtime_spec,
+                permissions=permissions,
+                details={"elapsed_ms": elapsed_ms, "error": "timeout"},
+            )
             return json.dumps({"error": err}, ensure_ascii=False)
 
         except Exception as e:
@@ -130,4 +210,61 @@ class SkillDispatcher:
                     "tool": tool_name, "error": str(e),
                     "elapsed_ms": elapsed_ms, "tool_call_id": tool_call_id,
                 })
+                await on_event("skill_eval", {
+                    "tool": tool_name,
+                    "skill_name": skill_name,
+                    "status": "failed",
+                    "elapsed_ms": elapsed_ms,
+                    "permission": permissions,
+                })
+            await _add_skill_audit(
+                db=db,
+                user_id=user_id,
+                action="skill.invoke.failed",
+                status="failed",
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                runtime_spec=runtime_spec,
+                permissions=permissions,
+                details={"elapsed_ms": elapsed_ms, "error": str(e)[:500]},
+            )
             return json.dumps({"error": err}, ensure_ascii=False)
+
+
+async def _add_skill_audit(
+    *,
+    db: AsyncSession | None,
+    user_id: str | None,
+    action: str,
+    status: str,
+    tool_name: str,
+    tool_call_id: str,
+    runtime_spec: dict[str, Any] | None,
+    permissions: list[str],
+    details: dict[str, Any] | None = None,
+) -> None:
+    if db is None or user_id is None:
+        return
+    skill_name = (runtime_spec or {}).get("name")
+    db.add(
+        AuditLog(
+            id=str(uuid.uuid4()),
+            action=action,
+            resource="skill",
+            user_id=user_id,
+            trace_id=tool_call_id[:36],
+            status=status,
+            degraded=False,
+            details={
+                "skill_name": skill_name,
+                "version": (runtime_spec or {}).get("version"),
+                "source": (runtime_spec or {}).get("source_type"),
+                "manifest_hash": (runtime_spec or {}).get("manifest_hash"),
+                "tool": tool_name,
+                "permission": permissions,
+                "status": status,
+                **(details or {}),
+            },
+        )
+    )
+    await db.flush()

@@ -265,13 +265,26 @@ web/src/views/settings/LLMConfig.vue
 - 调用前经过 SkillPolicy。
 - 调用后写审计和 Eval 事件。
 
-建议新增或调整：
+实际新增或调整：
 
 ```text
 src/agent_forge/skills/manifest.py
 src/agent_forge/skills/policy.py
 src/agent_forge/skills/runtime_spec.py
+src/agent_forge/skills/installer.py
+src/agent_forge/skills/registry.py
+src/agent_forge/skills/dispatcher.py
+src/api/routes/skills.py
+web/src/views/skills/List.vue
 ```
+
+完成状态：
+
+- 外部 Skill 安装前通过 Manifest preview 展示来源、工具、权限、风险等级和确认要求。
+- `Skill` / `SkillInstall` 保存 manifest_hash、permissions、runtime_spec、risk_level 和 preview。
+- `SkillRegistry` 保存 runtime spec 与 tool -> skill 映射。
+- `SkillDispatcher` 调用前执行权限策略，拒绝、成功、失败和超时都会输出 `skill_eval` 事件，拒绝/执行路径可写入审计日志。
+- Stage 级 `skill_policy_key` 与 AgentProfile allowed skills 的编排留给 GovernancePolicy 阶段。
 
 ### 4.5 Governance Policy
 
@@ -376,8 +389,7 @@ PATCH /api/llm/model-routes/{route_key}
 ```text
 POST /api/skills/import/preview
 POST /api/skills/import/install
-GET /api/skills/{name}/runtime-spec
-PATCH /api/skills/{name}/policy
+GET /api/skills
 ```
 
 ### 6.5 Evaluation API

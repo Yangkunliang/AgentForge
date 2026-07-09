@@ -461,13 +461,17 @@ def ssrf_check(url: str):
 ### 5.7 社区 Skill 安装安全
 
 ```
-上传 → 类型/大小校验 → 解压 → 静态分析 → 安装到隔离目录
+来源识别 → Manifest 解析 → 权限/风险预览 → 用户确认 → 安全解压/复制 → 安装到隔离目录 → Runtime 注册 → 调用审计
 ```
 
-- 仅允许 `.tar.gz`、`.whl`、`.zip`，最大 50MB
-- 解压后使用 AST 静态分析，检查 `import` 是否在依赖白名单内
-- 安装目录：`/opt/agentforge/skills/`，与系统 Python 环境隔离
-- 禁止安装期间执行 `setup.py`（改用 `pip install --no-build-isolation`）
+- 安装源支持本地目录、GitHub URL、通用 Git URL 和 PyPI 包名；平台不会自动扫描用户代码库。
+- Manifest 优先使用 `agentforge-skill.yaml`，兼容旧 `skill.md`，必须声明 tool，权限只允许 `network`、`filesystem`、`shell`、`credential`、`project_context`。
+- `filesystem`、`shell`、`credential` 被归为高风险权限，安装 API 未收到明确 `confirm_risk=true` 时返回 409，并回传 preview 供前端展示。
+- `SkillInstall.preview`、`manifest_hash`、`permissions`、`risk_level` 持久化，便于审计和回滚分析。
+- PyPI/GitHub/Git 预览会先下载或 clone 到临时目录；归档解压拒绝路径穿越和链接条目。
+- 本地安装会复制到 `skills/installed/<skill_name>/`，注册时只把 runtime spec、tool_defs 和 executor 引入 `SkillRegistry`。
+- Skill 调用前由 `SkillPermissionPolicy` 判断权限，拒绝时写入 `AuditLog.action=skill.invoke.denied`，成功、失败、超时也会发出 `skill_eval` 事件。
+- 后续 TASK-032 会把高风险 Skill 调用确认与阶段确认、写回确认统一到 GovernancePolicy。
 
 ```yaml
 # 依赖白名单（可扩展）

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import String, Text
+from sqlalchemy import JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin
@@ -32,6 +32,14 @@ class SkillInstall(Base, TimestampMixin):
     log: Mapped[str] = mapped_column(Text, default="")  # 安装过程日志
 
     error: Mapped[str | None] = mapped_column(Text)  # 错误信息(成功时为 None 或空)
+
+    manifest_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 安装时校验的 Manifest 哈希
+
+    permissions: Mapped[list[str]] = mapped_column(JSON, default=list)  # 安装时声明的权限
+
+    risk_level: Mapped[str | None] = mapped_column(String(20), nullable=True)  # low/medium/high
+
+    preview: Mapped[dict] = mapped_column(JSON, default=dict)  # 安装前预览快照
 
     def __repr__(self) -> str:
         return f"<SkillInstall id={self.id} skill={self.skill_name} status={self.status}>"

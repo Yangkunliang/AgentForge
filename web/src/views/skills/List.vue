@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSkillStore } from '@/stores/skill'
 import { usePermission } from '@/composables'
-import type { InstallSkillForm, MarketplaceSkill } from '@/types'
+import type { InstallSkillForm, MarketplaceSkill, SkillImportPreview } from '@/types'
 
 const skillStore = useSkillStore()
 const { canInstallSkills } = usePermission()
@@ -12,6 +12,8 @@ const { canInstallSkills } = usePermission()
 const showInstallDialog = ref(false)
 const installForm = ref<InstallSkillForm>({ source: '', version: '' })
 const installLoading = ref(false)
+const previewLoading = ref(false)
+const importPreview = ref<SkillImportPreview | null>(null)
 
 // ── Tabs ──────────────────────────────────────────────────────
 const activeTab = ref<'installed' | 'marketplace'>('installed')
@@ -41,20 +43,40 @@ async function loadMarketplace() {
 // ── 安装 ──────────────────────────────────────────────────────
 function openInstallDialog(prefill?: string) {
   installForm.value = { source: prefill || '', version: '' }
+  importPreview.value = null
   showInstallDialog.value = true
 }
 
-async function handleInstall() {
+async function handlePreviewImport() {
   if (!installForm.value.source.trim()) {
-    ElMessage.warning('请输入 Skill 来源（GitHub URL / PyPI 包名）')
+    ElMessage.warning('请输入 Skill 来源（GitHub URL / PyPI 包名 / 本地目录）')
     return
+  }
+  previewLoading.value = true
+  try {
+    importPreview.value = await skillStore.previewSkillImport(installForm.value)
+  } catch {
+    importPreview.value = null
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+async function handleInstall() {
+  if (!importPreview.value) {
+    await handlePreviewImport()
+    if (!importPreview.value) return
   }
   installLoading.value = true
   try {
-    await skillStore.installSkill(installForm.value)
+    await skillStore.installSkillImport({
+      ...installForm.value,
+      confirm_risk: importPreview.value.requires_confirmation,
+    })
     ElMessage.success('安装任务已创建，请稍候...')
     showInstallDialog.value = false
     installForm.value = { source: '', version: '' }
+    importPreview.value = null
     startPolling()
   } catch {
     // 错误已在 request 中处理
@@ -64,14 +86,9 @@ async function handleInstall() {
 }
 
 async function handleInstallFromMarket(item: MarketplaceSkill) {
-  try {
-    await skillStore.installFromMarketplace(item)
-    ElMessage.success(`正在安装 ${item.name}...`)
-    startPolling()
-    activeTab.value = 'installed'
-  } catch {
-    // handled
-  }
+  openInstallDialog(item.url || item.name)
+  installForm.value.version = item.version === 'latest' ? '' : item.version
+  await handlePreviewImport()
 }
 
 function startPolling() {
@@ -143,6 +160,26 @@ function sourceTagType(source: string): string {
     clawhub: 'danger',
   }
   return map[source] || ''
+}
+
+function riskTagType(risk: string): string {
+  const map: Record<string, string> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'danger',
+  }
+  return map[risk] || 'info'
+}
+
+function permissionLabel(permission: string): string {
+  const map: Record<string, string> = {
+    network: '网络访问',
+    filesystem: '文件系统',
+    shell: 'Shell 执行',
+    credential: '密钥访问',
+    project_context: '项目上下文',
+  }
+  return map[permission] || permission
 }
 
 function formatDate(dateStr: string | undefined): string {
@@ -359,21 +396,69 @@ function formatDate(dateStr: string | undefined): string {
         <el-form-item label="来源" required>
           <el-input
             v-model="installForm.source"
-            placeholder="GitHub URL 或 PyPI 包名"
+            placeholder="GitHub URL / PyPI 包名 / 本地目录"
+            @change="importPreview = null"
           />
           <div class="form-hint">
             示例：<code>https://github.com/owner/agentforge-skill-weather</code>
-            或 <code>agentforge-skill-calculator</code>
+            、<code>agentforge-skill-calculator</code> 或本地目录
           </div>
         </el-form-item>
         <el-form-item label="版本">
-          <el-input v-model="installForm.version" placeholder="默认 latest" />
+          <el-input v-model="installForm.version" placeholder="默认 latest" @change="importPreview = null" />
         </el-form-item>
       </el-form>
+
+      <div v-if="importPreview" class="import-preview">
+        <div class="import-preview__header">
+          <div>
+            <div class="import-preview__name">{{ importPreview.name }}</div>
+            <div class="import-preview__meta">
+              {{ sourceLabel(importPreview.source_type) }} · v{{ importPreview.version }}
+            </div>
+          </div>
+          <el-tag :type="riskTagType(importPreview.risk_level)" size="small">
+            {{ importPreview.risk_level === 'high' ? '高风险' : importPreview.risk_level === 'medium' ? '中风险' : '低风险' }}
+          </el-tag>
+        </div>
+        <div class="import-preview__desc">{{ importPreview.description || '暂无描述' }}</div>
+        <div class="import-preview__section">
+          <span class="import-preview__label">权限</span>
+          <div class="import-preview__tags">
+            <el-tag
+              v-for="permission in importPreview.permissions"
+              :key="permission"
+              :type="permission === 'shell' || permission === 'credential' || permission === 'filesystem' ? 'danger' : 'warning'"
+              size="small"
+            >
+              {{ permissionLabel(permission) }}
+            </el-tag>
+            <el-tag v-if="importPreview.permissions.length === 0" size="small" type="success">无额外权限</el-tag>
+          </div>
+        </div>
+        <div class="import-preview__section">
+          <span class="import-preview__label">工具</span>
+          <div class="import-preview__tools">
+            <el-tag v-for="tool in importPreview.tools" :key="tool.name" size="small">
+              {{ tool.name }}
+            </el-tag>
+          </div>
+        </div>
+        <el-alert
+          v-if="importPreview.requires_confirmation"
+          title="该 Skill 声明了高风险权限，安装后调用仍会经过运行时策略校验和审计记录。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+      </div>
       <template #footer>
         <el-button @click="showInstallDialog = false">取消</el-button>
+        <el-button :loading="previewLoading" @click="handlePreviewImport">
+          预览风险
+        </el-button>
         <el-button type="primary" :loading="installLoading" @click="handleInstall">
-          开始安装
+          {{ importPreview?.requires_confirmation ? '确认风险并安装' : '安装' }}
         </el-button>
       </template>
     </el-dialog>
@@ -581,6 +666,60 @@ function formatDate(dateStr: string | undefined): string {
     border-radius: 3px;
     font-family: monospace;
     font-size: 11px;
+  }
+}
+
+.import-preview {
+  border: 1px solid #e4e7ed;
+  border-radius: $border-radius-sm;
+  padding: $spacing-md;
+  margin-top: $spacing-md;
+  background: #fafafa;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    gap: $spacing-sm;
+    align-items: flex-start;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  &__meta,
+  &__desc {
+    color: #606266;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  &__desc {
+    margin-bottom: $spacing-sm;
+  }
+
+  &__section {
+    display: flex;
+    gap: $spacing-sm;
+    align-items: flex-start;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__label {
+    width: 40px;
+    color: #909399;
+    font-size: 12px;
+    line-height: 24px;
+    flex-shrink: 0;
+  }
+
+  &__tags,
+  &__tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 }
 </style>

@@ -8,9 +8,23 @@ from __future__ import annotations
 
 import logging
 import re
+import hashlib
 from typing import Any
+from pathlib import Path
+
+import yaml
+
+from agent_forge.skills.runtime_spec import (
+    SkillImportPreview,
+    SkillRuntimeSpec,
+    normalize_permissions,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class SkillManifestError(ValueError):
+    """Raised when an installable Skill manifest is missing or invalid."""
 
 
 def parse_skill_md(content: str) -> dict[str, Any]:
@@ -148,6 +162,180 @@ def to_tool_def(manifest: dict[str, Any]) -> list[dict]:
         })
 
     return tool_defs
+
+
+def load_skill_manifest(
+    skill_dir: str | Path,
+    source: str = "local",
+    source_type: str = "local",
+) -> SkillImportPreview:
+    """Load and validate an installable Skill manifest from a directory.
+
+    Preferred format is `agentforge-skill.yaml`. The legacy `skill.md`
+    frontmatter/tool block remains accepted as a compatibility fallback.
+    """
+    path = Path(skill_dir)
+    if not path.is_dir():
+        raise SkillManifestError(f"Skill source is not a directory: {path}")
+
+    manifest_path = path / "agentforge-skill.yaml"
+    if manifest_path.exists():
+        raw_text = manifest_path.read_text(encoding="utf-8")
+        try:
+            raw_manifest = yaml.safe_load(raw_text) or {}
+        except yaml.YAMLError as exc:
+            raise SkillManifestError(f"agentforge-skill.yaml is invalid YAML: {exc}") from exc
+        if not isinstance(raw_manifest, dict):
+            raise SkillManifestError("agentforge-skill.yaml must contain an object")
+        return _preview_from_manifest(raw_manifest, raw_text, source=source, source_type=source_type)
+
+    skill_md = path / "skill.md"
+    if skill_md.exists():
+        raw_text = skill_md.read_text(encoding="utf-8")
+        parsed = parse_skill_md(raw_text)
+        manifest = _compat_manifest_from_skill_md(parsed, path.name)
+        return _preview_from_manifest(manifest, raw_text, source=source, source_type=source_type)
+
+    raise SkillManifestError("Skill manifest not found: expected agentforge-skill.yaml or skill.md")
+
+
+def _preview_from_manifest(
+    raw_manifest: dict[str, Any],
+    raw_text: str,
+    *,
+    source: str,
+    source_type: str,
+) -> SkillImportPreview:
+    name = str(raw_manifest.get("name") or "").strip()
+    if not name:
+        raise SkillManifestError("Skill manifest field 'name' is required")
+    version = str(raw_manifest.get("version") or "1.0.0")
+    description = str(raw_manifest.get("description") or "")
+
+    try:
+        permissions = normalize_permissions(list(raw_manifest.get("permissions") or []))
+    except ValueError as exc:
+        raise SkillManifestError(str(exc)) from exc
+
+    executor = raw_manifest.get("executor") or {}
+    if not isinstance(executor, dict):
+        raise SkillManifestError("Skill manifest field 'executor' must be an object")
+    executor_kind = str(executor.get("kind") or "python")
+    executor_entry_point = executor.get("entry_point")
+    if executor_entry_point is not None:
+        executor_entry_point = str(executor_entry_point)
+
+    audit = raw_manifest.get("audit") or {}
+    if not isinstance(audit, dict):
+        raise SkillManifestError("Skill manifest field 'audit' must be an object")
+    audit_level = str(audit.get("level") or "standard")
+
+    tools = _normalize_tools(raw_manifest)
+    if not tools:
+        raise SkillManifestError("Skill manifest must declare at least one tool")
+    tool_defs = [_to_openai_tool_def(tool) for tool in tools]
+
+    manifest_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+    runtime_spec = SkillRuntimeSpec(
+        name=name,
+        version=version,
+        source_type=source_type,
+        manifest_hash=manifest_hash,
+        tool_defs=tool_defs,
+        permissions=permissions,
+        executor_kind=executor_kind,
+        executor_entry_point=executor_entry_point,
+        audit_level=audit_level,
+        source=source,
+    ).to_dict()
+
+    return SkillImportPreview(
+        name=name,
+        version=version,
+        description=description,
+        source=source,
+        source_type=source_type,
+        manifest_hash=manifest_hash,
+        permissions=permissions,
+        tools=tools,
+        tool_defs=tool_defs,
+        executor_kind=executor_kind,
+        executor_entry_point=executor_entry_point,
+        audit_level=audit_level,
+        runtime_spec=runtime_spec,
+    )
+
+
+def _compat_manifest_from_skill_md(parsed: dict[str, Any], fallback_name: str) -> dict[str, Any]:
+    manifest: dict[str, Any] = {
+        "name": parsed.get("name") or fallback_name,
+        "version": parsed.get("version") or "1.0.0",
+        "description": parsed.get("description") or "",
+        "permissions": parsed.get("permissions") or [],
+    }
+    tool_spec = parsed.get("tool")
+    if not tool_spec:
+        body = parsed.get("body", "")
+        tool_match = re.search(r"##\s*Tool Definition\s*\n```yaml\s*\n(.*?)```", body, re.DOTALL)
+        if tool_match:
+            try:
+                tool_spec = yaml.safe_load(tool_match.group(1)) or {}
+            except yaml.YAMLError as exc:
+                raise SkillManifestError(f"skill.md tool definition is invalid YAML: {exc}") from exc
+    if tool_spec:
+        manifest["tools"] = [tool_spec]
+    return manifest
+
+
+def _normalize_tools(raw_manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_tools = raw_manifest.get("tools")
+    if raw_tools is None and raw_manifest.get("tool"):
+        raw_tools = [raw_manifest["tool"]]
+    if not isinstance(raw_tools, list):
+        raise SkillManifestError("Skill manifest field 'tools' must be a list")
+
+    tools: list[dict[str, Any]] = []
+    for raw_tool in raw_tools:
+        if not isinstance(raw_tool, dict):
+            raise SkillManifestError("Each Skill tool must be an object")
+        tool = raw_tool.get("function") if raw_tool.get("type") == "function" else raw_tool
+        if not isinstance(tool, dict):
+            raise SkillManifestError("Each Skill tool function must be an object")
+        name = str(tool.get("name") or "").strip()
+        if not name:
+            raise SkillManifestError("Each Skill tool requires a name")
+        parameters = tool.get("parameters") or {}
+        if not isinstance(parameters, dict):
+            raise SkillManifestError("Each Skill tool parameters must be an object")
+        tools.append(
+            {
+                "name": name,
+                "description": str(tool.get("description") or ""),
+                "parameters": parameters,
+            }
+        )
+    return tools
+
+
+def _to_openai_tool_def(tool: dict[str, Any]) -> dict[str, Any]:
+    parameters = tool.get("parameters") or {}
+    required = [
+        key
+        for key, value in parameters.items()
+        if isinstance(value, dict) and value.get("type") == "string" and "default" not in value
+    ]
+    return {
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "parameters": {
+                "type": "object",
+                "properties": parameters,
+                "required": required,
+            },
+        },
+    }
 
 
 def generate_skill_md(skill_name: str, description: str, tool_spec: dict = None) -> str:

@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import importlib.util
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tarfile
+import zipfile
 from pathlib import Path
 from uuid import uuid4
 
@@ -15,7 +20,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.models.skill_install import SkillInstall
+from agent_forge.skills.manifest import SkillImportPreview, SkillManifestError, load_skill_manifest
 from agent_forge.skills.manager import SkillManager
+from agent_forge.skills.registry import get_skill_registry
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +34,86 @@ class SkillInstaller:
     _install_tasks: dict[str, dict] = {}
 
     @classmethod
+    async def preview_import(cls, source: str, version: str | None = None) -> SkillImportPreview:
+        source_type = cls._detect_source_type(source)
+        if source_type == "local":
+            return load_skill_manifest(Path(source), source=source, source_type="local")
+        if source_type in {"github", "git"}:
+            return await cls._preview_from_git_source(source, version, source_type)
+        if source_type == "pypi":
+            return await cls._preview_from_pypi_source(source, version)
+        raise SkillManifestError(f"Unsupported Skill source type: {source_type}")
+
+    @classmethod
+    async def install_from_source(
+        cls,
+        db: AsyncSession,
+        source: str,
+        version: str | None = None,
+        *,
+        confirm_risk: bool = False,
+    ) -> SkillInstall:
+        source_type = cls._detect_source_type(source)
+        preview = await cls.preview_import(source, version)
+        if preview.requires_confirmation and not confirm_risk:
+            raise PermissionError("High-risk Skill import requires explicit confirmation")
+
+        if source_type != "local":
+            return await cls.start_install(db, source, version, preview=preview)
+
+        install_id = f"install-{uuid4().hex[:8]}"
+        install_task = SkillInstall(
+            id=install_id,
+            skill_name=preview.name,
+            source=source,
+            version=version or preview.version,
+            status="installing",
+            log="Starting validated installation...\n",
+            error=None,
+            manifest_hash=preview.manifest_hash,
+            permissions=preview.permissions,
+            risk_level=preview.risk_level,
+            preview=preview.to_dict(),
+        )
+        db.add(install_task)
+        await db.commit()
+
+        try:
+            await cls._install_local_preview(db, install_task, Path(source), preview)
+            install_task.status = "done"
+            install_task.log += f"Installed skill '{preview.name}' successfully.\n"
+            await db.commit()
+        except Exception as exc:
+            install_task.status = "failed"
+            install_task.error = str(exc)
+            install_task.log += f"Installation failed: {exc}\n"
+            await db.commit()
+            raise
+        return install_task
+
+    @classmethod
     async def start_install(
-        cls, db: AsyncSession, source: str, version: str | None = None
+        cls,
+        db: AsyncSession,
+        source: str,
+        version: str | None = None,
+        preview: SkillImportPreview | None = None,
     ) -> SkillInstall:
         install_id = f"install-{uuid4().hex[:8]}"
-        skill_name = cls._extract_skill_name(source)
+        skill_name = preview.name if preview else cls._extract_skill_name(source)
 
         install_task = SkillInstall(
             id=install_id,
             skill_name=skill_name,
             source=source,
-            version=version or "latest",
+            version=version or (preview.version if preview else "latest"),
             status="pending",
             log="",
             error=None,
+            manifest_hash=preview.manifest_hash if preview else None,
+            permissions=preview.permissions if preview else [],
+            risk_level=preview.risk_level if preview else None,
+            preview=preview.to_dict() if preview else {},
         )
         db.add(install_task)
         await db.commit()
@@ -97,6 +170,12 @@ class SkillInstaller:
                 await cls._install_from_github(db, install_id, source, version)
             elif source_type == "git":
                 await cls._install_from_git(db, install_id, source, version)
+            elif source_type == "local":
+                preview = await cls.preview_import(source, version)
+                await cls._install_local_preview(db, install_record, Path(source), preview)
+                install_record.status = "done"
+                install_record.log += f"Installed skill '{preview.name}' successfully.\n"
+                await db.commit()
             else:
                 # 默认走 pip（PyPI 包名或本地路径）
                 await cls._install_pypi(db, install_id, source, version)
@@ -169,67 +248,16 @@ class SkillInstaller:
             if proc.returncode != 0:
                 raise RuntimeError(f"git clone failed: {stderr.decode()}")
 
-            repo_dir = temp_dir / "repo"
+            manifest_dir = cls._find_manifest_dir(temp_dir / "repo")
+            if not manifest_dir:
+                raise RuntimeError("No agentforge-skill.yaml or skill.md found in repository")
 
-            # 递归搜索 skill.md
-            skill_md = cls._find_skill_md(repo_dir)
-            if not skill_md:
-                raise RuntimeError("No skill.md found in repository")
-
-            install_record.log += f"Found skill.md at {skill_md}...\n"
-            await db.commit()
-
-            # 解析 manifest
-            from agent_forge.skills.manifest import parse_skill_md
-            content = skill_md.read_text(encoding="utf-8")
-            parsed = parse_skill_md(content)
-            name = parsed.get("name") or skill_md.parent.name
-
-            # 创建安装目录
-            installed_dir = SKILLS_INSTALLED_DIR / name
-            installed_dir.mkdir(parents=True, exist_ok=True)
-
-            # 复制 skill.md
-            shutil.copy2(skill_md, installed_dir / "skill.md")
-
-            # 复制同目录下其他文件（README, executor.py 等）
-            for f in skill_md.parent.iterdir():
-                if f.name != "skill.md":
-                    shutil.copy2(f, installed_dir / f.name)
-
-            install_record.log += f"Skill '{name}' copied to {installed_dir}...\n"
-            await db.commit()
-
-            # 注册到 DB
-            manifest = {
-                "name": name,
-                "version": parsed.get("version", "1.0.0"),
-                "description": parsed.get("description", ""),
-            }
-            raw_fm = parsed.get("raw_frontmatter", {})
-            # 尝试从 body 提取 tool 定义
-            body = parsed.get("body", "")
-            import re
-            tool_match = re.search(r"##\s*Tool Definition\s*\n```yaml\s*\n(.*?)```", body, re.DOTALL)
-            if tool_match:
-                tool_spec = SkillInstaller._parse_tool_yaml(tool_match.group(1))
-                if tool_spec:
-                    manifest["tool"] = tool_spec
-
-            executor_py = installed_dir / "executor.py"
-            entry_point = f"{name}.executor" if executor_py.exists() else None
-
-            await SkillManager.register_skill(
-                db,
-                name=name,
-                version=str(manifest.get("version", "1.0.0")),
-                description=str(manifest.get("description", "")),
-                entry_point=entry_point,
-                manifest=manifest,
-            )
+            preview = load_skill_manifest(manifest_dir, source=repo_url, source_type="github")
+            install_record.log += f"Found manifest for skill '{preview.name}' at {manifest_dir}...\n"
+            await cls._install_local_preview(db, install_record, manifest_dir, preview)
 
             install_record.status = "done"
-            install_record.log += f"\nInstalled skill '{name}' successfully.\n"
+            install_record.log += f"\nInstalled skill '{preview.name}' successfully.\n"
 
         except Exception as e:
             raise RuntimeError(f"GitHub install failed: {e!s}") from e
@@ -237,6 +265,92 @@ class SkillInstaller:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
         await db.commit()
+
+    @classmethod
+    async def _install_local_preview(
+        cls,
+        db: AsyncSession,
+        install_record: SkillInstall,
+        source_dir: Path,
+        preview: SkillImportPreview,
+    ) -> None:
+        installed_dir = SKILLS_INSTALLED_DIR / preview.name
+        if installed_dir.exists():
+            shutil.rmtree(installed_dir, ignore_errors=True)
+        installed_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source_dir, installed_dir, ignore=shutil.ignore_patterns("__pycache__", ".git"))
+
+        install_record.skill_name = preview.name
+        install_record.version = preview.version
+        install_record.manifest_hash = preview.manifest_hash
+        install_record.permissions = preview.permissions
+        install_record.risk_level = preview.risk_level
+        install_record.preview = preview.to_dict()
+        install_record.log += f"Copied skill to {installed_dir}.\n"
+
+        entry_point = preview.executor_entry_point
+        executor = cls._load_local_executor(installed_dir, entry_point)
+        executors = {}
+        if executor is not None:
+            for tool_def in preview.tool_defs:
+                executors[tool_def["function"]["name"]] = executor
+
+        await SkillManager.register_skill(
+            db,
+            name=preview.name,
+            version=preview.version,
+            description=preview.description,
+            entry_point=entry_point,
+            manifest={
+                "name": preview.name,
+                "version": preview.version,
+                "description": preview.description,
+                "tools": preview.tools,
+                "permissions": preview.permissions,
+            },
+            manifest_hash=preview.manifest_hash,
+            permissions=preview.permissions,
+            runtime_spec=preview.runtime_spec,
+            audit_level=preview.audit_level,
+            source_type=preview.source_type,
+        )
+        get_skill_registry().register(
+            skill_name=preview.name,
+            tool_defs=preview.tool_defs,
+            executors=executors,
+            runtime_spec=preview.runtime_spec,
+        )
+
+    @staticmethod
+    def _load_local_executor(installed_dir: Path, entry_point: str | None):
+        if not entry_point:
+            return None
+        module_name, _, function_name = entry_point.partition(":")
+        if not module_name or not function_name:
+            raise RuntimeError("executor.entry_point must use module:function format")
+
+        module_path = installed_dir / Path(*module_name.split(".")).with_suffix(".py")
+        if not module_path.exists():
+            raise RuntimeError(f"executor module not found: {module_path}")
+
+        safe_module = re.sub(r"[^a-zA-Z0-9_]", "_", f"agentforge_skill_{installed_dir.name}_{module_name}")
+        spec = importlib.util.spec_from_file_location(safe_module, module_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"failed to load executor module: {module_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[safe_module] = module
+        spec.loader.exec_module(module)
+        fn = getattr(module, function_name, None)
+        if fn is None:
+            raise RuntimeError(f"executor function not found: {function_name}")
+
+        async def wrapped_executor(**kwargs):
+            result = fn(**kwargs)
+            if inspect.isawaitable(result):
+                return await result
+            return result
+
+        return wrapped_executor
 
     @classmethod
     async def _install_from_git(
@@ -274,38 +388,14 @@ class SkillInstaller:
             if proc.returncode != 0:
                 raise RuntimeError(f"git clone failed: {stderr.decode()}")
 
-            repo_dir = temp_dir / "repo"
-            skill_md = cls._find_skill_md(repo_dir)
-            if not skill_md:
-                raise RuntimeError("No skill.md found in repository")
+            manifest_dir = cls._find_manifest_dir(temp_dir / "repo")
+            if not manifest_dir:
+                raise RuntimeError("No agentforge-skill.yaml or skill.md found in repository")
 
-            from agent_forge.skills.manifest import parse_skill_md
-            content = skill_md.read_text(encoding="utf-8")
-            parsed = parse_skill_md(content)
-            name = parsed.get("name") or skill_md.parent.name
-
-            installed_dir = SKILLS_INSTALLED_DIR / name
-            installed_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(skill_md, installed_dir / "skill.md")
-
+            preview = load_skill_manifest(manifest_dir, source=repo_url, source_type="git")
+            await cls._install_local_preview(db, install_record, manifest_dir, preview)
             install_record.status = "done"
-            install_record.log += f"Installed skill '{name}' from {repo_url}.\n"
-            await db.commit()
-
-            # 注册到 DB
-            manifest = {
-                "name": name,
-                "version": parsed.get("version", "1.0.0"),
-                "description": parsed.get("description", ""),
-            }
-            await SkillManager.register_skill(
-                db,
-                name=name,
-                version=str(manifest.get("version", "1.0.0")),
-                description=str(manifest.get("description", "")),
-                entry_point=None,
-                manifest=manifest,
-            )
+            install_record.log += f"Installed skill '{preview.name}' from {repo_url}.\n"
             await db.commit()
 
         finally:
@@ -366,6 +456,110 @@ class SkillInstaller:
             if entry.is_file():
                 return entry
         return None
+
+    @staticmethod
+    def _find_manifest_dir(parent: Path) -> Path | None:
+        for filename in ("agentforge-skill.yaml", "skill.md"):
+            direct = parent / filename
+            if direct.exists():
+                return parent
+        for entry in parent.rglob("agentforge-skill.yaml"):
+            if entry.is_file():
+                return entry.parent
+        skill_md = SkillInstaller._find_skill_md(parent)
+        return skill_md.parent if skill_md else None
+
+    @classmethod
+    async def _preview_from_git_source(
+        cls,
+        repo_url: str,
+        version: str | None,
+        source_type: str,
+    ) -> SkillImportPreview:
+        temp_dir = Path(f"/tmp/agentforge-skill-preview-{uuid4().hex[:8]}")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            cmd = ["git", "clone", "--depth", "1"]
+            if version and version != "latest":
+                cmd.extend(["--branch", version])
+            cmd.extend([repo_url, str(temp_dir / "repo")])
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise SkillManifestError(f"git clone failed: {stderr.decode(errors='replace')}")
+            manifest_dir = cls._find_manifest_dir(temp_dir / "repo")
+            if not manifest_dir:
+                raise SkillManifestError("Skill manifest not found in repository")
+            return load_skill_manifest(manifest_dir, source=repo_url, source_type=source_type)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    @classmethod
+    async def _preview_from_pypi_source(cls, package_name: str, version: str | None) -> SkillImportPreview:
+        temp_dir = Path(f"/tmp/agentforge-skill-pypi-preview-{uuid4().hex[:8]}")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            package_spec = f"{package_name}=={version}" if version else package_name
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "-m",
+                "pip",
+                "download",
+                "--no-deps",
+                "--dest",
+                str(temp_dir),
+                package_spec,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise SkillManifestError(f"pip download failed: {stderr.decode(errors='replace')}")
+
+            archive = next(temp_dir.iterdir(), None)
+            if archive is None:
+                raise SkillManifestError("pip download did not produce a package archive")
+            extract_dir = temp_dir / "extract"
+            extract_dir.mkdir()
+            if archive.suffix == ".whl":
+                with zipfile.ZipFile(archive) as zf:
+                    cls._safe_extract_zip(zf, extract_dir)
+            else:
+                with tarfile.open(archive) as tf:
+                    cls._safe_extract_tar(tf, extract_dir)
+            manifest_dir = cls._find_manifest_dir(extract_dir)
+            if not manifest_dir:
+                raise SkillManifestError("Skill manifest not found in PyPI package")
+            return load_skill_manifest(manifest_dir, source=package_name, source_type="pypi")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    @staticmethod
+    def _safe_extract_zip(zf: zipfile.ZipFile, destination: Path) -> None:
+        destination_root = destination.resolve()
+        for member in zf.infolist():
+            target = (destination / member.filename).resolve()
+            if destination_root != target and destination_root not in target.parents:
+                raise SkillManifestError("Package archive contains unsafe paths")
+        zf.extractall(destination)
+
+    @staticmethod
+    def _safe_extract_tar(tf: tarfile.TarFile, destination: Path) -> None:
+        destination_root = destination.resolve()
+        for member in tf.getmembers():
+            if member.issym() or member.islnk():
+                raise SkillManifestError("Package archive contains links")
+            target = (destination / member.name).resolve()
+            if destination_root != target and destination_root not in target.parents:
+                raise SkillManifestError("Package archive contains unsafe paths")
+        try:
+            tf.extractall(destination, filter="data")
+        except TypeError:
+            tf.extractall(destination)
 
     @staticmethod
     def _parse_tool_yaml(yaml_text: str) -> dict | None:

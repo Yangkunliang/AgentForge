@@ -54,8 +54,27 @@
 | description | Text | Skill 描述 |
 | entry_point | String | 入口路径，如 `skill.main` |
 | manifest | JSON | Skill 声明（inputs/outputs schema） |
+| manifest_hash | String | Manifest 内容 SHA-256，用于安装追踪和审计 |
+| permissions | JSON | 运行时权限声明，如 `network`、`filesystem`、`shell`、`credential`、`project_context` |
+| runtime_spec | JSON | 运行时注册规格，包含 tool_defs、executor、权限、来源和审计级别 |
+| audit_level | String | 审计级别，默认 `standard` |
 | dependencies | JSON | 依赖列表，如 `["ruff", "mypy"]` |
 | installed_at | DateTime | 安装时间 |
+
+### 1.5.1 SkillInstall
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | String | 安装任务 ID |
+| skill_name | String | 被安装的 Skill 名称 |
+| source | String | 来源地址（本地目录 / GitHub URL / Git URL / PyPI 包名） |
+| version | String | 目标版本 |
+| status | String | pending/installing/done/failed |
+| log | Text | 安装日志 |
+| error | Text | 失败原因 |
+| manifest_hash | String | 安装前校验的 Manifest 哈希 |
+| permissions | JSON | 安装时声明的权限 |
+| risk_level | String | low/medium/high |
+| preview | JSON | 安装前预览快照，包含来源、工具、权限和风险 |
 
 ### 1.6 Agent-Skill 关联 (AgentSkill)
 | 字段 | 类型 | 说明 |

@@ -37,6 +37,10 @@ class Skill(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text)  # 功能描述
     entry_point: Mapped[str | None] = mapped_column(String(255), nullable=True)  # 执行器入口(模块:函数名)
     manifest: Mapped[dict] = mapped_column(JSON, default=dict)  # 技能完整配置清单
+    manifest_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # Manifest 内容哈希
+    permissions: Mapped[list[str]] = mapped_column(JSON, default=list)  # 运行时权限声明
+    runtime_spec: Mapped[dict] = mapped_column(JSON, default=dict)  # 运行时注册规格
+    audit_level: Mapped[str] = mapped_column(String(20), default="standard", nullable=False)  # 审计级别
     dependencies: Mapped[list[str]] = mapped_column(JSON, default=list)  # 依赖的 Python 包名列表
     installed_at: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 安装时间
 

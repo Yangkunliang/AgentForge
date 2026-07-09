@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-028，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义收敛到后端 Catalog；Agent、Model、Skill、Governance 和 Eval 仍需要继续进入统一 AI Runtime Contract。
+截至 TASK-031，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute 和第三方 Skill Runtime 逐步接入统一 AI Runtime Contract；Governance 和 Eval 仍需要继续收敛。
 
 ### 2.1 请求到执行
 
@@ -36,7 +36,7 @@ src/api/routes/sessions.py
 缺口：
 
 - 还没有按 Project / Stage / AgentProfile 解析模型路由。
-- 还没有按 AgentProfile 或 StageDefinition 过滤 Skill。
+- SkillRuntime 已有权限校验和审计闭环，但还没有把 StageDefinition.skill_policy_key 与 AgentProfile.allowed_skill_names 统一编排成阶段级 Skill 过滤。
 - Agent 管理页创建的 active `Agent` 已可通过 AgentResolver 进入 StageRuntime 选择链路。
 
 ### 2.2 Pipeline 状态机
@@ -64,7 +64,7 @@ src/agent_forge/pipeline/runtime.py
 
 缺口：
 
-- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key；`default_agent_selector` 已绑定 AgentResolver，ModelRouter 和 SkillPolicy 仍待后续任务接入。
+- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key；`default_agent_selector` 已绑定 AgentResolver，`model_route_key` 已绑定 ModelRouter，SkillPolicy 已进入 Skill 调用前权限校验。
 - 风险策略仍停留在 confirmation 字段和 confirmation_gate，尚未进入统一 GovernancePolicy。
 - 前端仍保留 intent 展示 label/icon，但阶段业务语义已以后端 Catalog 为准。
 
@@ -85,14 +85,16 @@ src/agent_forge/skills/dispatcher.py
 
 - 内置 Skill 和 MCP tool 可以注册到 SkillRegistry。
 - SkillExecutionEngine 实现 ReAct tool_use 循环。
-- SkillDispatcher 支持超时、SSE 事件、tracing。
-- DB 中的 enabled Skill 可被 `get_enabled_tool_defs()` 过滤，但主执行路径当前使用 `get_all_tool_defs()`。
+- SkillDispatcher 支持超时、SSE 事件、tracing、权限校验、审计和 `skill_eval` 事件。
+- `SkillInstaller` 支持外部 Skill import preview/install，安装前展示来源、工具、权限、风险和确认要求。
+- `SkillManifest` 支持 `agentforge-skill.yaml` 优先、`skill.md` 兼容，统一生成 `SkillRuntimeSpec`。
+- `SkillRegistry` 保存 runtime spec 和 tool -> skill 映射，安装后可刷新第三方 Skill executor。
 
 缺口：
 
-- SkillRegistry 只保存 tool_defs 和 executor，没有统一 SkillRuntimeSpec。
-- 外部 Skill 导入缺少完整 Manifest / 权限 / 风险 / 审计闭环。
-- Skill 调用前还没有统一 SkillPolicy。
+- DB 中的 enabled Skill 可被 `get_enabled_tool_defs()` 过滤，但主执行路径当前使用 `get_all_tool_defs()`。
+- StageDefinition.skill_policy_key、AgentProfile.allowed_skill_names 与 SkillPolicy 的组合过滤留给 TASK-032。
+- MCP Tool 尚未全部归一化成带权限声明的 SkillRuntimeSpec。
 
 ### 2.4 LLM Provider
 
@@ -230,7 +232,7 @@ can_restore
 
 - `default_agent_selector` 已绑定到真实 AgentProfile。
 - `model_route_key` 已绑定到真实 ModelRoute。
-- TASK-031 将 `skill_policy_key` 绑定到真实 SkillPolicy。
+- `skill_policy_key` 仍需在 TASK-032 中接入统一 Governance / SkillPolicy 编排。
 
 ### 3.4 AgentProfile
 
@@ -260,7 +262,7 @@ enabled
 后续收敛：
 
 - AgentProfile 的 model_name / default_model_route_key 已交给 ModelRouter 做 fallback。
-- TASK-031 将 AgentProfile 的 allowed_skill_names 交给 SkillPolicy。
+- AgentProfile 的 allowed_skill_names 仍需在 TASK-032 中交给统一 SkillPolicy 编排。
 - `UserAgentSettings` 继续负责个人助手展示名，不等同于 AgentProfile。
 
 ### 3.5 ModelRoute
@@ -314,13 +316,16 @@ audit_level
 当前映射：
 
 - `Skill` DB 模型记录管理态 Skill。
-- `SkillRegistry` 记录 tool_defs 和 executor。
-- `SkillInstaller` 支持安装流程，但运行时权限尚未闭环。
+- `Skill` DB 模型记录 manifest_hash、permissions、runtime_spec 和 audit_level。
+- `SkillInstall` 记录安装预览、manifest_hash、permissions 和 risk_level。
+- `SkillRegistry` 记录 tool_defs、executor、runtime_spec 和 tool -> skill 映射。
+- `SkillInstaller` 支持本地、Git/GitHub、PyPI 源的安装前预览；本地安装会复制到 `skills/installed/` 并刷新 registry。
+- `SkillDispatcher` 调用前检查权限，调用后写审计并发出 `skill_eval` 事件。
 
 后续收敛：
 
-- TASK-031 定义 Manifest parser、RuntimeSpec 和 SkillPolicy。
-- SkillDispatcher 调用前检查权限，调用后写审计和 EvalEvent。
+- TASK-032 将 StageDefinition.skill_policy_key、AgentProfile.allowed_skill_names 和高风险确认接入 GovernancePolicy。
+- TASK-033 将 `skill_eval` 事件沉淀为结构化 EvalEvent。
 
 ### 3.7 GovernanceDecision
 
@@ -424,10 +429,10 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 |----------|----------|----------|----------|
 | ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | TASK-032 |
 | IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | TASK-032 |
-| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-031 |
-| AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | TASK-031 |
+| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-032 |
+| AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | TASK-032 |
 | ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | TASK-033 |
-| SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`mcp/client.py` | tool defs + executor，缺权限和 manifest | TASK-031 |
+| SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py` | Manifest、权限、runtime spec、registry 刷新和调用审计已落地；Stage 级策略编排待接入 | TASK-032 |
 | GovernanceDecision | `pipeline/service.py`、`harness/`、Delivery 确认 | 阶段确认和交付确认存在，策略未统一 | TASK-032 |
 | EvalFeedback | tracing、LLMResponse、Delivery report | 有零散指标，缺结构化 EvalEvent | TASK-033 |
 | 架构文档 | `docs/architecture/`、`docs/tech-design/` | 核心闭环文档已存在，AI Runtime 主线新增 | TASK-034 |
@@ -480,10 +485,13 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 
 目标：外部 Skill 导入必须经过 Manifest、权限、注册、调用、审计。
 
+完成状态：已落地 `src/agent_forge/skills/manifest.py`、`runtime_spec.py`、`policy.py`、`017_skill_runtime_policy.py`、`/api/v1/skills/import/preview`、`/api/v1/skills/import/install`、前端导入预览和 SkillDispatcher 权限审计。
+
 不做：
 
 - 不默认允许任意第三方 Skill 执行本地命令。
 - 不把市场展示等同于运行时可用。
+- 不在本任务完成 Stage 级 Skill 策略编排和统一人工确认策略。
 
 ### TASK-032: GovernancePolicy
 
@@ -517,9 +525,9 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
-| Agent 配置空转 | 已进入 StageRuntime；后续需接入 SkillPolicy | TASK-031 |
+| Agent 配置空转 | 已进入 StageRuntime；后续需接入 Stage 级 SkillPolicy 编排 | TASK-032 |
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | TASK-033 |
-| Skill 安全边界不足 | 第三方 Skill 缺权限和审计闭环 | TASK-031 |
+| Skill 安全边界不足 | Manifest、权限、风险和调用审计已落地；统一高风险确认仍待 Governance 收敛 | TASK-032 |
 | 人工确认逻辑分散 | 高风险动作可能漏确认 | TASK-032 |
 | 长期优化无数据 | 无法知道哪个阶段慢、贵、失败率高 | TASK-033 |
 | 文档和代码分叉 | 新人和 Agent 误读系统状态 | TASK-034 |

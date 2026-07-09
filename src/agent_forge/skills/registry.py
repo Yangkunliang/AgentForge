@@ -26,6 +26,10 @@ class SkillRegistry:
         self._tool_defs: dict[str, list[dict]] = {}
         # tool function name → async callable
         self._executors: dict[str, Callable[..., Awaitable[Any]]] = {}
+        # tool function name → skill_name
+        self._tool_to_skill: dict[str, str] = {}
+        # skill_name → runtime spec dict
+        self._runtime_specs: dict[str, dict[str, Any]] = {}
 
     @classmethod
     def get_instance(cls) -> "SkillRegistry":
@@ -40,6 +44,7 @@ class SkillRegistry:
         skill_name: str,
         tool_defs: list[dict],
         executors: dict[str, Callable[..., Awaitable[Any]]],
+        runtime_spec: dict[str, Any] | None = None,
     ) -> None:
         """注册一个 Skill 的 tool 定义和执行函数。
 
@@ -50,6 +55,10 @@ class SkillRegistry:
         """
         self._tool_defs[skill_name] = tool_defs
         self._executors.update(executors)
+        for td in tool_defs:
+            self._tool_to_skill[td["function"]["name"]] = skill_name
+        if runtime_spec:
+            self._runtime_specs[skill_name] = runtime_spec
         logger.info(
             "SkillRegistry: registered '%s' with tools=%s",
             skill_name,
@@ -60,7 +69,10 @@ class SkillRegistry:
         """卸载 Skill（安装/卸载后调用）"""
         tool_defs = self._tool_defs.pop(skill_name, [])
         for td in tool_defs:
-            self._executors.pop(td["function"]["name"], None)
+            tool_name = td["function"]["name"]
+            self._executors.pop(tool_name, None)
+            self._tool_to_skill.pop(tool_name, None)
+        self._runtime_specs.pop(skill_name, None)
         logger.info("SkillRegistry: unregistered '%s'", skill_name)
 
     # ── 查询 ────────────────────────────────────────────────
@@ -99,6 +111,12 @@ class SkillRegistry:
     def get_executor(self, tool_function_name: str) -> Callable[..., Awaitable[Any]] | None:
         """根据 tool function name 获取执行函数"""
         return self._executors.get(tool_function_name)
+
+    def get_skill_name_for_tool(self, tool_function_name: str) -> str | None:
+        return self._tool_to_skill.get(tool_function_name)
+
+    def get_runtime_spec(self, skill_name: str) -> dict[str, Any] | None:
+        return self._runtime_specs.get(skill_name)
 
     def list_registered(self) -> list[str]:
         """列出已注册的 Skill 名称"""

@@ -7,6 +7,9 @@ import pytest
 import asyncio
 from unittest.mock import patch, AsyncMock
 
+from sqlalchemy import select
+
+from agent_forge.models import AuditLog
 from agent_forge.skills.dispatcher import SkillDispatcher, SKILL_TIMEOUT_SECONDS
 from agent_forge.skills.registry import get_skill_registry
 
@@ -168,3 +171,64 @@ class TestSkillDispatcher:
         assert skill_called_data["args"] == {"key": "value"}
 
         registry.unregister("test-skill")
+
+    async def test_invoke_denies_disallowed_permission_by_default_and_writes_audit(self, db_session):
+        events = []
+
+        async def on_event(event_type, data):
+            events.append((event_type, data))
+
+        registry = get_skill_registry()
+
+        async def shell_executor(**kwargs):
+            return {"result": "should not run"}
+
+        tool_def = {
+            "type": "function",
+            "function": {
+                "name": "shell_tool",
+                "description": "Shell tool",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+        registry.register(
+            skill_name="external-shell",
+            tool_defs=[tool_def],
+            executors={"shell_tool": shell_executor},
+            runtime_spec={
+                "name": "external-shell",
+                "version": "1.0.0",
+                "source_type": "local",
+                "manifest_hash": "abc123",
+                "permissions": ["shell"],
+                "executor_kind": "python",
+                "audit_level": "standard",
+            },
+        )
+
+        dispatcher = SkillDispatcher()
+        result = await dispatcher.invoke(
+            tool_name="shell_tool",
+            tool_call_id="policy-id",
+            arguments={},
+            on_event=on_event,
+            user_id="test-user-001",
+            db=db_session,
+        )
+
+        parsed = json.loads(result)
+        assert "error" in parsed
+        assert "权限" in parsed["error"]
+
+        audit_result = await db_session.execute(
+            select(AuditLog)
+            .where(AuditLog.resource == "skill")
+            .where(AuditLog.action == "skill.invoke.denied")
+        )
+        audit = audit_result.scalar_one()
+        assert audit.details["skill_name"] == "external-shell"
+        assert audit.details["permission"] == ["shell"]
+        assert audit.status == "denied"
+        assert "skill_eval" in [event[0] for event in events]
+
+        registry.unregister("external-shell")

@@ -737,7 +737,7 @@ Authorization: Bearer <token>
 | `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
 | `stages[].default_agent_selector` | AgentResolver 的默认选择线索，StageRuntime 会据此选择 AgentProfile。 |
 | `stages[].model_route_key` | StageRuntime 实际解析到的 ModelRoute key。 |
-| `stages[].skill_policy_key` | 后续 SkillPolicy 的策略 key，TASK-031 接入 Skill Runtime 权限过滤。 |
+| `stages[].skill_policy_key` | 后续 SkillPolicy 的策略 key；TASK-031 已接入 Skill 调用前权限过滤，阶段级策略编排留给 TASK-032。 |
 
 ---
 
@@ -1155,7 +1155,8 @@ Authorization: Bearer <token>   (需要 admin 权限)
 
 {
   "source": "git+https://github.com/user/my-skill.git",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "confirm_risk": false
 }
 ```
 
@@ -1164,7 +1165,79 @@ Authorization: Bearer <token>   (需要 admin 权限)
 {
   "install_id": "install-001",
   "skill_name": "my-skill",
-  "status": "pending"
+  "status": "pending",
+  "manifest_hash": "sha256...",
+  "permissions": ["network"],
+  "risk_level": "medium"
+}
+```
+
+### 5.1.1 预览第三方 Skill 导入
+
+```http
+POST /api/v1/skills/import/preview
+Authorization: Bearer <token>   (需要 admin 权限)
+
+{
+  "source": "/Users/me/skills/safe-echo",
+  "version": "1.0.0"
+}
+```
+
+支持本地目录、GitHub URL、通用 Git URL 和 PyPI 包名。后端优先读取 `agentforge-skill.yaml`，兼容旧 `skill.md`。
+
+**响应 200**:
+```json
+{
+  "name": "safe-echo",
+  "version": "1.0.0",
+  "description": "Echo a message.",
+  "source": "/Users/me/skills/safe-echo",
+  "source_type": "local",
+  "manifest_hash": "sha256...",
+  "permissions": ["network", "project_context"],
+  "risk_level": "medium",
+  "requires_confirmation": false,
+  "tools": [
+    {
+      "name": "safe_echo",
+      "description": "Echo a message.",
+      "parameters": {
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  ],
+  "audit_level": "standard"
+}
+```
+
+### 5.1.2 安装已预览 Skill
+
+```http
+POST /api/v1/skills/import/install
+Authorization: Bearer <token>   (需要 admin 权限)
+
+{
+  "source": "/Users/me/skills/safe-echo",
+  "version": "1.0.0",
+  "confirm_risk": false
+}
+```
+
+高风险权限（`filesystem`、`shell`、`credential`）未确认时响应 `409`：
+
+```json
+{
+  "detail": {
+    "code": "SKILL_PERMISSION_CONFIRMATION_REQUIRED",
+    "preview": {
+      "name": "shell-skill",
+      "permissions": ["shell"],
+      "risk_level": "high"
+    }
+  }
 }
 ```
 
@@ -1205,6 +1278,13 @@ Authorization: Bearer <token>
       "version": "1.0.0",
       "description": "代码质量审查",
       "entry_point": "code_review.main",
+      "manifest_hash": "sha256...",
+      "permissions": ["network"],
+      "runtime_spec": {
+        "name": "code-review",
+        "tool_defs": []
+      },
+      "audit_level": "standard",
       "installed_at": "2026-06-17T10:00:00Z"
     }
   ]

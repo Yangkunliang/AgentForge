@@ -95,6 +95,10 @@ export interface Skill {
   icon_url?: string
   tags: string[]
   github_url?: string
+  manifest_hash?: string | null
+  permissions: string[]
+  runtime_spec?: Record<string, unknown>
+  audit_level?: string
 }
 
 export interface MarketplaceSkill {
@@ -126,6 +130,28 @@ export interface SkillInstall {
 export interface InstallSkillForm {
   source: string
   version?: string
+  confirm_risk?: boolean
+}
+
+export interface SkillImportToolPreview {
+  name: string
+  description: string
+  parameters: Record<string, unknown>
+}
+
+export interface SkillImportPreview {
+  name: string
+  version: string
+  description: string
+  source: string
+  source_type: string
+  manifest_hash: string
+  permissions: string[]
+  tools: SkillImportToolPreview[]
+  risk_level: 'low' | 'medium' | 'high'
+  requires_confirmation: boolean
+  audit_level?: string
+  warnings: string[]
 }
 
 // Dashboard 相关

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent_forge.database import get_async_session
 from agent_forge.models import User
 from agent_forge.skills.installer import SkillInstaller
+from agent_forge.skills.manifest import SkillManifestError
 from agent_forge.skills.manager import SkillManager
 from middleware.auth import get_current_user, require_permission
 
@@ -25,18 +27,21 @@ logger = logging.getLogger("agent_forge")
 class InstallSkillRequest(BaseModel):
     source: str
     version: str | None = None
+    confirm_risk: bool = False
 
     @field_validator("source")
     @classmethod
     def validate_source(cls, v: str) -> str:
-        """白名单验证：只允许 GitHub HTTPS URL 或 PyPI 合规包名"""
+        """白名单验证：允许 GitHub HTTPS URL、PyPI 包名或存在的本地目录。"""
         if re.match(r"^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", v):
             return v
         if re.match(r"^git\+https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", v):
             return v
+        if os.path.isdir(v):
+            return v
         if re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$", v):
             return v
-        raise ValueError("Invalid source. Only GitHub HTTPS URLs or PyPI package names allowed.")
+        raise ValueError("Invalid source. Only GitHub HTTPS URLs, local directories, or PyPI package names allowed.")
 
 
 class SkillResponse(BaseModel):
@@ -50,6 +55,10 @@ class SkillResponse(BaseModel):
     icon_url: str | None
     tags: list[str]
     github_url: str | None
+    manifest_hash: str | None = None
+    permissions: list[str] = []
+    runtime_spec: dict = Field(default_factory=dict)
+    audit_level: str = "standard"
 
 
 class InstallStatusResponse(BaseModel):
@@ -63,6 +72,39 @@ class InstallTaskCreated(BaseModel):
     install_id: str
     skill_name: str
     status: str
+    manifest_hash: str | None = None
+    permissions: list[str] = []
+    risk_level: str | None = None
+
+
+class SkillImportPreviewRequest(BaseModel):
+    source: str = Field(..., min_length=1, max_length=500)
+    version: str | None = None
+
+
+class SkillImportInstallRequest(SkillImportPreviewRequest):
+    confirm_risk: bool = False
+
+
+class SkillImportToolPreview(BaseModel):
+    name: str
+    description: str
+    parameters: dict = Field(default_factory=dict)
+
+
+class SkillImportPreviewResponse(BaseModel):
+    name: str
+    version: str
+    description: str
+    source: str
+    source_type: str
+    manifest_hash: str
+    permissions: list[str]
+    tools: list[SkillImportToolPreview]
+    risk_level: str
+    requires_confirmation: bool
+    audit_level: str = "standard"
+    warnings: list[str] = []
 
 
 class MarketplaceSkill(BaseModel):
@@ -104,10 +146,55 @@ async def list_skills(
             icon_url=s.icon_url,
             tags=s.tags or [],
             github_url=s.github_url,
+            manifest_hash=s.manifest_hash,
+            permissions=s.permissions or [],
+            runtime_spec=s.runtime_spec or {},
+            audit_level=s.audit_level,
         ).model_dump()
         for s in skills
     ]
     return {"total": len(items), "items": items}
+
+
+# ── 第三方 Skill 导入 Preview / Install ───────────────────────
+
+@router.post("/import/preview", response_model=SkillImportPreviewResponse, summary="预览第三方 Skill 导入风险")
+async def preview_skill_import(
+    body: SkillImportPreviewRequest,
+    _: User = Depends(require_permission("admin")),
+) -> dict:
+    try:
+        preview = await SkillInstaller.preview_import(body.source, body.version)
+    except SkillManifestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return preview.to_dict()
+
+
+@router.post("/import/install", status_code=status.HTTP_201_CREATED, summary="安装已预览的第三方 Skill")
+async def install_skill_import(
+    body: SkillImportInstallRequest,
+    db: AsyncSession = Depends(get_async_session),
+    _: User = Depends(require_permission("admin")),
+) -> dict:
+    try:
+        install_task = await SkillInstaller.install_from_source(
+            db,
+            body.source,
+            body.version,
+            confirm_risk=body.confirm_risk,
+        )
+    except SkillManifestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError:
+        await _raise_skill_permission_confirmation_required(body.source, body.version)
+    return InstallTaskCreated(
+        install_id=install_task.id,
+        skill_name=install_task.skill_name,
+        status=install_task.status,
+        manifest_hash=install_task.manifest_hash,
+        permissions=install_task.permissions or [],
+        risk_level=install_task.risk_level,
+    ).model_dump()
 
 
 # ── 安装进度查询 ──────────────────────────────────────────────
@@ -145,11 +232,24 @@ async def install_skill(
     - PyPI 包名（如 `agentforge-skill-calculator`）→ pip install
     - 本地路径（如 `/path/to/my-skill`）→ 本地目录注册
     """
-    install_task = await SkillInstaller.start_install(db, body.source, body.version)
+    try:
+        install_task = await SkillInstaller.install_from_source(
+            db,
+            body.source,
+            body.version,
+            confirm_risk=body.confirm_risk,
+        )
+    except SkillManifestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError:
+        await _raise_skill_permission_confirmation_required(body.source, body.version)
     return InstallTaskCreated(
         install_id=install_task.id,
         skill_name=install_task.skill_name,
         status=install_task.status,
+        manifest_hash=install_task.manifest_hash,
+        permissions=install_task.permissions or [],
+        risk_level=install_task.risk_level,
     ).model_dump()
 
 
@@ -164,12 +264,37 @@ async def install_skill_from_url(
             status_code=400,
             detail="GitHub URL 必须以 https://github.com/ 或 git+https://github.com/ 开头",
         )
-    install_task = await SkillInstaller.start_install(db, body.source, body.version)
+    try:
+        install_task = await SkillInstaller.install_from_source(
+            db,
+            body.source,
+            body.version,
+            confirm_risk=body.confirm_risk,
+        )
+    except SkillManifestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError:
+        await _raise_skill_permission_confirmation_required(body.source, body.version)
     return InstallTaskCreated(
         install_id=install_task.id,
         skill_name=install_task.skill_name,
         status=install_task.status,
+        manifest_hash=install_task.manifest_hash,
+        permissions=install_task.permissions or [],
+        risk_level=install_task.risk_level,
     ).model_dump()
+
+
+async def _raise_skill_permission_confirmation_required(source: str, version: str | None) -> None:
+    preview = await SkillInstaller.preview_import(source, version)
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "SKILL_PERMISSION_CONFIRMATION_REQUIRED",
+            "message": "该 Skill 声明了高风险权限，需要用户确认后安装",
+            "preview": preview.to_dict(),
+        },
+    )
 
 
 # ── 启用 / 禁用 Skill ─────────────────────────────────────────

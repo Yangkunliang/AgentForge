@@ -26,6 +26,10 @@ class SkillManager:
         description: str,
         entry_point: str | None = None,
         manifest: dict | None = None,
+        manifest_hash: str | None = None,
+        permissions: list[str] | None = None,
+        runtime_spec: dict | None = None,
+        audit_level: str = "standard",
         dependencies: list[str] | None = None,
         source_type: str = "builtin",
         github_url: str | None = None,
@@ -43,6 +47,20 @@ class SkillManager:
                 existing.entry_point = entry_point
             if manifest:
                 existing.manifest = manifest
+            if manifest_hash is not None:
+                existing.manifest_hash = manifest_hash
+            if permissions is not None:
+                existing.permissions = permissions
+            if runtime_spec is not None:
+                existing.runtime_spec = runtime_spec
+            existing.audit_level = audit_level
+            existing.source_type = source_type
+            if github_url is not None:
+                existing.github_url = github_url
+            if tags is not None:
+                existing.tags = tags
+            if icon_url is not None:
+                existing.icon_url = icon_url
             await db.commit()
             cls._skill_cache[name] = existing.__dict__.copy()
             return existing
@@ -55,6 +73,10 @@ class SkillManager:
             description=description,
             entry_point=entry_point,
             manifest=manifest or {},
+            manifest_hash=manifest_hash,
+            permissions=permissions or [],
+            runtime_spec=runtime_spec or {},
+            audit_level=audit_level,
             dependencies=dependencies or [],
             source_type=source_type,
             github_url=github_url,

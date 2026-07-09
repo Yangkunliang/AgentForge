@@ -58,6 +58,21 @@ export const useSkillStore = defineStore('skill', () => {
     return data
   }
 
+  async function previewSkillImport(form: InstallSkillForm) {
+    const { data } = await skillsApi.previewImport(form)
+    return data
+  }
+
+  async function installSkillImport(form: InstallSkillForm) {
+    const { data } = await skillsApi.installImport(form)
+    installingTasks.value.set(data.install_id, {
+      install_id: data.install_id,
+      skill_name: data.skill_name,
+      status: data.status as SkillInstall['status'],
+    })
+    return data
+  }
+
   async function pollInstallStatus(installId: string) {
     const { data } = await skillsApi.getInstallStatus(installId)
     const task = installingTasks.value.get(installId)
@@ -106,6 +121,8 @@ export const useSkillStore = defineStore('skill', () => {
     // install tasks
     installingTasks,
     installSkill,
+    previewSkillImport,
+    installSkillImport,
     pollInstallStatus,
     removeInstallTask,
     // marketplace
