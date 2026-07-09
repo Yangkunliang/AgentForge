@@ -118,6 +118,7 @@ async function syncProjectMounts(projectId?: string | null) {
 }
 
 onMounted(async () => {
+  await pipelineStore.fetchCatalog()
   await projectStore.fetchProjects()
   await syncProjectMounts(projectStore.currentProjectId)
   await sessionStore.fetchSessions(projectStore.currentProjectId)

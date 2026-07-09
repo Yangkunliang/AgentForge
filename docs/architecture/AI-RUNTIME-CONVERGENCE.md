@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-027，代码里的主链路已经具备 Project-first 基础，但还没有完全收敛成统一 AI Runtime Contract。
+截至 TASK-028，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义收敛到后端 Catalog；Agent、Model、Skill、Governance 和 Eval 仍需要继续进入统一 AI Runtime Contract。
 
 ### 2.1 请求到执行
 
@@ -42,8 +42,8 @@ src/api/routes/sessions.py
 ### 2.2 Pipeline 状态机
 
 ```text
-src/agent_forge/pipeline/config.py
-  -> PIPELINE_CONFIGS
+src/agent_forge/pipeline/catalog.py
+  -> PIPELINE_CATALOG
 src/agent_forge/pipeline/service.py
   -> create_pipeline_run_for_session()
   -> PipelineRun + PipelineStageState
@@ -55,17 +55,18 @@ src/agent_forge/pipeline/runtime.py
 
 现状：
 
-- `PIPELINE_CONFIGS` 是当前阶段配置源。
+- `PIPELINE_CATALOG` 是 intent -> StageDefinition 的后端唯一事实源。
 - `PipelineRun` 记录 intent、状态、current_stage_id。
 - `PipelineStageState` 记录阶段状态、是否 required、是否 confirmation_required。
-- `StageRuntime` 负责 stage started / completed / failed 与 SSE。
+- `StageRuntime` 从 Catalog 读取 StageDefinition，负责 stage started / completed / failed 与 SSE。
 - confirmation_required 阶段完成后进入 `waiting_confirmation`。
+- 前端通过 `/api/v1/pipeline/catalog` 读取阶段定义、默认动作和 placeholder。
 
 缺口：
 
-- StageDefinition 还不够丰富，缺少输出物类型、默认 Agent、模型路由、Skill policy、风险策略等字段。
-- 前端和后端仍可能各自承载部分阶段展示语义。
-- Pipeline Catalog API 尚未成为前端唯一事实源。
+- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key，但这些 key 还没有绑定真实 AgentResolver、ModelRouter 和 SkillPolicy。
+- 风险策略仍停留在 confirmation 字段和 confirmation_gate，尚未进入统一 GovernancePolicy。
+- 前端仍保留 intent 展示 label/icon，但阶段业务语义已以后端 Catalog 为准。
 
 ### 2.3 Skill Runtime
 
@@ -167,7 +168,7 @@ audit_context
 
 后续收敛：
 
-- TASK-028 以后 StageRuntime 应显式接收或构建 ProjectRuntimeContext。
+- TASK-029 以后 StageRuntime 应显式接收或构建 ProjectRuntimeContext。
 - Delivery 和 SkillPolicy 复用同一授权边界。
 
 ### 3.2 IntentDecision
@@ -192,7 +193,7 @@ pipeline_key
 
 后续收敛：
 
-- TASK-028 可先保持规则分类，但 Pipeline Catalog 应把 intent 到阶段的映射服务化。
+- Pipeline Catalog 已把 intent 到阶段的映射服务化；后续可把 confidence、reason 和 risk_level 写入 PipelineRun metadata 或独立 IntentDecision 表。
 - 未来可把 confidence、reason 和 risk_level 写入 PipelineRun metadata 或独立 IntentDecision 表。
 
 ### 3.3 StageDefinition
@@ -219,13 +220,15 @@ can_restore
 
 当前映射：
 
-- `StageConfig(stage_id, stage_name, required, confirmation_required)` 已存在。
+- `StageDefinition(stage_id, stage_name, description, required, confirmation_required, output_artifact_types, default_agent_selector, model_route_key, skill_policy_key)` 已存在。
 - `PipelineStageState` 保存阶段运行状态。
+- `Pipeline Catalog API` 已向前端提供 intent 对应阶段、确认策略和默认快捷动作。
 
 后续收敛：
 
-- TASK-028 将 `StageConfig` 升级为后端 Pipeline Catalog。
-- 前端从 Catalog API 读取阶段定义，不再复制核心业务语义。
+- TASK-029 将 `default_agent_selector` 绑定到真实 AgentProfile。
+- TASK-030 将 `model_route_key` 绑定到真实 ModelRoute。
+- TASK-031 将 `skill_policy_key` 绑定到真实 SkillPolicy。
 
 ### 3.4 AgentProfile
 
@@ -414,9 +417,9 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 
 | 目标对象 | 当前代码 | 当前状态 | 下一任务 |
 |----------|----------|----------|----------|
-| ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | TASK-028 |
-| IntentDecision | `pipeline/config.py`、`sessions.py` | intent_type 已落地，缺 confidence/reason/risk | TASK-028 |
-| StageDefinition | `StageConfig`、`PipelineStageState` | 仅有阶段名、必选、确认字段 | TASK-028 |
+| ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | TASK-029 |
+| IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | TASK-029 |
+| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义 | TASK-029 |
 | AgentProfile | `models/agent.py`、`UserAgentSettings` | 管理态 Agent 存在，未绑定 StageRuntime | TASK-029 |
 | ModelRoute | `llm/provider.py`、`config.py`、`api_key.py` | 全局模型配置，缺 route/credential 分层 | TASK-030 |
 | SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`mcp/client.py` | tool defs + executor，缺权限和 manifest | TASK-031 |
@@ -438,6 +441,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 ### TASK-028: Pipeline Stage Catalog
 
 目标：把 `PIPELINE_CONFIGS` 升级为后端阶段目录，让前端和 StageRuntime 消费同一份 StageDefinition。
+
+完成状态：已落地 `src/agent_forge/pipeline/catalog.py` 和 `/api/v1/pipeline/catalog`，StageRuntime、PipelineService 和前端 Pipeline Store 均消费后端 Catalog。
 
 不做：
 
@@ -502,7 +507,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
-| 阶段语义漂移 | 前后端阶段配置各自演化 | TASK-028 |
+| 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
 | Agent 配置空转 | 创建 Agent 后用户不知道作用在哪里 | TASK-029 |
 | 模型配置不可治理 | 多 provider、多密钥、多阶段策略难维护 | TASK-030 |
 | Skill 安全边界不足 | 第三方 Skill 缺权限和审计闭环 | TASK-031 |

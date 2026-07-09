@@ -257,6 +257,47 @@ export interface ChatAdvancedPayload {
   stage_overrides?: Record<string, boolean>
 }
 
+// Pipeline Catalog（后端阶段事实源）
+export interface PipelineQuickAction {
+  id: string
+  label: string
+  prompt: string
+  highlighted?: boolean
+}
+
+export interface PipelineStageDefinition {
+  stage_id: string
+  stage_name: string
+  description: string
+  order_index: number
+  required: boolean
+  confirmation_required: boolean
+  confirmation_policy: {
+    required: boolean
+    type: string
+    gate?: string | null
+  }
+  output_artifact_types: string[]
+  default_agent_selector: string
+  model_route_key: string
+  skill_policy_key: string
+  can_skip: boolean
+  can_restore: boolean
+}
+
+export interface PipelineIntentCatalog {
+  intent_type: ChatIntentType
+  label: string
+  description: string
+  placeholder: string
+  stages: PipelineStageDefinition[]
+  default_actions: PipelineQuickAction[]
+}
+
+export interface PipelineCatalogResponse {
+  items: PipelineIntentCatalog[]
+}
+
 // Pipeline 运行态（TASK-015）
 export type PipelineStageStatus =
   | 'pending'

@@ -672,6 +672,75 @@ GET /api/v1/sessions/{session_id}/messages
 
 ---
 
+## Pipeline Catalog API
+
+Pipeline Catalog 是 intent -> StageDefinition 的后端事实源。前端用于渲染需求类型阶段、默认快捷动作和输入 placeholder；StageRuntime 和 PipelineService 用同一份定义创建阶段状态并补充运行上下文。
+
+```http
+GET /api/v1/pipeline/catalog
+GET /api/v1/pipeline/catalog/{intent_type}
+Authorization: Bearer <token>
+```
+
+`intent_type` 支持 `new_feature`、`iteration`、`ui_adjust`、`bug_fix`。未知 intent 在单项查询中返回 404；运行时创建 PipelineRun 时未知 intent 仍按兼容逻辑回退到 `iteration`。
+
+列表响应：
+
+```json
+{
+  "items": [
+    {
+      "intent_type": "iteration",
+      "label": "迭代优化",
+      "description": "改现有逻辑、范围局部、不新增核心实体时使用。",
+      "placeholder": "描述你的迭代需求，例如：优化订单列表加载性能...",
+      "stages": [
+        {
+          "stage_id": "diff",
+          "stage_name": "需求 Diff",
+          "description": "描述本次变化和旧行为差异。",
+          "order_index": 0,
+          "required": true,
+          "confirmation_required": true,
+          "confirmation_policy": {
+            "required": true,
+            "type": "stage_output",
+            "gate": "diff_review"
+          },
+          "output_artifact_types": ["diff"],
+          "default_agent_selector": "planner",
+          "model_route_key": "default",
+          "skill_policy_key": "default",
+          "can_skip": false,
+          "can_restore": false
+        }
+      ],
+      "default_actions": [
+        {
+          "id": "analyze_diff",
+          "label": "分析需求变更",
+          "prompt": "帮我分析这次需求变更的具体内容和影响范围。",
+          "highlighted": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+字段说明：
+
+| 字段 | 说明 |
+|------|------|
+| `stages[].required` | 是否为必需阶段；只有 `false` 阶段允许 skip/restore。 |
+| `stages[].confirmation_policy` | 当前阶段确认策略，`gate` 后续接入 GovernancePolicy。 |
+| `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
+| `stages[].default_agent_selector` | 后续 AgentResolver 的默认选择线索，TASK-029 接入真实 AgentProfile。 |
+| `stages[].model_route_key` | 后续 ModelRouter 的路由 key，TASK-030 接入 Provider / Model / Credential / Route。 |
+| `stages[].skill_policy_key` | 后续 SkillPolicy 的策略 key，TASK-031 接入 Skill Runtime 权限过滤。 |
+
+---
+
 ## PipelineRun / StageState API
 
 PipelineRun 是一次 Session 内按需求类型生成的阶段计划；PipelineStageState 是每个阶段的运行时状态。所有接口按当前登录用户隔离，访问其他用户的 run 返回 404。

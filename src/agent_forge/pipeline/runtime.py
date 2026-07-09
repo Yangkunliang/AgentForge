@@ -17,6 +17,7 @@ from agent_forge.api.sse import (
 )
 from agent_forge.database import async_session_factory
 from agent_forge.models import PipelineRun, PipelineStageState
+from agent_forge.pipeline.catalog import get_stage_definition, stage_definition_to_dict
 from agent_forge.pipeline.service import (
     complete_stage,
     fail_stage,
@@ -128,7 +129,8 @@ class StageRuntime:
             if stage and stage.status == "waiting_confirmation":
                 return None, None, "waiting_confirmation"
 
-            confirmation_context = _confirmation_context(stage)
+            stage_definition = get_stage_definition(run.intent_type, stage_id)
+            confirmation_context = _confirmation_context(stage, stage_definition)
             if stage and stage.status == "pending":
                 start_stage(run, stage_id)
                 await db.commit()
@@ -214,15 +216,18 @@ def _find_stage(run: PipelineRun, stage_id: str) -> PipelineStageState | None:
     return next((stage for stage in run.stages if stage.stage_id == stage_id), None)
 
 
-def _confirmation_context(stage: PipelineStageState | None) -> dict | None:
+def _confirmation_context(stage: PipelineStageState | None, stage_definition: Any | None = None) -> dict | None:
     if not stage or not stage.confirmation_feedback:
         return None
-    return {
+    context = {
         "stage_id": stage.stage_id,
         "stage_name": stage.stage_name,
         "feedback": stage.confirmation_feedback,
         "action": stage.confirmation_action,
     }
+    if stage_definition:
+        context["stage_definition"] = stage_definition_to_dict(stage_definition, stage.order_index)
+    return context
 
 
 def _merge_confirmation_context(base: dict | None, confirmation: dict | None) -> dict | None:

@@ -1,12 +1,25 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { pipelineCatalogApi } from '@/api/modules/pipelineCatalog'
 import { pipelineRunsApi } from '@/api/modules/pipelineRuns'
-import type { ChatIntentType, PipelineRun, StageConfirmationAction } from '@/types'
+import type { ChatIntentType, PipelineIntentCatalog, PipelineRun, StageConfirmationAction } from '@/types'
 
 export const usePipelineStore = defineStore('pipeline', () => {
   const currentRun = ref<PipelineRun | null>(null)
+  const catalog = ref<Record<ChatIntentType, PipelineIntentCatalog | undefined>>({
+    new_feature: undefined,
+    iteration: undefined,
+    ui_adjust: undefined,
+    bug_fix: undefined,
+  })
   const loading = ref(false)
+  const catalogLoading = ref(false)
+  const catalogLoaded = ref(false)
   const mutatingStageId = ref<string | null>(null)
+
+  const catalogItems = computed(() =>
+    Object.values(catalog.value).filter((item): item is PipelineIntentCatalog => Boolean(item)),
+  )
 
   function setCurrentRun(run: PipelineRun | null) {
     currentRun.value = run
@@ -31,6 +44,31 @@ export const usePipelineStore = defineStore('pipeline', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  async function fetchCatalog(force = false) {
+    if (catalogLoaded.value && !force) return catalogItems.value
+    catalogLoading.value = true
+    try {
+      const { data } = await pipelineCatalogApi.list()
+      catalog.value = {
+        new_feature: undefined,
+        iteration: undefined,
+        ui_adjust: undefined,
+        bug_fix: undefined,
+      }
+      for (const item of data.items) {
+        catalog.value[item.intent_type] = item
+      }
+      catalogLoaded.value = true
+      return catalogItems.value
+    } finally {
+      catalogLoading.value = false
+    }
+  }
+
+  function catalogForIntent(intentType: ChatIntentType): PipelineIntentCatalog | null {
+    return catalog.value[intentType] ?? null
   }
 
   async function createForSession(
@@ -112,10 +150,16 @@ export const usePipelineStore = defineStore('pipeline', () => {
 
   return {
     currentRun,
+    catalog,
+    catalogItems,
     loading,
+    catalogLoading,
+    catalogLoaded,
     mutatingStageId,
     setCurrentRun,
     clearRun,
+    fetchCatalog,
+    catalogForIntent,
     fetchRun,
     createForSession,
     skipStage,

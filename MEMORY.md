@@ -9,7 +9,7 @@
 
 ## 技术设计文档 (docs/tech-design/)
 - [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
-- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
+- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
 - [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
 - [SECURITY.md](docs/tech-design/SECURITY.md) — 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测 + tool_call 分级）、Skill 沙箱分级、审计日志
 - [SANDBOX-RESEARCH.md](docs/tech-design/SANDBOX-RESEARCH.md) — 沙箱机制技术调研报告（方案一 Docker vs 方案二 CubeSandbox，含对比表格与选型依据）
@@ -96,6 +96,7 @@
 - TASK-025 已完成：zip Delivery preview/apply/download API、deterministic zip sha256、manifest/report、下载权限隔离、过期清理、`delivery.zip.*` 审计事件和 Artifact Viewer zip 包模式已落地。
 - TASK-026 已完成：Upload Mount multipart 上传 API、manifest 范围读取、Bridge/Chat 上下文读取、路径/数量/大小/扩展名限制、`upload_mount.*` 审计、Project 创建向导上传模式和 ContextPicker upload 文件源已落地。
 - TASK-027 已完成：新增 AI Runtime 收敛架构基线，明确 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路、当前代码映射、目标运行时契约和 TASK-028～TASK-034 迁移边界。
+- TASK-028 已完成：新增 `src/agent_forge/pipeline/catalog.py` 和 `/api/v1/pipeline/catalog`，将 intent -> StageDefinition 收敛为后端唯一事实源；StageRuntime、PipelineService 与前端 Pipeline Store 已消费 Catalog，阶段定义包含确认策略、输出产物类型、默认 Agent selector、ModelRoute key 和 SkillPolicy key。
 
 ---
 

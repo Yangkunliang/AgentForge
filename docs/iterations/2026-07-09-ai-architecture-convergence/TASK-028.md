@@ -16,7 +16,7 @@ acceptance:
   - 后端能按 intent_type 返回阶段定义
   - StageRuntime 使用后端 StageDefinition
   - 前端核心阶段展示从 API 读取，不重复维护业务事实源
-status: todo
+status: done
 ```
 
 ## 背景
@@ -56,7 +56,17 @@ uv run --extra dev pytest tests/api/test_pipeline_catalog.py
 ```
 
 ```bash
+uv run --extra dev pytest tests/api/test_pipeline_catalog.py tests/api/test_pipeline_runs.py tests/pipeline/test_runtime.py
+```
+
+```bash
 npm run build
 ```
 
 前端命令在 `/Users/yangkl/AgentForge/web` 下执行。
+
+后端启动验证：
+
+```bash
+JWT_SECRET_KEY=task028-local-startup-secret uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18090
+```

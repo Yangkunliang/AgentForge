@@ -15,7 +15,7 @@
 | 任务 | 标题 | 模块 | 优先级 | 依赖 | 状态 |
 |------|------|------|--------|------|------|
 | [TASK-027](TASK-027.md) | AI Runtime Baseline 与契约文档 | architecture | P0 | none | done |
-| [TASK-028](TASK-028.md) | Pipeline Stage Catalog 后端唯一事实源 | pipeline | P0 | TASK-027 | todo |
+| [TASK-028](TASK-028.md) | Pipeline Stage Catalog 后端唯一事实源 | pipeline | P0 | TASK-027 | done |
 | [TASK-029](TASK-029.md) | Agent Profile 运行时绑定 | agents, pipeline | P0 | TASK-027, TASK-028 | todo |
 | [TASK-030](TASK-030.md) | LLM Provider / Model / Credential / Route | llm, settings | P0 | TASK-027, TASK-029 | todo |
 | [TASK-031](TASK-031.md) | 第三方 Skill 导入与运行时闭环 | skills | P1 | TASK-027, TASK-030 | todo |

@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from agent_forge.models import PipelineRun, PipelineStageState
 from agent_forge.models.session import Session
-from agent_forge.pipeline.config import PIPELINE_CONFIGS, normalize_intent
+from agent_forge.pipeline.catalog import get_stage_definitions_for_intent, normalize_intent
 
 TERMINAL_STAGE_STATUSES = {"completed", "skipped"}
 
@@ -77,7 +77,7 @@ async def create_pipeline_run_for_session(
 
     stages: list[PipelineStageState] = []
     overrides = stage_overrides or {}
-    for index, config in enumerate(PIPELINE_CONFIGS[normalized_intent]):
+    for index, config in enumerate(get_stage_definitions_for_intent(normalized_intent)):
         skipped_by_user = overrides.get(config.stage_id) is False and not config.required
         stage = PipelineStageState(
             id=str(uuid.uuid4()),

@@ -38,7 +38,7 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 | ✅ |
-| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
+| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
 | [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
 | [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
 | [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
@@ -102,7 +102,7 @@ docs/
 | TASK-024 | 2026-07-08 | GitHub PR Delivery | ✅ 已完成 |
 | TASK-025 | 2026-07-08 | zip Delivery Package | ✅ 已完成 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
-| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-027 已完成，TASK-028 待执行 |
+| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-028 已完成，TASK-029 待执行 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
