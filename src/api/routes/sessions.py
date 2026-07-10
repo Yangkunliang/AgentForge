@@ -78,6 +78,12 @@ class ContextFileItem(BaseModel):
     mount_id: str | None = Field(default=None, max_length=50)
 
 
+class SkillAuthorizationRequest(BaseModel):
+    authorized_skill_names: list[str] = Field(default_factory=list, max_length=20)
+    authorized_permissions: list[str] = Field(default_factory=list, max_length=20)
+    source: str = Field(default="user_confirmation", max_length=80)
+
+
 class ChatRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=50000, description="用户消息（最多 50000 字符）")
     intent: Literal["new_feature", "iteration", "ui_adjust", "bug_fix"] | None = Field(
@@ -91,6 +97,10 @@ class ChatRequest(BaseModel):
     stage_overrides: dict[str, bool] = Field(
         default_factory=dict,
         description="执行阶段开关覆盖，false 表示用户显式跳过",
+    )
+    skill_authorization: SkillAuthorizationRequest | None = Field(
+        default=None,
+        description="当前阶段一次性 Skill 授权上下文",
     )
 
 
@@ -378,6 +388,10 @@ async def _build_advanced_context(
         ]
     if body.stage_overrides:
         context["stage_overrides"] = body.stage_overrides
+    if body.skill_authorization:
+        authorization = body.skill_authorization.model_dump()
+        if authorization["authorized_skill_names"] or authorization["authorized_permissions"]:
+            context["skill_authorization"] = authorization
     return context
 
 

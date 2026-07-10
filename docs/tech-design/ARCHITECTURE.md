@@ -6,7 +6,7 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
-> 当前状态（TASK-038）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
+> 当前状态（TASK-039）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
 
 ## 2. 整体架构
 

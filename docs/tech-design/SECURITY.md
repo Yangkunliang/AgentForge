@@ -719,6 +719,7 @@ TASK-023 后，GitHub OAuth Mount 使用服务端加密凭据表保存 access to
 - TASK-036 后，MCP 外部工具也必须进入 SkillRuntimeSpec 权限模型；未声明 permissions 的 MCP Server 默认视为未知高风险，避免第三方工具通过 MCP 注册绕过 Stage 级工具过滤。
 - TASK-037 后，内置 Skill 也必须进入 SkillRuntimeSpec 权限模型；`http_request`、`update_profile`、`code_executor` 默认不暴露给 LLM，除非当前阶段的高风险授权上下文明示放行。
 - TASK-038 后，高风险 Skill 临时授权只通过 `advanced_context.skill_authorization` 影响当前 StageRuntime；授权不会越过 AgentSkill allowlist，也不会持久化为长期权限。运行时过滤报告会记录授权 Skill 和权限，便于后续审计与 Eval 分析。
+- TASK-039 后，前端只会对 `permission_denied` 且已绑定到当前 Agent 的 Skill 展示授权卡；`agent_not_allowed` 不会触发授权提示。`skill_authorization_required` SSE 不携带用户源码或消息正文。
 
 ---
 

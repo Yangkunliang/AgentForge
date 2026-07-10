@@ -161,10 +161,11 @@ TASK-016 已补充：
 TASK-017 已补充：
 
 - `web/src/components/chat/ConfirmCard.vue`：聊天消息区内的人工确认节点，支持确认继续、提交修改意见、终止需求。
+- `web/src/components/chat/SkillAuthorizationCard.vue`：聊天消息区内的高风险 Skill 授权节点，展示需要授权的 Skill 和权限，用户确认后触发本阶段一次性授权重试。
 - `web/src/api/modules/pipelineRuns.ts`：新增 `confirmStage(runId, stageId, { action, feedback })`。
 - `web/src/stores/pipeline.ts`：新增 `confirmStage` action，并复用 `mutatingStageId` 标记确认请求中的阶段。
-- `web/src/composables/useChat.ts`：处理 `confirm_required` / `confirm_resolved` SSE，刷新 PipelineRun 和待确认 Artifact。
-- `web/src/views/chat/Index.vue`：按当前 `PipelineRun.stages[].status=waiting_confirmation` 渲染 ConfirmCard，并从 Project Artifact 缓存匹配待确认产物。
+- `web/src/composables/useChat.ts`：处理 `confirm_required` / `confirm_resolved` / `skill_authorization_required` SSE，刷新 PipelineRun、待确认 Artifact，并保存一次性高风险 Skill 授权请求。
+- `web/src/views/chat/Index.vue`：按当前 `PipelineRun.stages[].status=waiting_confirmation` 渲染 ConfirmCard，并从 Project Artifact 缓存匹配待确认产物；当收到 `skill_authorization_required` 时渲染 SkillAuthorizationCard，确认后用同一条消息和一次性授权 payload 重试。
 
 TASK-019 已补充：
 

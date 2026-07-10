@@ -436,6 +436,112 @@ async def test_stage_runtime_passes_temporary_high_risk_skill_authorization(
 
 
 @pytest.mark.asyncio
+async def test_stage_runtime_emits_skill_authorization_required_for_bound_high_risk_skill(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+):
+    user_id = fake_user.id
+    project = Project(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="high-risk-skill-event-runtime-test",
+        tech_tags=["FastAPI"],
+        status="active",
+    )
+    session = Session(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        project_id=project.id,
+        title="高风险 Skill 授权事件会话",
+        intent_type="bug_fix",
+    )
+    agent = Agent(
+        id=str(uuid.uuid4()),
+        name=f"High Risk Event Agent {uuid.uuid4()}",
+        capabilities=["testing"],
+        model="claude-3-sonnet",
+        status="active",
+    )
+    shell_skill = Skill(
+        id=str(uuid.uuid4()),
+        name=f"event-shell-skill-{uuid.uuid4().hex[:8]}",
+        version="1.0.0",
+        description="shell skill requiring runtime authorization",
+        permissions=["shell"],
+        runtime_spec={},
+        enabled=True,
+        source_type="local",
+    )
+    agent_skill = AgentSkill(agent_id=agent.id, skill_id=shell_skill.id, enabled=True)
+    db_session.add_all([project, session, agent, shell_skill, agent_skill])
+    await db_session.commit()
+    agent_id = agent.id
+    shell_skill_name = shell_skill.name
+
+    shell_tool = _tool_def("runtime_event_shell_tool")
+    registry = get_skill_registry()
+    registry.register(
+        skill_name=shell_skill_name,
+        tool_defs=[shell_tool],
+        executors={"runtime_event_shell_tool": _test_executor},
+        runtime_spec={
+            "name": shell_skill_name,
+            "version": "1.0.0",
+            "source_type": "local",
+            "manifest_hash": "event-shell-runtime-hash",
+            "permissions": ["shell"],
+            "executor_kind": "python",
+        },
+    )
+
+    events: list[tuple[str, dict]] = []
+
+    async def capture_event(event_type: str, data: dict) -> None:
+        events.append((event_type, data))
+
+    try:
+        run = await create_pipeline_run_for_session(db_session, session, "bug_fix")
+        await db_session.commit()
+        run_id = run.id
+
+        fake_engine = FakeSkillEngine()
+        runtime = StageRuntime(engine=fake_engine, session_factory=test_session_factory)
+
+        chunks = []
+        async for chunk in runtime.run_current_stage(
+            task_id="task-high-risk-skill-event-runtime",
+            pipeline_run_id=run_id,
+            user_id=user_id,
+            user_message="需要执行一次测试命令",
+            conversation_history=[],
+            tools=[shell_tool],
+            llm=object(),
+            config=object(),
+            sse_publish=capture_event,
+            agent_name="CodeSoul",
+            advanced_context={"intent": "bug_fix", "agent_profile_id": agent_id},
+        ):
+            chunks.append(chunk)
+    finally:
+        registry.unregister(shell_skill_name)
+
+    assert chunks == ["stage output"]
+    assert fake_engine.kwargs is not None
+    assert fake_engine.kwargs["tools"] == []
+    [event] = [item for item in events if item[0] == "skill_authorization_required"]
+    assert event[1]["pipeline_run_id"] == run_id
+    assert event[1]["stage_id"] == "locate"
+    assert event[1]["skills"] == [
+        {
+            "skill_name": shell_skill_name,
+            "tool_name": "runtime_event_shell_tool",
+            "permissions": ["shell"],
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_stage_runtime_records_resolved_model_route_and_passes_config(
     db_session: AsyncSession,
     test_session_factory,

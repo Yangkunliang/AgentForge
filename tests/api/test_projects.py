@@ -450,3 +450,53 @@ def test_chat_context_hydrates_selected_mount_file_content(
     assert context_item["source"] == "project_mount"
     assert context_item["content"] == "def checkout():\n    return 'ok'\n"
     assert context_item["content_truncated"] is False
+
+
+def test_chat_payload_passes_temporary_skill_authorization(
+    async_client: TestClient,
+    fake_user: User,
+    monkeypatch,
+):
+    captured: dict = {}
+
+    def capture_run_task_with_skills(**kwargs):
+        captured.update(kwargs)
+
+        async def noop():
+            return None
+
+        return noop()
+
+    monkeypatch.setattr("api.routes.sessions._run_task_with_skills", capture_run_task_with_skills)
+
+    project = async_client.post(
+        "/api/v1/projects",
+        json={"name": "授权上下文项目"},
+        headers=_auth_headers(fake_user),
+    ).json()
+    session = async_client.post(
+        f"/api/v1/projects/{project['id']}/sessions",
+        json={"title": "高风险授权", "intent_type": "bug_fix"},
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    resp = async_client.post(
+        f"/api/v1/sessions/{session['id']}/chat",
+        json={
+            "content": "授权后运行测试",
+            "intent": "bug_fix",
+            "skill_authorization": {
+                "authorized_skill_names": ["code-executor"],
+                "authorized_permissions": ["shell"],
+                "source": "user_confirmation",
+            },
+        },
+        headers=_auth_headers(fake_user),
+    )
+
+    assert resp.status_code == 202
+    assert captured["advanced_context"]["skill_authorization"] == {
+        "authorized_skill_names": ["code-executor"],
+        "authorized_permissions": ["shell"],
+        "source": "user_confirmation",
+    }

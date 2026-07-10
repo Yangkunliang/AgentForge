@@ -7,6 +7,7 @@ import IntentSelector from '@/components/chat/IntentSelector.vue'
 import ProjectBar from '@/components/chat/ProjectBar.vue'
 import QuickActions from '@/components/chat/QuickActions.vue'
 import SessionSidebar from '@/components/chat/SessionSidebar.vue'
+import SkillAuthorizationCard from '@/components/chat/SkillAuthorizationCard.vue'
 import StagePreview from '@/components/chat/StagePreview.vue'
 import WelcomeScreen from '@/components/chat/WelcomeScreen.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
@@ -70,7 +71,13 @@ const sessionDrawerVisible = ref(false)
 
 const sessionId = ref(route.params.sessionId as string | undefined)
 
-const { sending, sendMessage: _send, abort: abortStream } = useChat()
+const {
+  sending,
+  sendMessage: _send,
+  abort: abortStream,
+  skillAuthorizationRequest,
+  clearSkillAuthorizationRequest,
+} = useChat()
 
 function isChatIntentType(value: string | null | undefined): value is ChatIntentType {
   return value === 'new_feature'
@@ -239,6 +246,28 @@ async function send() {
 
 function stopStreaming() {
   abortStream()
+}
+
+async function authorizeSkillRequest() {
+  const request = skillAuthorizationRequest.value
+  if (!request || sending.value) return
+  const authorizedSkillNames = [...new Set(request.skills.map((skill) => skill.skill_name))]
+  const authorizedPermissions = [
+    ...new Set(request.skills.flatMap((skill) => skill.permissions)),
+  ].filter(Boolean)
+  clearSkillAuthorizationRequest()
+  await _send(
+    request.content,
+    request.sessionId,
+    {
+      ...(request.advancedPayload ?? {}),
+      skill_authorization: {
+        authorized_skill_names: authorizedSkillNames,
+        authorized_permissions: authorizedPermissions,
+        source: 'user_confirmation',
+      },
+    },
+  )
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -427,6 +456,14 @@ function removePendingImage(idx: number) {
           :stage="waitingConfirmationStage"
           :artifact="waitingConfirmationArtifact"
           @resolved="handleConfirmationResolved"
+        />
+
+        <SkillAuthorizationCard
+          v-if="skillAuthorizationRequest"
+          :request="skillAuthorizationRequest"
+          :busy="sending"
+          @authorize="authorizeSkillRequest"
+          @dismiss="clearSkillAuthorizationRequest"
         />
       </div>
 

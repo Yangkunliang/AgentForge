@@ -20,12 +20,18 @@ import { useSessionStore } from '@/stores/session'
 import { useAuthStore } from '@/stores/auth'
 import { usePipelineStore } from '@/stores/pipeline'
 import { useArtifactStore } from '@/stores/artifact'
-import type { ChatAdvancedPayload, SSEEvent } from '@/types'
+import type {
+  ChatAdvancedPayload,
+  SSEEvent,
+  SkillAuthorizationItem,
+  SkillAuthorizationRequest,
+} from '@/types'
 
 export function useChat(sessionId?: string) {
   const sessionStore = useSessionStore()
   const pipelineStore = usePipelineStore()
   const sending = ref(false)
+  const skillAuthorizationRequest = ref<SkillAuthorizationRequest | null>(null)
   let currentController: AbortController | null = null
 
   async function sendMessage(
@@ -36,6 +42,7 @@ export function useChat(sessionId?: string) {
     const targetId = id ?? sessionId
     if (!content.trim() || sending.value || !targetId) return null
     sending.value = true
+    skillAuthorizationRequest.value = null
 
     // 乐观更新：立即显示用户消息 + 空 assistant 占位
     const assistantMsg = sessionStore.appendUserMessage(content)
@@ -59,7 +66,18 @@ export function useChat(sessionId?: string) {
       }
 
       // 订阅 SSE，监听执行过程
-      currentController = await _subscribeSSE(taskId, localId)
+      currentController = await _subscribeSSE(
+        taskId,
+        localId,
+        (request) => {
+          skillAuthorizationRequest.value = {
+            ...request,
+            sessionId: targetId,
+            content,
+            advancedPayload,
+          }
+        },
+      )
 
       // 更新会话排序（置顶）
       sessionStore.bumpCurrentSession()
@@ -77,7 +95,11 @@ export function useChat(sessionId?: string) {
     currentController = null
   }
 
-  return { sending, sendMessage, abort }
+  function clearSkillAuthorizationRequest() {
+    skillAuthorizationRequest.value = null
+  }
+
+  return { sending, sendMessage, abort, skillAuthorizationRequest, clearSkillAuthorizationRequest }
 }
 
 // ── 本地意图拦截 ─────────────────────────────────────────────
@@ -172,7 +194,13 @@ async function _typeReply(
   sessionStore.finalizeAssistantMessage(localId, text)
 }
 
-async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<AbortController> {
+async function _subscribeSSE(
+  taskId: string,
+  localAssistantId: string,
+  onSkillAuthorizationRequired?: (
+    request: Omit<SkillAuthorizationRequest, 'sessionId' | 'content' | 'advancedPayload'>
+  ) => void,
+): Promise<AbortController> {
   const sessionStore = useSessionStore()
   const pipelineStore = usePipelineStore()
   const artifactStore = useArtifactStore()
@@ -232,6 +260,19 @@ async function _subscribeSSE(taskId: string, localAssistantId: string): Promise<
                 const artifactId = event.data.artifact_id as string | undefined
                 if (artifactId) {
                   void artifactStore.fetchArtifact(artifactId)
+                }
+                break
+              }
+
+              case 'skill_authorization_required': {
+                const skills = _normalizeSkillAuthorizationItems(event.data.skills)
+                if (skills.length > 0) {
+                  onSkillAuthorizationRequired?.({
+                    task_id: event.data.task_id as string | undefined,
+                    pipeline_run_id: event.data.pipeline_run_id as string | undefined,
+                    stage_id: event.data.stage_id as string | undefined,
+                    skills,
+                  })
                 }
                 break
               }
@@ -416,6 +457,31 @@ async function _refreshProfile(): Promise<void> {
   } catch {
     console.log('[useChat] refresh profile failed')
   }
+}
+
+function _normalizeSkillAuthorizationItems(value: unknown): SkillAuthorizationItem[] {
+  if (!Array.isArray(value)) return []
+  const result: SkillAuthorizationItem[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const record = item as Record<string, unknown>
+    const skillName = String(record.skill_name ?? '').trim()
+    const toolName = String(record.tool_name ?? '').trim()
+    if (!skillName || !toolName) continue
+    const permissions = Array.isArray(record.permissions)
+      ? record.permissions.map((permission) => String(permission).trim()).filter(Boolean)
+      : []
+    const key = `${skillName}:${toolName}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push({
+      skill_name: skillName,
+      tool_name: toolName,
+      permissions: [...new Set(permissions)],
+    })
+  }
+  return result
 }
 
 function _parseSSE(chunk: string): SSEEvent | null {

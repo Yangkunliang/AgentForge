@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from inspect import isawaitable
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
@@ -105,6 +106,13 @@ class StageRuntime:
                     ),
                     authorized_skill_names=authorized_skill_names,
                     authorized_permissions=authorized_permissions,
+                )
+                await _emit_skill_authorization_required(
+                    task_id=task_id,
+                    pipeline_run_id=pipeline_run_id,
+                    stage_id=active_stage_id,
+                    skill_filter_report=skill_filter_report,
+                    sse_publish=sse_publish,
                 )
             async_gen = await self.engine.run(
                 user_message=user_message,
@@ -438,6 +446,57 @@ def _skill_authorization_from_context(context: dict | None) -> tuple[list[str], 
         authorization.get("authorized_permissions") or authorization.get("permissions")
     )
     return skill_names, permissions
+
+
+async def _emit_skill_authorization_required(
+    *,
+    task_id: str,
+    pipeline_run_id: str | None,
+    stage_id: str | None,
+    skill_filter_report: SkillToolFilterReport | None,
+    sse_publish: SsePublisher,
+) -> None:
+    if not pipeline_run_id or not stage_id or not skill_filter_report:
+        return
+    skills = _authorization_required_skills(skill_filter_report)
+    if not skills:
+        return
+    result = sse_publish(
+        "skill_authorization_required",
+        {
+            "task_id": task_id,
+            "pipeline_run_id": pipeline_run_id,
+            "stage_id": stage_id,
+            "skills": skills,
+        },
+    )
+    if isawaitable(result):
+        await result
+
+
+def _authorization_required_skills(report: SkillToolFilterReport) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    seen: set[tuple[str | None, str]] = set()
+    for item in report.excluded_tools:
+        if item.get("reason") != "permission_denied":
+            continue
+        tool_name = str(item.get("tool_name") or "").strip()
+        skill_name_value = item.get("skill_name")
+        skill_name = str(skill_name_value).strip() if skill_name_value else None
+        if not tool_name or not skill_name:
+            continue
+        key = (skill_name, tool_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(
+            {
+                "skill_name": skill_name,
+                "tool_name": tool_name,
+                "permissions": list(item.get("permissions") or []),
+            }
+        )
+    return result
 
 
 def _string_list_from_context(value: Any) -> list[str]:

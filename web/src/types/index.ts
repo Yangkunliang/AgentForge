@@ -288,6 +288,29 @@ export interface ChatAdvancedPayload {
       mount_id?: string
   }>
   stage_overrides?: Record<string, boolean>
+  skill_authorization?: SkillAuthorizationPayload
+}
+
+export interface SkillAuthorizationPayload {
+  authorized_skill_names: string[]
+  authorized_permissions: string[]
+  source?: string
+}
+
+export interface SkillAuthorizationItem {
+  skill_name: string
+  tool_name: string
+  permissions: string[]
+}
+
+export interface SkillAuthorizationRequest {
+  task_id?: string
+  pipeline_run_id?: string
+  stage_id?: string
+  sessionId: string
+  content: string
+  advancedPayload?: ChatAdvancedPayload
+  skills: SkillAuthorizationItem[]
 }
 
 // Pipeline Catalog（后端阶段事实源）
@@ -424,6 +447,7 @@ export type SSEEventType =
   | 'artifact_created'
   | 'confirm_required'
   | 'confirm_resolved'
+  | 'skill_authorization_required'
   | 'session_title_updated'
   | 'heartbeat'
 

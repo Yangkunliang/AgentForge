@@ -68,6 +68,7 @@ class SSEEventTypes:
     ARTIFACT_CREATED = "artifact_created"
     CONFIRM_REQUIRED = "confirm_required"
     CONFIRM_RESOLVED = "confirm_resolved"
+    SKILL_AUTHORIZATION_REQUIRED = "skill_authorization_required"
 
     # ── 沙箱生命周期（内部，不透出给用户）────────────────────
     SANDBOX_CREATED   = "sandbox_created"

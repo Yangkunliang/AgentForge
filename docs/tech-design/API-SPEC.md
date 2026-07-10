@@ -881,6 +881,25 @@ TASK-038 后，StageRuntime 支持从 `advanced_context.skill_authorization` 读
 
 该授权只影响本次 StageRuntime 工具过滤，不写入 Agent、Skill 或 StageDefinition。`AgentProfile.allowed_skill_names` 仍优先于临时授权，因此未绑定到当前 Agent 的 Skill 不会被放行。过滤报告会在 `advanced_context.skill_policy` 中回传 `authorized_skill_names`、`authorized_permissions` 和被排除工具原因。
 
+TASK-039 后，Chat 请求体也可以携带同样的 `skill_authorization` 字段；StageRuntime 发现已绑定但被权限策略过滤的高风险 Skill 时会发出 `skill_authorization_required` SSE：
+
+```json
+{
+  "task_id": "task-id",
+  "pipeline_run_id": "run-id",
+  "stage_id": "locate",
+  "skills": [
+    {
+      "skill_name": "code-executor",
+      "tool_name": "code_executor",
+      "permissions": ["shell"]
+    }
+  ]
+}
+```
+
+前端确认后会用原消息重试，并把 `skills[].skill_name` 和 `skills[].permissions` 汇总为一次性授权 payload。
+
 ---
 
 ## LLM 设置 API
@@ -1534,6 +1553,7 @@ Cache-Control: no-cache
 | `message` | 中间进度消息 | `{ content }` |
 | `skill_called` | Skill 被调用 | `{ skill_id, input }` |
 | `skill_result` | Skill 执行结果 | `{ skill_id, result }` |
+| `skill_authorization_required` | 当前阶段有已绑定高风险 Skill 被策略过滤，需要用户确认后重试 | `{ task_id, pipeline_run_id, stage_id, skills }` |
 | `sub_task_completed` | 子任务完成 | `{ sub_task_id, result }` |
 | `task_completed` | 任务完成 | `{ task_id, result, total_cost_usd }` |
 | `task_failed` | 任务失败 | `{ task_id, error }` |
