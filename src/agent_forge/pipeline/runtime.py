@@ -29,6 +29,7 @@ from agent_forge.pipeline.service import (
 )
 from agent_forge.skills.dispatcher import SkillDispatcher
 from agent_forge.skills.engine import SkillExecutionEngine
+from agent_forge.skills.policy import SkillToolFilterReport, filter_tool_defs_for_runtime
 
 SsePublisher = Callable[[str, dict], Any]
 
@@ -66,9 +67,18 @@ class StageRuntime:
         agent_profile: AgentProfile | None = None
         model_route: ModelRouteResolution | None = None
         eval_context: dict | None = None
+        skill_policy_key: str | None = None
         stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
-            active_stage_id, confirmation_context, blocked_reason, agent_profile, model_route, eval_context = await self._start_current_stage(
+            (
+                active_stage_id,
+                confirmation_context,
+                blocked_reason,
+                agent_profile,
+                model_route,
+                eval_context,
+                skill_policy_key,
+            ) = await self._start_current_stage(
                 task_id=task_id,
                 pipeline_run_id=pipeline_run_id,
                 user_id=user_id,
@@ -81,10 +91,20 @@ class StageRuntime:
             return
 
         try:
+            effective_tools = tools
+            skill_filter_report: SkillToolFilterReport | None = None
+            if skill_policy_key or agent_profile:
+                effective_tools, skill_filter_report = filter_tool_defs_for_runtime(
+                    tools,
+                    skill_policy_key=skill_policy_key,
+                    agent_allowed_skill_names=(
+                        agent_profile.allowed_skill_names if agent_profile else None
+                    ),
+                )
             async_gen = await self.engine.run(
                 user_message=user_message,
                 conversation_history=conversation_history,
-                tools=tools,
+                tools=effective_tools,
                 llm=llm,
                 config=model_route.config if model_route else config,
                 sse_publish=sse_publish,
@@ -96,6 +116,7 @@ class StageRuntime:
                     agent_profile,
                     model_route,
                     eval_context,
+                    skill_filter_report,
                 ),
             )
 
@@ -126,7 +147,15 @@ class StageRuntime:
         user_id: str,
         fallback_agent_name: str,
         advanced_context: dict | None,
-    ) -> tuple[str | None, dict | None, str | None, AgentProfile | None, ModelRouteResolution | None, dict | None]:
+    ) -> tuple[
+        str | None,
+        dict | None,
+        str | None,
+        AgentProfile | None,
+        ModelRouteResolution | None,
+        dict | None,
+        str | None,
+    ]:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
             await emit_pipeline_started(
@@ -139,11 +168,11 @@ class StageRuntime:
 
             stage_id = run.current_stage_id
             if not stage_id:
-                return None, None, None, None, None, None
+                return None, None, None, None, None, None, None
 
             stage = _find_stage(run, stage_id)
             if stage and stage.status == "waiting_confirmation":
-                return None, None, "waiting_confirmation", None, None, None
+                return None, None, "waiting_confirmation", None, None, None, None
 
             stage_definition = get_stage_definition(run.intent_type, stage_id)
             eval_context = {
@@ -199,7 +228,15 @@ class StageRuntime:
                 pipeline_run_id=run.id,
                 stage_id=stage_id,
             )
-            return stage_id, confirmation_context, None, agent_profile, model_route, eval_context
+            return (
+                stage_id,
+                confirmation_context,
+                None,
+                agent_profile,
+                model_route,
+                eval_context,
+                stage_definition.skill_policy_key,
+            )
 
     async def _complete_stage(
         self,
@@ -359,9 +396,10 @@ def _merge_runtime_context(
     agent_profile: AgentProfile | None,
     model_route: ModelRouteResolution | None,
     eval_context: dict | None = None,
+    skill_filter_report: SkillToolFilterReport | None = None,
 ) -> dict | None:
     merged = _merge_confirmation_context(base, confirmation)
-    if not agent_profile and not model_route and not eval_context:
+    if not agent_profile and not model_route and not eval_context and not skill_filter_report:
         return merged
     runtime_context = dict(merged or {})
     if agent_profile:
@@ -370,6 +408,8 @@ def _merge_runtime_context(
         runtime_context["model_route"] = model_route.to_context()
     if eval_context:
         runtime_context["evaluation_context"] = eval_context
+    if skill_filter_report:
+        runtime_context["skill_policy"] = skill_filter_report.to_context()
     return runtime_context
 
 

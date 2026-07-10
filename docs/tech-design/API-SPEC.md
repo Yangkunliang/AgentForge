@@ -861,6 +861,8 @@ StageRuntime 启动阶段时会通过 AgentResolver 选择 AgentProfile，并写
 
 StageRuntime 启动阶段时也会通过 ModelRouter 选择 ModelRoute，并写入 `PipelineStageState.model_route_key/name/source` 和 `model_name`。解析优先级为：用户本次 `model_route_key` 覆盖 → AgentProfile 默认 route → `StageDefinition.model_route_key` → legacy settings fallback。Credential 明文只用于服务端调用 LLM，不进入 API 响应和 prompt 上下文。
 
+TASK-035 后，StageRuntime 会在调用 SkillExecutionEngine 前按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见 tools。过滤报告写入 `advanced_context.skill_policy`，其中包含 `policy_key`、输入/允许工具数量、Agent allowlist 和被排除工具的原因。SkillDispatcher 的调用前权限校验仍保留为第二道防线。
+
 ---
 
 ## LLM 设置 API

@@ -3,9 +3,50 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from agent_forge.governance import GovernancePolicy
 from agent_forge.skills.runtime_spec import normalize_permissions
+
+
+@dataclass(frozen=True, slots=True)
+class StageSkillPolicy:
+    key: str
+    allowed_permissions: tuple[str, ...]
+    allow_unregistered_tools: bool = True
+    disabled: bool = False
+
+
+@dataclass(slots=True)
+class SkillToolFilterReport:
+    policy_key: str
+    input_tool_count: int
+    allowed_tool_count: int
+    agent_allowed_skill_names: list[str] = field(default_factory=list)
+    excluded_tools: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_context(self) -> dict[str, Any]:
+        return {
+            "policy_key": self.policy_key,
+            "input_tool_count": self.input_tool_count,
+            "allowed_tool_count": self.allowed_tool_count,
+            "agent_allowed_skill_names": self.agent_allowed_skill_names,
+            "excluded_tools": self.excluded_tools,
+        }
+
+
+STAGE_SKILL_POLICIES: dict[str, StageSkillPolicy] = {
+    "default": StageSkillPolicy(
+        key="default",
+        allowed_permissions=("network", "project_context"),
+    ),
+    "no_tools": StageSkillPolicy(
+        key="no_tools",
+        allowed_permissions=(),
+        allow_unregistered_tools=False,
+        disabled=True,
+    ),
+}
 
 
 @dataclass(slots=True)
@@ -55,3 +96,100 @@ class SkillPermissionPolicy:
 
 
 DEFAULT_SKILL_PERMISSION_POLICY = SkillPermissionPolicy()
+
+
+def resolve_stage_skill_policy(policy_key: str | None) -> StageSkillPolicy:
+    key = (policy_key or "default").strip() or "default"
+    return STAGE_SKILL_POLICIES.get(key, STAGE_SKILL_POLICIES["default"])
+
+
+def filter_tool_defs_for_runtime(
+    tool_defs: list[dict],
+    *,
+    registry: Any | None = None,
+    skill_policy_key: str | None = None,
+    agent_allowed_skill_names: list[str] | None = None,
+) -> tuple[list[dict], SkillToolFilterReport]:
+    """Filter LLM-visible tool defs for a pipeline stage and AgentProfile."""
+    from agent_forge.skills.registry import get_skill_registry
+
+    skill_registry = registry or get_skill_registry()
+    policy = resolve_stage_skill_policy(skill_policy_key)
+    allowed_skill_names = _normalize_skill_names(agent_allowed_skill_names)
+    allowed_skill_set = set(allowed_skill_names)
+    filtered: list[dict] = []
+    excluded: list[dict[str, Any]] = []
+
+    for tool_def in tool_defs:
+        tool_name = _tool_name(tool_def)
+        skill_name = skill_registry.get_skill_name_for_tool(tool_name) if tool_name else None
+        runtime_spec = skill_registry.get_runtime_spec(skill_name) if skill_name else None
+        permissions = _runtime_permissions(runtime_spec)
+
+        if policy.disabled:
+            excluded.append(_excluded_tool(tool_name, skill_name, "policy_disabled", permissions))
+            continue
+
+        if allowed_skill_set and (not skill_name or skill_name not in allowed_skill_set):
+            excluded.append(_excluded_tool(tool_name, skill_name, "agent_not_allowed", permissions))
+            continue
+
+        if runtime_spec is None and not policy.allow_unregistered_tools:
+            excluded.append(_excluded_tool(tool_name, skill_name, "unregistered_tool", permissions))
+            continue
+
+        denied_permissions = [
+            permission
+            for permission in permissions
+            if permission not in policy.allowed_permissions
+        ]
+        if denied_permissions:
+            excluded.append(_excluded_tool(tool_name, skill_name, "permission_denied", permissions))
+            continue
+
+        filtered.append(tool_def)
+
+    return filtered, SkillToolFilterReport(
+        policy_key=policy.key,
+        input_tool_count=len(tool_defs),
+        allowed_tool_count=len(filtered),
+        agent_allowed_skill_names=allowed_skill_names,
+        excluded_tools=excluded,
+    )
+
+
+def _normalize_skill_names(skill_names: list[str] | None) -> list[str]:
+    result: list[str] = []
+    for skill_name in skill_names or []:
+        value = str(skill_name).strip()
+        if value and value not in result:
+            result.append(value)
+    return result
+
+
+def _tool_name(tool_def: dict) -> str:
+    function_def = tool_def.get("function") if isinstance(tool_def, dict) else None
+    if not isinstance(function_def, dict):
+        return ""
+    return str(function_def.get("name") or "").strip()
+
+
+def _runtime_permissions(runtime_spec: dict[str, Any] | None) -> list[str]:
+    try:
+        return normalize_permissions(list((runtime_spec or {}).get("permissions") or []))
+    except ValueError:
+        return ["credential"]
+
+
+def _excluded_tool(
+    tool_name: str,
+    skill_name: str | None,
+    reason: str,
+    permissions: list[str],
+) -> dict[str, Any]:
+    return {
+        "tool_name": tool_name,
+        "skill_name": skill_name,
+        "reason": reason,
+        "permissions": permissions,
+    }

@@ -109,6 +109,7 @@
 - TASK-032 已完成：新增 `src/agent_forge/governance/policy.py` 和 `018_governance_confirmation_context.py`；`PipelineStageState` 记录确认类型、原因、影响范围和审计 payload；Pipeline 阶段确认、Delivery 未确认拒绝和高风险 Skill 调用拒绝均写入 `governance_decision`；ConfirmCard 渲染服务端策略生成的确认原因与影响范围。
 - TASK-033 已完成：新增 `src/agent_forge/evaluation/service.py`、`src/agent_forge/models/evaluation.py` 和 `019_eval_events.py`；StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 会以非阻塞方式写入 `EvalEvent`；新增 `/api/v1/evaluation/summary`、Dashboard evaluation 指标和 `eval_events` / `evaluation` JSONL 导出类型。
 - TASK-034 已完成：更新 Agent 模型、核心开发闭环、AI Runtime 主线、ARCHITECTURE、LLM-CONFIG、API-SPEC、DATABASE、SECURITY、DATA-EXPORT、docs README、MEMORY、CLAUDE，并新增 AI Runtime 迭代复盘；当前推荐阅读路径是 `docs/README.md` → `docs/architecture/AI-RUNTIME-CONVERGENCE.md` → `docs/iterations/2026-07-09-ai-architecture-convergence/ITERATION-REVIEW.md`。
+- TASK-035 已完成：新增 `filter_tool_defs_for_runtime()` 和 StageSkillPolicy 过滤报告；AgentResolver 从 `agent_skills` 生成 `AgentProfile.allowed_skill_names`；StageRuntime 调用 SkillExecutionEngine 前按阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 tools，SkillDispatcher 权限校验继续作为第二道防线。
 
 ---
 

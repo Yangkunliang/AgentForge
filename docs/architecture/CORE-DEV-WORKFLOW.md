@@ -89,7 +89,7 @@ TASK-012 路线图和状态纠偏
 
 ```text
 创建项目 -> 创建会话 -> 选择需求类型 -> 生成阶段计划
--> 选择 AgentProfile / ModelRoute / SkillRuntime
+-> 选择 AgentProfile / ModelRoute / StageSkillPolicy / SkillRuntime
 -> 完成一个阶段 -> 保存产物 -> 人工确认 -> 进入下一阶段
 -> 查看产物 -> 将结果交付到本地、GitHub PR 或 zip 包
 -> 通过 Eval Feedback 复盘成功率、耗时和失败原因

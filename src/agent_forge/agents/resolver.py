@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_forge.models import Agent
+from agent_forge.models import Agent, AgentSkill, Skill
 from agent_forge.pipeline.catalog import StageDefinition
 
 SYSTEM_AGENT_PROFILE_ID = "system-default"
@@ -60,16 +60,16 @@ async def resolve_agent_profile(
 
     override = await _get_active_agent_by_id(db, user_override_agent_id)
     if override:
-        return _profile_from_agent(override, "user_override")
+        return await _profile_from_agent(db, override, "user_override")
 
     project_default = await _get_active_agent_by_id(db, project_default_agent_id)
     if project_default:
-        return _profile_from_agent(project_default, "project_default")
+        return await _profile_from_agent(db, project_default, "project_default")
 
     selector = stage_definition.default_agent_selector if stage_definition else None
     stage_agent = await _get_active_agent_by_selector(db, selector)
     if stage_agent:
-        return _profile_from_agent(stage_agent, "stage_default")
+        return await _profile_from_agent(db, stage_agent, "stage_default")
 
     return AgentProfile(
         id=SYSTEM_AGENT_PROFILE_ID,
@@ -131,7 +131,7 @@ async def _get_active_agent_by_selector(db: AsyncSession, selector: str | None) 
     return None
 
 
-def _profile_from_agent(agent: Agent, source: str) -> AgentProfile:
+async def _profile_from_agent(db: AsyncSession, agent: Agent, source: str) -> AgentProfile:
     return AgentProfile(
         id=agent.id,
         name=agent.name,
@@ -139,8 +139,22 @@ def _profile_from_agent(agent: Agent, source: str) -> AgentProfile:
         capabilities=list(agent.capabilities or []),
         model_name=agent.model,
         default_model_route_key=DEFAULT_MODEL_ROUTE_KEY,
-        allowed_skill_names=[],
+        allowed_skill_names=await _get_agent_allowed_skill_names(db, agent.id),
     )
+
+
+async def _get_agent_allowed_skill_names(db: AsyncSession, agent_id: str) -> list[str]:
+    result = await db.execute(
+        select(Skill.name)
+        .join(AgentSkill, AgentSkill.skill_id == Skill.id)
+        .where(
+            AgentSkill.agent_id == agent_id,
+            AgentSkill.enabled == True,  # noqa: E712
+            Skill.enabled == True,  # noqa: E712
+        )
+        .order_by(Skill.name.asc())
+    )
+    return list(result.scalars().all())
 
 
 def _agent_matches_selector(agent: Agent, selector: str | None) -> bool:

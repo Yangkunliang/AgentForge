@@ -10,18 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.models import (
     Agent,
+    AgentSkill,
     Artifact,
     LLMCredential,
     LLMModelSetting,
     LLMProviderSetting,
     LLMRoute,
     Project,
+    Skill,
     User,
 )
 from agent_forge.models.session import Message, Session
 from agent_forge.pipeline.service import create_pipeline_run_for_session, get_pipeline_run_for_user_or_404
 from agent_forge.pipeline.runtime import StageRuntime
 from agent_forge.security.credentials import encrypt_secret
+from agent_forge.skills.registry import get_skill_registry
 
 
 class FakeSkillEngine:
@@ -37,6 +40,21 @@ class FakeSkillEngine:
             yield "stage output"
 
         return _chunks()
+
+
+def _tool_def(name: str) -> dict:
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": f"{name} test tool",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    }
+
+
+async def _test_executor(**_kwargs):
+    return {"ok": True}
 
 
 @pytest.mark.asyncio
@@ -179,6 +197,136 @@ async def test_stage_runtime_records_resolved_agent_profile(
     stage_by_id = {stage.stage_id: stage for stage in refreshed.stages}
     assert stage_by_id["locate"].agent_profile_id == agent_id
     assert stage_by_id["locate"].agent_profile_name == agent_name
+
+
+@pytest.mark.asyncio
+async def test_stage_runtime_filters_tools_by_stage_policy_and_agent_allowed_skills(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+):
+    user_id = fake_user.id
+    project = Project(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="skill-policy-runtime-test",
+        tech_tags=["FastAPI"],
+        status="active",
+    )
+    session = Session(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        project_id=project.id,
+        title="Skill Policy 运行时会话",
+        intent_type="bug_fix",
+    )
+    agent = Agent(
+        id=str(uuid.uuid4()),
+        name=f"Policy Agent {uuid.uuid4()}",
+        capabilities=["research"],
+        model="claude-3-sonnet",
+        status="active",
+    )
+    safe_skill = Skill(
+        id=str(uuid.uuid4()),
+        name=f"safe-skill-{uuid.uuid4().hex[:8]}",
+        version="1.0.0",
+        description="safe project context skill",
+        permissions=["project_context"],
+        runtime_spec={},
+        enabled=True,
+        source_type="local",
+    )
+    shell_skill = Skill(
+        id=str(uuid.uuid4()),
+        name=f"shell-skill-{uuid.uuid4().hex[:8]}",
+        version="1.0.0",
+        description="shell skill",
+        permissions=["shell"],
+        runtime_spec={},
+        enabled=True,
+        source_type="local",
+    )
+    agent_skill = AgentSkill(agent_id=agent.id, skill_id=safe_skill.id, enabled=True)
+    db_session.add_all([project, session, agent, safe_skill, shell_skill, agent_skill])
+    await db_session.commit()
+    agent_id = agent.id
+    safe_skill_name = safe_skill.name
+    shell_skill_name = shell_skill.name
+
+    safe_tool = _tool_def("runtime_safe_tool")
+    shell_tool = _tool_def("runtime_shell_tool")
+    registry = get_skill_registry()
+    registry.register(
+        skill_name=safe_skill_name,
+        tool_defs=[safe_tool],
+        executors={"runtime_safe_tool": _test_executor},
+        runtime_spec={
+            "name": safe_skill_name,
+            "version": "1.0.0",
+            "source_type": "local",
+            "manifest_hash": "safe-runtime-hash",
+            "permissions": ["project_context"],
+            "executor_kind": "python",
+        },
+    )
+    registry.register(
+        skill_name=shell_skill_name,
+        tool_defs=[shell_tool],
+        executors={"runtime_shell_tool": _test_executor},
+        runtime_spec={
+            "name": shell_skill_name,
+            "version": "1.0.0",
+            "source_type": "local",
+            "manifest_hash": "shell-runtime-hash",
+            "permissions": ["shell"],
+            "executor_kind": "python",
+        },
+    )
+
+    try:
+        run = await create_pipeline_run_for_session(db_session, session, "bug_fix")
+        await db_session.commit()
+        run_id = run.id
+
+        fake_engine = FakeSkillEngine()
+        runtime = StageRuntime(engine=fake_engine, session_factory=test_session_factory)
+
+        chunks = []
+        async for chunk in runtime.run_current_stage(
+            task_id="task-skill-policy-runtime",
+            pipeline_run_id=run_id,
+            user_id=user_id,
+            user_message="分析报错",
+            conversation_history=[],
+            tools=[safe_tool, shell_tool],
+            llm=object(),
+            config=object(),
+            sse_publish=lambda _event_type, _data: None,
+            agent_name="CodeSoul",
+            advanced_context={"intent": "bug_fix", "agent_profile_id": agent_id},
+        ):
+            chunks.append(chunk)
+    finally:
+        registry.unregister(safe_skill_name)
+        registry.unregister(shell_skill_name)
+
+    assert chunks == ["stage output"]
+    assert fake_engine.kwargs is not None
+    assert [tool["function"]["name"] for tool in fake_engine.kwargs["tools"]] == ["runtime_safe_tool"]
+    policy_context = fake_engine.kwargs["advanced_context"]["skill_policy"]
+    assert policy_context["policy_key"] == "default"
+    assert policy_context["input_tool_count"] == 2
+    assert policy_context["allowed_tool_count"] == 1
+    assert policy_context["agent_allowed_skill_names"] == [safe_skill_name]
+    assert policy_context["excluded_tools"] == [
+        {
+            "tool_name": "runtime_shell_tool",
+            "skill_name": shell_skill_name,
+            "reason": "agent_not_allowed",
+            "permissions": ["shell"],
+        }
+    ]
 
 
 @pytest.mark.asyncio

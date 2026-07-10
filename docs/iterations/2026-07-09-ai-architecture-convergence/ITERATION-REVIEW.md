@@ -74,7 +74,7 @@ rg -n "AI Runtime|ModelRoute|AgentProfile|SkillRuntime|EvalFeedback" docs MEMORY
 
 | 风险 | 当前状态 | 建议后续 |
 |------|----------|----------|
-| Stage 级 Skill 白名单 | SkillPolicy 已有权限校验，高风险权限会走 Governance；StageDefinition.skill_policy_key 与 AgentProfile.allowed_skill_names 还未统一过滤工具列表 | 增强 SkillPolicy.resolve(stage, agent) 并让 SkillExecutionEngine 使用过滤后的 tool_defs |
+| Stage 级 Skill 白名单 | TASK-035 已完成 StageSkillPolicy 工具过滤，StageRuntime 会按阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 tools | 后续可做高风险 Skill 临时授权 |
 | LLM token/cost 明细 | ModelRoute 已进入运行时，EvalEvent 有 token/cost 字段；LLMProvider 级细粒度写入还可继续增强 | 在 LLM 调用完成后写入 `llm_completed` EvalEvent |
 | Artifact 运行时引用 | EvalEvent 已记录 AgentProfile/ModelRoute/Skill/Delivery；Artifact 表自身尚未持久化完整运行时引用 | 如前端需要按 Artifact 展示生成来源，再补 Artifact 字段或关联表 |
 | MCP 权限归一化 | 外部 Skill Manifest 已归一化；MCP Tool 尚未全部转成带 permissions 的 SkillRuntimeSpec | 引入 MCP RuntimeSpec adapter |
@@ -82,4 +82,4 @@ rg -n "AI Runtime|ModelRoute|AgentProfile|SkillRuntime|EvalFeedback" docs MEMORY
 
 ## 6. 后续建议
 
-下一轮可以优先做 Stage 级 SkillPolicy 编排，让 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 真正决定每个阶段可用工具集合。这样 AgentForge 的“更快迭代、更稳定迭代”会继续向运行时自动治理靠拢，而不是停留在配置可见。
+TASK-035 已完成 Stage 级 SkillPolicy 编排，让 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 开始决定每个阶段可用工具集合。下一步更适合推进 MCP RuntimeSpec adapter 或高风险 Skill 临时授权。

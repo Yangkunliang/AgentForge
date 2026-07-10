@@ -103,6 +103,7 @@ docs/
 | TASK-025 | 2026-07-08 | zip Delivery Package | ✅ 已完成 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
 | TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | ✅ 已完成 |
+| TASK-035 | 2026-07-10 | Stage 级 SkillPolicy 编排 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -200,6 +201,16 @@ docs/
   - [TASK-033.md](iterations/2026-07-09-ai-architecture-convergence/TASK-033.md)
   - [TASK-034.md](iterations/2026-07-09-ai-architecture-convergence/TASK-034.md)
 - **核心功能**：把 AgentForge 的长期 AI 架构收敛为 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路。TASK-027～TASK-034 已完成运行时契约、Pipeline Catalog、Agent 绑定、模型路由、第三方 Skill 导入闭环、Governance 人工确认策略、Eval Feedback 结构化反馈闭环和架构文档收敛。
+
+### TASK-035 详细信息
+- **目录**：`docs/iterations/2026-07-10-stage-skill-policy/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-10-stage-skill-policy/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-10-stage-skill-policy/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-10-stage-skill-policy/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-10-stage-skill-policy/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-10-stage-skill-policy/ITERATION-REVIEW.md)
+- **核心功能**：StageRuntime 在调用 SkillExecutionEngine 前按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见工具；SkillDispatcher 继续保留调用前权限校验。
 
 ## 版本号规范
 

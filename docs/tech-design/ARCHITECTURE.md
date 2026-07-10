@@ -95,12 +95,14 @@
 - **AgentResolver**：按用户覆盖、项目默认、阶段默认和系统默认解析 AgentProfile。
 - **SkillRegistry**：注册 Skill tool_defs、executor、runtime_spec 和 tool -> skill 映射。
 - **SkillInstaller**：第三方 Skill 安装前预览 Manifest、权限、风险和工具，安装后刷新 runtime registry。
+- **StageSkillPolicy**：根据阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 LLM 可见工具。
 - **热加载**：内置 Skill 启动注册，第三方 Skill 安装后显式刷新。
 
 ### 3.3 路由分发 (Router)
 - **Pipeline Catalog**：按 intent 返回 StageDefinition，是阶段语义后端事实源。
 - **AgentResolver**：根据 StageDefinition 和运行时上下文选择 AgentProfile。
 - **ModelRouter**：根据请求覆盖、AgentProfile、StageDefinition 和 legacy settings 解析 ModelRoute。
+- **SkillPolicy**：在 SkillExecutionEngine 前过滤当前阶段可见 tools。
 - **SkillDispatcher**：根据 tool_name 路由到具体 Skill executor，并执行权限、审计和 Eval 记录。
 
 ### 3.4 容错治理 (Governance)

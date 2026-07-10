@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-035 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-034 文档收敛后，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
+截至 TASK-035，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
 
 ### 2.1 请求到执行
 
@@ -31,11 +31,10 @@ src/api/routes/sessions.py
 - Chat 入口会创建 Task、Message，并在后台任务中执行。
 - 用户自定义助手名来自 `UserAgentSettings.agent_name`，传给 SkillExecutionEngine 的 system prompt。
 - 模型选择来自全局 settings 的 `default_model`。
-- 工具列表来自全局 SkillRegistry 的全部 tool defs。
+- 工具列表来自全局 SkillRegistry，但 StageRuntime 会在调用 SkillExecutionEngine 前按 StageSkillPolicy 和 AgentProfile allowlist 过滤。
 
 缺口：
 
-- SkillRuntime 已有权限校验和审计闭环，但还没有把 StageDefinition.skill_policy_key 与 AgentProfile.allowed_skill_names 统一编排成阶段级 Skill 过滤。
 - Agent 管理页创建的 active `Agent` 已可通过 AgentResolver 进入 StageRuntime 选择链路。
 
 ### 2.2 Pipeline 状态机
@@ -63,7 +62,7 @@ src/agent_forge/pipeline/runtime.py
 
 缺口：
 
-- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key；`default_agent_selector` 已绑定 AgentResolver，`model_route_key` 已绑定 ModelRouter，确认策略已绑定 GovernancePolicy，SkillPolicy 已进入 Skill 调用前权限校验。
+- StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key；`default_agent_selector` 已绑定 AgentResolver，`model_route_key` 已绑定 ModelRouter，`skill_policy_key` 已绑定 Stage 级工具过滤，确认策略已绑定 GovernancePolicy，SkillDispatcher 仍保留 Skill 调用前权限校验。
 - ConfirmCard 已渲染 GovernancePolicy 生成的确认原因和影响范围。
 - 前端仍保留 intent 展示 label/icon，但阶段业务语义已以后端 Catalog 为准。
 
@@ -91,8 +90,8 @@ src/agent_forge/skills/dispatcher.py
 
 缺口：
 
-- DB 中的 enabled Skill 可被 `get_enabled_tool_defs()` 过滤，但主执行路径当前使用 `get_all_tool_defs()`。
-- GovernancePolicy 已兜底高风险 Skill 权限确认；StageDefinition.skill_policy_key 与 AgentProfile.allowed_skill_names 的精细化可用工具过滤仍可作为后续策略增强。
+- `filter_tool_defs_for_runtime()` 会按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见工具。
+- GovernancePolicy 已兜底高风险 Skill 权限确认；默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential` 高风险权限工具。
 - MCP Tool 尚未全部归一化成带权限声明的 SkillRuntimeSpec。
 
 ### 2.4 LLM Provider
@@ -231,7 +230,7 @@ can_restore
 
 - `default_agent_selector` 已绑定到真实 AgentProfile。
 - `model_route_key` 已绑定到真实 ModelRoute。
-- `skill_policy_key` 已作为阶段策略标识保留；后续可把它继续接入 Stage 级可用 Skill 白名单。
+- `skill_policy_key` 已接入 Stage 级可用 Skill 过滤。
 
 ### 3.4 AgentProfile
 
@@ -261,7 +260,7 @@ enabled
 后续收敛：
 
 - AgentProfile 的 model_name / default_model_route_key 已交给 ModelRouter 做 fallback。
-- AgentProfile 的 allowed_skill_names 仍可在后续策略增强中交给 SkillPolicy 做精细化工具过滤。
+- AgentProfile 的 allowed_skill_names 来自启用的 `AgentSkill` 绑定，并参与 SkillPolicy 工具过滤。
 - `UserAgentSettings` 继续负责个人助手展示名，不等同于 AgentProfile。
 
 ### 3.5 ModelRoute
@@ -435,7 +434,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义，并写入 Governance 确认上下文 | 后续增强 |
 | AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | 后续增强 |
 | ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | 后续增强 |
-| SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py` | Manifest、权限、runtime spec、registry 刷新、调用审计和高风险 Governance 决策已落地；Stage 级白名单可后续增强 | 后续策略增强 |
+| SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py` | Manifest、权限、runtime spec、registry 刷新、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地 | 后续增强 |
 | GovernanceDecision | `governance/policy.py`、`pipeline/service.py`、`pipeline_runs.py`、`projects.py`、`skills/policy.py` | 阶段、交付和高风险 Skill 调用已走统一决策，并写入确认上下文、审计 payload 和 EvalEvent 确认事实 | 后续增强 |
 | EvalFeedback | `evaluation/service.py`、`models/evaluation.py`、`api/routes/evaluation.py`、StageRuntime、SkillDispatcher、Delivery | EvalEvent、Evaluation summary、Dashboard 聚合和 JSONL 导出已落地 | 后续增强 |
 | 架构文档 | `docs/architecture/`、`docs/tech-design/`、`docs/README.md`、`MEMORY.md`、`CLAUDE.md` | 已完成 AI Runtime 主线、核心闭环、Agent、LLM、Skill、安全、API、数据库和导出文档收敛 | 持续维护 |
@@ -534,9 +533,9 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
-| Agent 配置空转 | 已进入 StageRuntime；后续可接入 Stage 级 SkillPolicy 编排 | 后续策略增强 |
+| Agent 配置空转 | AgentProfile 已进入 StageRuntime，AgentSkill allowlist 已参与 Stage 级 SkillPolicy 编排 | 后续增强 |
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
-| Skill 安全边界不足 | Manifest、权限、风险、调用审计和高风险 Governance 决策已落地；Stage 级可用 Skill 白名单可继续增强 | 后续策略增强 |
+| Skill 安全边界不足 | Manifest、权限、风险、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地；MCP 权限归一化可继续增强 | 后续增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
 | 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认和失败事实；LLM token/cost 明细可继续增强 | 后续增强 |
 | 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |

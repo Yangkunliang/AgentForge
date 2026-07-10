@@ -300,7 +300,7 @@ web/src/views/skills/List.vue
 - `Skill` / `SkillInstall` 保存 manifest_hash、permissions、runtime_spec、risk_level 和 preview。
 - `SkillRegistry` 保存 runtime spec 与 tool -> skill 映射。
 - `SkillDispatcher` 调用前执行权限策略，拒绝、成功、失败和超时都会输出 `skill_eval` 事件，拒绝/执行路径可写入审计日志。
-- 高风险权限已由 GovernancePolicy 兜底确认；Stage 级 `skill_policy_key` 与 AgentProfile allowed skills 的精细化工具白名单仍属于后续策略增强。
+- TASK-035 已完成 Stage 级 `skill_policy_key` 与 AgentProfile allowed skills 的工具过滤；高风险权限仍由 GovernancePolicy 作为调用前兜底确认。
 
 ### 4.5 Governance Policy
 

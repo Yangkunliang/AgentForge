@@ -46,7 +46,7 @@ Agent:
   model: string              # 兼容字段；运行时优先交给 ModelRoute 解析
   capabilities: []          # 能力标签列表
   default_model_route_key: string | null
-  allowed_skill_names: []    # 后续 SkillPolicy 精细化白名单
+  allowed_skill_names: []    # 来自 AgentSkill 绑定，参与 StageSkillPolicy 工具过滤
   stage_preferences: {}      # 后续阶段偏好
   status: enum[active, inactive]
   metadata:

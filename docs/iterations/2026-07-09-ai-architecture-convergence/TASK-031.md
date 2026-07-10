@@ -81,5 +81,5 @@ npm run build
 
 ## 后续边界
 
-- TASK-032 已完成高风险 Skill 权限的 Governance 兜底确认；`StageDefinition.skill_policy_key` 与 `AgentProfile.allowed_skill_names` 的阶段级可用工具白名单仍属于后续策略增强。
+- TASK-032 已完成高风险 Skill 权限的 Governance 兜底确认；TASK-035 已完成 `StageDefinition.skill_policy_key` 与 `AgentProfile.allowed_skill_names` 的阶段级可用工具过滤。
 - TASK-033 已完成结构化 `EvalEvent` 表和 Dashboard 级统计；TASK-031 的 `skill_eval` SSE / callback 事件继续作为运行时即时反馈。
