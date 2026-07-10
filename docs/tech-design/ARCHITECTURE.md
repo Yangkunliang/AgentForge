@@ -6,7 +6,7 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
-> 当前状态（TASK-037）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
+> 当前状态（TASK-038）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
 
 ## 2. 整体架构
 
@@ -95,14 +95,14 @@
 - **AgentResolver**：按用户覆盖、项目默认、阶段默认和系统默认解析 AgentProfile。
 - **SkillRegistry**：注册 Skill tool_defs、executor、runtime_spec 和 tool -> skill 映射。
 - **SkillInstaller**：第三方 Skill 安装前预览 Manifest、权限、风险和工具，安装后刷新 runtime registry。
-- **StageSkillPolicy**：根据阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 LLM 可见工具。
+- **StageSkillPolicy**：根据阶段策略、Agent allowlist、SkillRuntimeSpec permissions 和当前阶段临时授权过滤 LLM 可见工具。
 - **热加载**：内置 Skill 启动注册时写入 RuntimeSpec，第三方 Skill 安装后显式刷新。
 
 ### 3.3 路由分发 (Router)
 - **Pipeline Catalog**：按 intent 返回 StageDefinition，是阶段语义后端事实源。
 - **AgentResolver**：根据 StageDefinition 和运行时上下文选择 AgentProfile。
 - **ModelRouter**：根据请求覆盖、AgentProfile、StageDefinition 和 legacy settings 解析 ModelRoute。
-- **SkillPolicy**：在 SkillExecutionEngine 前过滤当前阶段可见 tools。
+- **SkillPolicy**：在 SkillExecutionEngine 前过滤当前阶段可见 tools，并输出授权与排除报告。
 - **SkillDispatcher**：根据 tool_name 路由到具体 Skill executor，并执行权限、审计和 Eval 记录。
 
 ### 3.4 容错治理 (Governance)

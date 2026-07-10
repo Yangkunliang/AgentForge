@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-037 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-038 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权上下文。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-037，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
+截至 TASK-038，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
 
 ### 2.1 请求到执行
 
@@ -89,12 +89,13 @@ src/agent_forge/skills/dispatcher.py
 - `SkillRegistry` 保存 runtime spec 和 tool -> skill 映射，安装后可刷新第三方 Skill executor。
 - MCP Server 配置支持声明 permissions；未声明时默认按 `credential` 高风险处理；MCP 注册时写入 `source_type=mcp`、`executor_kind=mcp` 的 RuntimeSpec。
 - 内置 Skill 启动注册时也会写入 `source_type=builtin` 的 RuntimeSpec；默认 StageSkillPolicy 只暴露 `web_search` 和 `get_weather`。
+- 高风险 Skill 可通过 `advanced_context.skill_authorization` 在当前阶段临时授权，授权范围会进入 `advanced_context.skill_policy`。
 
 缺口：
 
 - `filter_tool_defs_for_runtime()` 会按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见工具。
 - GovernancePolicy 已兜底高风险 Skill 权限确认；默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential`、`external_side_effect` 高风险权限工具。
-- 高风险 Skill 临时授权/确认恢复机制尚未落地。
+- 临时授权 UI/API 尚未完整落地；当前已完成运行时契约和安全边界。
 
 ### 2.4 LLM Provider
 
@@ -323,10 +324,11 @@ audit_level
 - `SkillDispatcher` 调用前检查权限，调用后写审计并发出 `skill_eval` 事件。
 - `MCPClientPool` 注册 MCP Server 时生成 `source_type=mcp` 的 RuntimeSpec，并复用 StageSkillPolicy 过滤。
 - `register_builtin_skills()` 注册内置 Skill 时生成 `source_type=builtin` 的 RuntimeSpec，并把 `http_request`、`update_profile`、`code_executor` 标成默认不可见的高风险工具。
+- `filter_tool_defs_for_runtime()` 支持 `authorized_skill_names` 和 `authorized_permissions`，用于阶段级临时授权。
 
 后续收敛：
 
-- TASK-032 已将高风险权限确认接入 GovernancePolicy，并把拒绝审计写入 `governance_decision`；TASK-035/TASK-037 已让内置 Skill、外部 Skill 和 MCP tool 进入 Stage 级可见工具过滤。
+- TASK-032 已将高风险权限确认接入 GovernancePolicy，并把拒绝审计写入 `governance_decision`；TASK-035/TASK-038 已让内置 Skill、外部 Skill、MCP tool 和临时授权进入 Stage 级可见工具过滤。
 - `skill_eval` SSE 事件已沉淀为结构化 EvalEvent。
 
 ### 3.7 GovernanceDecision
@@ -565,6 +567,17 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 - 不实现高风险 Skill 临时授权 UI。
 - 不按 HTTP method 动态拆分 tool 权限。
 
+### TASK-038: 高风险 Skill 临时授权
+
+目标：让用户确认后的当前阶段可以临时使用指定高风险 Skill，同时不绕过 AgentSkill allowlist。
+
+完成状态：已落地 `advanced_context.skill_authorization` 运行时契约、`authorized_skill_names` / `authorized_permissions` 过滤参数、SkillPolicy 授权报告和 StageRuntime 透传测试。
+
+不做：
+
+- 不实现完整前端确认 UI。
+- 不把临时授权持久化为 Agent 或 StagePolicy 的长期权限。
+
 ## 8. 当前风险
 
 | 风险 | 表现 | 对应任务 |
@@ -572,7 +585,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
 | Agent 配置空转 | AgentProfile 已进入 StageRuntime，AgentSkill allowlist 已参与 Stage 级 SkillPolicy 编排 | 后续增强 |
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
-| Skill 安全边界不足 | 内置/外部/MCP RuntimeSpec、Manifest、权限、风险、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地；高风险临时授权可继续增强 | 后续增强 |
+| Skill 安全边界不足 | 内置/外部/MCP RuntimeSpec、Manifest、权限、风险、Stage 级工具过滤、临时授权上下文、调用审计和高风险 Governance 决策已落地；授权 UI/API 可继续增强 | 后续增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
 | 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认和失败事实；LLM token/cost 明细可继续增强 | 后续增强 |
 | 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |
@@ -587,6 +600,7 @@ AI Runtime 收敛完成后，一次执行必须可以回答：
 - 当前阶段由哪个 AgentProfile 执行。
 - 使用了哪个 ModelRoute 和 Credential 引用。
 - 可调用哪些 SkillRuntimeSpec，为什么允许。
+- 若使用高风险 Skill，临时授权范围是什么。
 - 是否经过 GovernanceDecision。
 - 生成了哪个 Artifact。
 - Delivery 是否成功，失败如何恢复。

@@ -23,6 +23,8 @@ class SkillToolFilterReport:
     input_tool_count: int
     allowed_tool_count: int
     agent_allowed_skill_names: list[str] = field(default_factory=list)
+    authorized_skill_names: list[str] = field(default_factory=list)
+    authorized_permissions: list[str] = field(default_factory=list)
     excluded_tools: list[dict[str, Any]] = field(default_factory=list)
 
     def to_context(self) -> dict[str, Any]:
@@ -31,6 +33,8 @@ class SkillToolFilterReport:
             "input_tool_count": self.input_tool_count,
             "allowed_tool_count": self.allowed_tool_count,
             "agent_allowed_skill_names": self.agent_allowed_skill_names,
+            "authorized_skill_names": self.authorized_skill_names,
+            "authorized_permissions": self.authorized_permissions,
             "excluded_tools": self.excluded_tools,
         }
 
@@ -109,6 +113,8 @@ def filter_tool_defs_for_runtime(
     registry: Any | None = None,
     skill_policy_key: str | None = None,
     agent_allowed_skill_names: list[str] | None = None,
+    authorized_skill_names: list[str] | None = None,
+    authorized_permissions: list[str] | None = None,
 ) -> tuple[list[dict], SkillToolFilterReport]:
     """Filter LLM-visible tool defs for a pipeline stage and AgentProfile."""
     from agent_forge.skills.registry import get_skill_registry
@@ -117,6 +123,10 @@ def filter_tool_defs_for_runtime(
     policy = resolve_stage_skill_policy(skill_policy_key)
     allowed_skill_names = _normalize_skill_names(agent_allowed_skill_names)
     allowed_skill_set = set(allowed_skill_names)
+    authorized_names = _normalize_skill_names(authorized_skill_names)
+    authorized_name_set = set(authorized_names)
+    authorized_perms = _normalize_authorized_permissions(authorized_permissions)
+    authorized_perm_set = set(authorized_perms)
     filtered: list[dict] = []
     excluded: list[dict[str, Any]] = []
 
@@ -144,6 +154,13 @@ def filter_tool_defs_for_runtime(
             if permission not in policy.allowed_permissions
         ]
         if denied_permissions:
+            skill_authorized = bool(skill_name and skill_name in authorized_name_set)
+            permission_authorized = all(
+                permission in authorized_perm_set for permission in denied_permissions
+            )
+            if skill_authorized or permission_authorized:
+                filtered.append(tool_def)
+                continue
             excluded.append(_excluded_tool(tool_name, skill_name, "permission_denied", permissions))
             continue
 
@@ -154,6 +171,8 @@ def filter_tool_defs_for_runtime(
         input_tool_count=len(tool_defs),
         allowed_tool_count=len(filtered),
         agent_allowed_skill_names=allowed_skill_names,
+        authorized_skill_names=authorized_names,
+        authorized_permissions=authorized_perms,
         excluded_tools=excluded,
     )
 
@@ -179,6 +198,18 @@ def _runtime_permissions(runtime_spec: dict[str, Any] | None) -> list[str]:
         return normalize_permissions(list((runtime_spec or {}).get("permissions") or []))
     except ValueError:
         return ["credential"]
+
+
+def _normalize_authorized_permissions(permissions: list[str] | None) -> list[str]:
+    result: list[str] = []
+    for permission in permissions or []:
+        try:
+            [value] = normalize_permissions([permission])
+        except (TypeError, ValueError):
+            continue
+        if value not in result:
+            result.append(value)
+    return result
 
 
 def _excluded_tool(

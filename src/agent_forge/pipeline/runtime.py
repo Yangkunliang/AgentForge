@@ -94,12 +94,17 @@ class StageRuntime:
             effective_tools = tools
             skill_filter_report: SkillToolFilterReport | None = None
             if skill_policy_key or agent_profile:
+                authorized_skill_names, authorized_permissions = _skill_authorization_from_context(
+                    advanced_context
+                )
                 effective_tools, skill_filter_report = filter_tool_defs_for_runtime(
                     tools,
                     skill_policy_key=skill_policy_key,
                     agent_allowed_skill_names=(
                         agent_profile.allowed_skill_names if agent_profile else None
                     ),
+                    authorized_skill_names=authorized_skill_names,
+                    authorized_permissions=authorized_permissions,
                 )
             async_gen = await self.engine.run(
                 user_message=user_message,
@@ -418,6 +423,36 @@ def _agent_id_from_context(context: dict | None, key: str) -> str | None:
         return None
     value = context.get(key)
     return value if isinstance(value, str) and value else None
+
+
+def _skill_authorization_from_context(context: dict | None) -> tuple[list[str], list[str]]:
+    if not context:
+        return [], []
+    authorization = context.get("skill_authorization")
+    if not isinstance(authorization, dict):
+        return [], []
+    skill_names = _string_list_from_context(
+        authorization.get("authorized_skill_names") or authorization.get("skill_names")
+    )
+    permissions = _string_list_from_context(
+        authorization.get("authorized_permissions") or authorization.get("permissions")
+    )
+    return skill_names, permissions
+
+
+def _string_list_from_context(value: Any) -> list[str]:
+    if isinstance(value, str):
+        values = [value]
+    elif isinstance(value, list):
+        values = value
+    else:
+        return []
+    result: list[str] = []
+    for item in values:
+        normalized = str(item).strip()
+        if normalized and normalized not in result:
+            result.append(normalized)
+    return result
 
 
 def _requested_model_route_key(
