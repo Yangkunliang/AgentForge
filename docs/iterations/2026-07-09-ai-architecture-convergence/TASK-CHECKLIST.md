@@ -21,7 +21,7 @@
 | [TASK-031](TASK-031.md) | 第三方 Skill 导入与运行时闭环 | skills | P1 | TASK-027, TASK-030 | done |
 | [TASK-032](TASK-032.md) | Governance 与人工确认策略引擎 | governance, pipeline | P1 | TASK-028, TASK-031 | done |
 | [TASK-033](TASK-033.md) | Eval Feedback 执行质量反馈闭环 | evaluation, dashboard | P1 | TASK-029, TASK-030, TASK-031, TASK-032 | done |
-| [TASK-034](TASK-034.md) | 架构文档收敛与迁移清理 | docs | P2 | TASK-028, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033 | todo |
+| [TASK-034](TASK-034.md) | 架构文档收敛与迁移清理 | docs | P2 | TASK-028, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033 | done |
 
 ## 3. 推荐执行顺序
 

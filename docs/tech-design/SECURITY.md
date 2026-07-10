@@ -712,6 +712,7 @@ TASK-023 后，GitHub OAuth Mount 使用服务端加密凭据表保存 access to
 - 训练数据导出前自动应用脱敏规则
 - 可配置脱敏级别（Level 0/1/2），详见 DATA-EXPORT.md
 - EvalEvent 仅记录结构化执行事实和非敏感 metadata，禁止写入明文 API Key、OAuth token、文件正文或用户源码内容；`eval_events` 导出同样应用脱敏策略。
+- TASK-034 后，ModelRoute、SkillRuntime 和 EvalEvent 均按“运行时可追溯、密钥不出服务端”的安全基线维护：API、SSE、日志、导出和 prompt 上下文不得包含明文凭据。
 
 ---
 

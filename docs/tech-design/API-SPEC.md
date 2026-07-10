@@ -733,11 +733,11 @@ Authorization: Bearer <token>
 | 字段 | 说明 |
 |------|------|
 | `stages[].required` | 是否为必需阶段；只有 `false` 阶段允许 skip/restore。 |
-| `stages[].confirmation_policy` | 当前阶段确认策略，`gate` 后续接入 GovernancePolicy。 |
+| `stages[].confirmation_policy` | 当前阶段确认策略；StageState 初始化时由 GovernancePolicy 生成确认类型、原因和影响范围。 |
 | `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
 | `stages[].default_agent_selector` | AgentResolver 的默认选择线索，StageRuntime 会据此选择 AgentProfile。 |
 | `stages[].model_route_key` | StageRuntime 实际解析到的 ModelRoute key。 |
-| `stages[].skill_policy_key` | 后续 SkillPolicy 的策略 key；TASK-031 已接入 Skill 调用前权限过滤，阶段级策略编排留给 TASK-032。 |
+| `stages[].skill_policy_key` | Stage 级 Skill 策略 key；当前已接入 Skill 调用前权限校验和高风险 Governance 决策，精细化白名单仍可后续增强。 |
 
 ---
 

@@ -324,6 +324,8 @@ TASK-020 后，Delivery preview 会保存目标文件 fingerprint 到响应 repo
 ### 1.19 EvalEvent
 TASK-033 后，执行事实进入 `eval_events` 表，用于 Dashboard、Evaluation API 和导出分析。Eval 写入使用非阻塞策略，失败时只记录日志，不回滚主执行链路。
 
+TASK-034 文档收敛后，EvalEvent 是 AI Runtime 反馈闭环的当前结构化事实源；Artifact 自身尚未持久化完整 AgentProfile / ModelRoute / SkillRuntime 引用时，先通过 EvalEvent 追溯运行时来源。
+
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | String | 主键，形如 `eval-...` |

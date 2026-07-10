@@ -11,7 +11,20 @@
 - **执行**：调用 Skill 完成任务
 - **协作**：与其他 Agent 协商分工
 
-**公式**：`Agent = Model + Harness + Skills`
+**公式（概念层）**：`Agent = Model + Harness + Skills`
+
+**当前运行时落地（TASK-029～TASK-033）**：
+
+```text
+Agent 管理态配置
+  -> AgentResolver
+  -> AgentProfile
+  -> StageRuntime
+  -> ModelRoute + SkillRuntimeSpec + GovernancePolicy
+  -> EvalEvent
+```
+
+也就是说，后台 Agent 创建后不再只是展示配置。StageRuntime 会根据用户覆盖、项目默认、阶段默认和系统默认解析 AgentProfile，并把 `agent_profile_id/name/source` 写入 `PipelineStageState` 与 EvalEvent。
 
 ## 2. Agent 类型
 
@@ -29,11 +42,12 @@
 Agent:
   id: UUID
   name: string
-  type: enum[coder, reviewer, researcher, planner, custom]
   description: string
-  model: string              # LLM 模型标识
+  model: string              # 兼容字段；运行时优先交给 ModelRoute 解析
   capabilities: []          # 能力标签列表
-  skills: []                # 绑定的 Skill
+  default_model_route_key: string | null
+  allowed_skill_names: []    # 后续 SkillPolicy 精细化白名单
+  stage_preferences: {}      # 后续阶段偏好
   status: enum[active, inactive]
   metadata:
     max_concurrency: int    # 最大并发任务数
@@ -42,9 +56,9 @@ Agent:
 
 ## 4. 协作机制
 
-### 4.1 Contract Net 协议
+### 4.1 Contract Net 协议（概念保留）
 
-Agent 间通过 Contract Net 协议进行任务协商：
+Agent 间通过 Contract Net 协议进行任务协商的概念仍保留，但当前核心开发闭环优先采用 StageRuntime 的单阶段 AgentProfile 解析，而不是多 Agent 实时竞标：
 
 ```
 1. 发布(Announce)   → 发布者广播任务需求
@@ -129,6 +143,9 @@ POST /api/v1/agents
 # 列出 Agent
 GET /api/v1/agents
 
+# 查询运行时候选
+GET /api/v1/agents/runtime/candidates?stage_selector=coder
+
 # 更新 Agent
 PUT /api/v1/agents/{id}
 
@@ -142,9 +159,9 @@ DELETE /api/v1/agents/{id}
 |------|------|
 | `active` | 可接收任务 |
 | `inactive` | 暂停服务 |
-| `busy` | 任务执行中 |
-| `error` | 异常状态 |
+
+当前数据库状态以 `active` / `inactive` 为准；`busy` / `error` 可作为后续调度器扩展状态，不是当前 API 契约。
 
 ---
 
-*文档版本: v1.0 | 创建日期: 2026-06-19*
+*文档版本: v1.1 | 更新日期: 2026-07-10*

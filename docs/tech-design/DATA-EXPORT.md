@@ -131,6 +131,8 @@ Authorization: Bearer <token>
 
 `type` 支持 `training_data`、`eval_events` 和 `evaluation`。Eval 导出会复用 `delevel` 脱敏策略，并默认排除密钥、文件正文和用户源码内容。
 
+TASK-034 文档收敛后，`eval_events` / `evaluation` 是 AI Runtime 反馈闭环的推荐导出入口，用于分析 Stage、AgentProfile、ModelRoute、Skill、Delivery 和失败原因。
+
 **响应**:
 ```json
 {

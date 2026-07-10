@@ -222,7 +222,7 @@ score
 - 提供 API 给前端读取阶段定义。
 - StageRuntime 只接收 StageDefinition，不依赖前端硬编码。
 
-建议新增或调整：
+实际新增或调整：
 
 ```text
 src/agent_forge/pipeline/catalog.py
@@ -240,7 +240,7 @@ web/src/api/modules/pipelineCatalog.ts
 - 支持 project default、stage default、manual override。
 - 记录执行使用的 agent_profile_id。
 
-建议新增或调整：
+实际新增或调整：
 
 ```text
 src/agent_forge/agents/resolver.py
@@ -300,7 +300,7 @@ web/src/views/skills/List.vue
 - `Skill` / `SkillInstall` 保存 manifest_hash、permissions、runtime_spec、risk_level 和 preview。
 - `SkillRegistry` 保存 runtime spec 与 tool -> skill 映射。
 - `SkillDispatcher` 调用前执行权限策略，拒绝、成功、失败和超时都会输出 `skill_eval` 事件，拒绝/执行路径可写入审计日志。
-- Stage 级 `skill_policy_key` 与 AgentProfile allowed skills 的编排留给 GovernancePolicy 阶段。
+- 高风险权限已由 GovernancePolicy 兜底确认；Stage 级 `skill_policy_key` 与 AgentProfile allowed skills 的精细化工具白名单仍属于后续策略增强。
 
 ### 4.5 Governance Policy
 

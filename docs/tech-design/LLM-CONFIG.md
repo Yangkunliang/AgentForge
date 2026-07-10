@@ -418,17 +418,18 @@ GET /api/v1/cost?date=2026-06-28
 
 ---
 
-## 9. 性能优化（规划中）
+## 9. 性能优化与后续增强
 
-以下功能在文档中提及但尚未实现：
+结构化 ModelRoute 已经落地；以下是后续优化方向，不属于当前运行时必需契约：
 
 | 功能 | 状态 | 备注 |
 |------|------|------|
-| 相同任务响应缓存 (TTL 1h) | 未实现 | 可基于 Redis + prompt hash |
-| Prompt 模板缓存 | 部分实现 | 当前 Prompt 硬编码在 Python 中 |
-| 模型选择结果缓存 | 未实现 | |
-| 每模型并发数限制 | 未实现 | YAML 配置方案未落地 |
-| 队列管理 | 未实现 | |
+| 相同任务响应缓存 (TTL 1h) | 后续增强 | 可基于 Redis + prompt hash |
+| Prompt 模板缓存 | 后续增强 | 当前 Prompt 硬编码在 Python 中 |
+| 模型选择结果缓存 | 后续增强 | 可缓存 ModelRouter 解析结果，但必须尊重 Credential 变更 |
+| 每模型并发数限制 | 后续增强 | 不再采用旧 YAML 方案，建议纳入 Route policy |
+| 队列管理 | 后续增强 | 可与 RabbitMQ / PipelineRun 调度结合 |
+| token / cost 明细进入 EvalEvent | 后续增强 | EvalEvent 已有字段，Provider 级写入仍可继续完善 |
 
 ---
 

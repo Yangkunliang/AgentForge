@@ -76,6 +76,12 @@
   - [UI-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/UI-REVIEW.md) — TASK-021 核心交互入口复盘、设计约束和 E2E 验收覆盖
   - [TEST-PLAN.md](docs/iterations/2026-07-08-core-strengthening/TEST-PLAN.md) — 服务端、UI、交付扩展验证矩阵
   - [ITERATION-REVIEW.md](docs/iterations/2026-07-08-core-strengthening/ITERATION-REVIEW.md) — TASK-020～TASK-025 完成内容、风险修正和验证结果
+- [2026-07-09-ai-architecture-convergence/](docs/iterations/2026-07-09-ai-architecture-convergence/) — TASK-027～TASK-034 AI Runtime 收敛，推荐从 `ITERATION-REVIEW.md` 和 `docs/architecture/AI-RUNTIME-CONVERGENCE.md` 阅读当前状态
+  - [PRODUCT-REQUIREMENTS.md](docs/iterations/2026-07-09-ai-architecture-convergence/PRODUCT-REQUIREMENTS.md) — AI Runtime 收敛的用户故事、范围和分阶段计划
+  - [TASK-CHECKLIST.md](docs/iterations/2026-07-09-ai-architecture-convergence/TASK-CHECKLIST.md) — TASK-027～TASK-034 优先级、依赖和完成状态
+  - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-09-ai-architecture-convergence/TECHNICAL-DESIGN.md) — Pipeline Catalog、AgentResolver、ModelRouter、SkillRuntime、GovernancePolicy 和 EvalEvent 设计边界
+  - [TEST-PLAN.md](docs/iterations/2026-07-09-ai-architecture-convergence/TEST-PLAN.md) — AI Runtime 收敛测试矩阵
+  - [ITERATION-REVIEW.md](docs/iterations/2026-07-09-ai-architecture-convergence/ITERATION-REVIEW.md) — TASK-027～TASK-034 完成情况、验证结果和遗留风险
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -102,6 +108,7 @@
 - TASK-031 已完成：新增 `src/agent_forge/skills/runtime_spec.py`、`src/agent_forge/skills/policy.py` 和 `017_skill_runtime_policy.py`；Skill Manifest 支持 `agentforge-skill.yaml` 优先、`skill.md` 兼容，`/api/v1/skills/import/preview` 与 `/api/v1/skills/import/install` 会展示来源、工具、权限、风险和确认要求；安装后 Skill/SkillInstall 记录 manifest_hash、permissions、runtime_spec 和 preview，SkillRegistry 注册 runtime spec，SkillDispatcher 调用前执行权限校验并写入 `skill.invoke.*` 审计和 `skill_eval` 事件。
 - TASK-032 已完成：新增 `src/agent_forge/governance/policy.py` 和 `018_governance_confirmation_context.py`；`PipelineStageState` 记录确认类型、原因、影响范围和审计 payload；Pipeline 阶段确认、Delivery 未确认拒绝和高风险 Skill 调用拒绝均写入 `governance_decision`；ConfirmCard 渲染服务端策略生成的确认原因与影响范围。
 - TASK-033 已完成：新增 `src/agent_forge/evaluation/service.py`、`src/agent_forge/models/evaluation.py` 和 `019_eval_events.py`；StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 会以非阻塞方式写入 `EvalEvent`；新增 `/api/v1/evaluation/summary`、Dashboard evaluation 指标和 `eval_events` / `evaluation` JSONL 导出类型。
+- TASK-034 已完成：更新 Agent 模型、核心开发闭环、AI Runtime 主线、ARCHITECTURE、LLM-CONFIG、API-SPEC、DATABASE、SECURITY、DATA-EXPORT、docs README、MEMORY、CLAUDE，并新增 AI Runtime 迭代复盘；当前推荐阅读路径是 `docs/README.md` → `docs/architecture/AI-RUNTIME-CONVERGENCE.md` → `docs/iterations/2026-07-09-ai-architecture-convergence/ITERATION-REVIEW.md`。
 
 ---
 

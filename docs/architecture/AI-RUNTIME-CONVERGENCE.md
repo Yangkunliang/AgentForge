@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，也是 TASK-028 到 TASK-034 的共同参考。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-033，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
+截至 TASK-034 文档收敛后，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
 
 ### 2.1 请求到执行
 
@@ -438,7 +438,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py` | Manifest、权限、runtime spec、registry 刷新、调用审计和高风险 Governance 决策已落地；Stage 级白名单可后续增强 | 后续策略增强 |
 | GovernanceDecision | `governance/policy.py`、`pipeline/service.py`、`pipeline_runs.py`、`projects.py`、`skills/policy.py` | 阶段、交付和高风险 Skill 调用已走统一决策，并写入确认上下文、审计 payload 和 EvalEvent 确认事实 | 后续增强 |
 | EvalFeedback | `evaluation/service.py`、`models/evaluation.py`、`api/routes/evaluation.py`、StageRuntime、SkillDispatcher、Delivery | EvalEvent、Evaluation summary、Dashboard 聚合和 JSONL 导出已落地 | 后续增强 |
-| 架构文档 | `docs/architecture/`、`docs/tech-design/` | 核心闭环文档已存在，AI Runtime 主线新增 | TASK-034 |
+| 架构文档 | `docs/architecture/`、`docs/tech-design/`、`docs/README.md`、`MEMORY.md`、`CLAUDE.md` | 已完成 AI Runtime 主线、核心闭环、Agent、LLM、Skill、安全、API、数据库和导出文档收敛 | 持续维护 |
 
 ## 6. 迁移原则
 
@@ -522,6 +522,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 
 目标：把 AI Runtime 实现结果同步到 architecture、tech-design、MEMORY 和 CLAUDE。
 
+完成状态：已更新 Agent 模型、核心开发闭环、AI Runtime 主线、ARCHITECTURE、LLM-CONFIG、API-SPEC、DATABASE、SECURITY、DATA-EXPORT、docs README、MEMORY、CLAUDE，并新增 `ITERATION-REVIEW.md`。
+
 不做：
 
 - 不删除历史文档。
@@ -537,7 +539,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | Skill 安全边界不足 | Manifest、权限、风险、调用审计和高风险 Governance 决策已落地；Stage 级可用 Skill 白名单可继续增强 | 后续策略增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
 | 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认和失败事实；LLM token/cost 明细可继续增强 | 后续增强 |
-| 文档和代码分叉 | 新人和 Agent 误读系统状态 | TASK-034 |
+| 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |
 
 ## 9. 完成定义
 

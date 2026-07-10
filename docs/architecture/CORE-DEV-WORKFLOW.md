@@ -4,10 +4,10 @@
 
 ## 1. 核心闭环
 
-AgentForge 的核心功能不是单纯聊天，也不是单纯多 Agent 编排，而是围绕用户自己的项目完成开发交付：
+AgentForge 的核心功能不是单纯聊天，也不是单纯多 Agent 编排，而是围绕用户自己的项目完成开发交付，并把执行事实沉淀为可复盘数据：
 
 ```text
-Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
+Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery -> Eval Feedback
 ```
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
@@ -19,6 +19,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
 | Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | 可继续增强发布/回滚编排 |
+| Eval Feedback | 结构化记录阶段、Agent、模型、Skill、确认、Artifact 和 Delivery 执行事实 | 已支持 EvalEvent、EvaluationService、Dashboard 聚合、Evaluation summary API 和 Eval JSONL 导出 | 可继续增强 LLM token/cost 明细和质量评分 |
 
 ## 2. 用户路径
 
@@ -34,6 +35,7 @@ MVP 用户路径按以下顺序落地：
 8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
 9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
 10. 用户在 Artifact Viewer 中选择本地写回、GitHub PR Delivery 或 zip 包交付：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR；zip 模式生成包含 manifest、delivery report 和文件树的可下载包。
+11. StageRuntime、SkillDispatcher、确认 API 和 Delivery 路径写入 EvalEvent；Dashboard、Evaluation API 和 Export 使用这些事件分析成功率、耗时和失败原因。
 
 ## 3. 设计原则
 
@@ -49,6 +51,7 @@ MVP 用户路径按以下顺序落地：
 - 写回用户项目、创建远程 PR、导出 zip 的成功、拒绝、冲突和失败都必须进入审计日志，且审计 details 不记录 Artifact 内容、OAuth token 或上传文件正文。
 - Upload Mount 只代表用户主动上传的文件集合，不得反推或访问用户本地路径，也不得作为写回目标。
 - Upload Mount 的 manifest、读取和删除必须可审计，AuditLog 不记录上传文件正文。
+- EvalEvent 只记录结构化执行事实，不记录 API Key、OAuth token、文件正文或用户源码内容。
 
 ## 4. 分阶段落地
 
@@ -68,6 +71,7 @@ TASK-012 路线图和状态纠偏
                       -> TASK-024 GitHub PR Delivery
                     -> TASK-025 zip Delivery Package
                     -> TASK-026 Upload Mount
+                      -> TASK-027～TASK-034 AI Runtime 收敛
 ```
 
 ## 5. MVP 非目标
@@ -85,8 +89,10 @@ TASK-012 路线图和状态纠偏
 
 ```text
 创建项目 -> 创建会话 -> 选择需求类型 -> 生成阶段计划
+-> 选择 AgentProfile / ModelRoute / SkillRuntime
 -> 完成一个阶段 -> 保存产物 -> 人工确认 -> 进入下一阶段
 -> 查看产物 -> 将结果交付到本地、GitHub PR 或 zip 包
+-> 通过 Eval Feedback 复盘成功率、耗时和失败原因
 ```
 
 Delivery 不能绕过用户确认；只有在用户明确确认写入后，Artifact 内容才能写回授权 Mount。

@@ -6,12 +6,14 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
+> 当前状态（TASK-034）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
+
 ## 2. 整体架构
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       FastAPI API Layer                                    │
-│  /tasks  /agents  /skills  /auth  /sandboxes  /sessions  /exports  /stream  │
+│ /projects /sessions /pipeline /agents /skills /llm /evaluation /exports /stream │
 └────────────────────────┬────────────────────────────────────────────────────┘
                          │
          ┌───────────────┼──────────────────────────┐
@@ -90,19 +92,23 @@
 - 消息格式：`{type, from, to, payload, timestamp, correlation_id}`
 
 ### 3.2 注册中心 (Registry)
-- **AgentRegistry**：注册/查询 Agent 元数据（id、capabilities、model、status）
-- **SkillRegistry**：注册 Skill 元数据（manifest、entry_point、schema）
-- **热加载**：本地 skills/ 目录变更自动刷新
+- **AgentResolver**：按用户覆盖、项目默认、阶段默认和系统默认解析 AgentProfile。
+- **SkillRegistry**：注册 Skill tool_defs、executor、runtime_spec 和 tool -> skill 映射。
+- **SkillInstaller**：第三方 Skill 安装前预览 Manifest、权限、风险和工具，安装后刷新 runtime registry。
+- **热加载**：内置 Skill 启动注册，第三方 Skill 安装后显式刷新。
 
 ### 3.3 路由分发 (Router)
-- **AgentRouter**：根据子任务能力需求路由到最佳 Agent
-- **SkillRouter**：根据 Skill ID 路由到具体执行模块
+- **Pipeline Catalog**：按 intent 返回 StageDefinition，是阶段语义后端事实源。
+- **AgentResolver**：根据 StageDefinition 和运行时上下文选择 AgentProfile。
+- **ModelRouter**：根据请求覆盖、AgentProfile、StageDefinition 和 legacy settings 解析 ModelRoute。
+- **SkillDispatcher**：根据 tool_name 路由到具体 Skill executor，并执行权限、审计和 Eval 记录。
 
 ### 3.4 容错治理 (Governance)
 - **重试**：指数退避重试（tenacity），最多 3 次
 - **熔断**：连续失败触发熔断（pybreaker）
 - **降级**：返回友好降级文案
 - **分类**：业务异常不重试，系统异常重试
+- **确认策略**：`GovernancePolicy` 统一阶段确认、Delivery 写回确认和高风险 Skill 权限决策。
 
 ### 3.5 执行编排 (Executor)
 - **TaskOrchestrator**：任务分解 → Agent 协商 → Skill 调用 → 结果合并
@@ -138,10 +144,16 @@
 - **Cost 追踪**：每次调用记录 token 消耗和成本
 
 ### 3.9 数据导出 (Exporter)
-- **数据收集**：自动收集用户输入、Agent 选择、Skill 调用、结果、用户反馈
+- **数据收集**：训练数据导出继续读取 Task / TaskExecution；执行质量反馈读取 EvalEvent。
 - **数据脱敏**：导出前自动脱敏 PII 信息（`exporter/anonymizer.py`）
-- **导出格式**：JSONL（每行一条完整记录）
+- **导出格式**：JSONL（`training_data`、`eval_events` / `evaluation`）
 - **导出用途**：Agent 路由优化、Skill 模板优化、模型选择优化
+
+### 3.9.1 Eval Feedback
+- **EvalEvent**：记录 Stage、AgentProfile、ModelRoute、Skill、Artifact、Delivery、确认、耗时、成本和失败原因。
+- **EvaluationService**：主链路非阻塞写入，失败只打日志，不阻断执行。
+- **Evaluation API**：`GET /api/v1/evaluation/summary` 提供项目和时间范围维度聚合。
+- **Dashboard**：显示阶段、Skill 和 Delivery 成功率与平均阶段耗时。
 
 ### 3.10 认证 (Auth)
 - **JWT 工具**：access_token / refresh_token 签发与校验（`auth/jwt.py`）
@@ -179,7 +191,8 @@ src/
 │   │   └── init.py              # 总线初始化
 │   ├── agents/                  # Agent 实现
 │   │   ├── base.py              # Agent 基类 + CodeAgent + AnalysisAgent + SearchAgent
-│   │   └── coder.py             # CoderAgent
+│   │   ├── coder.py             # CoderAgent
+│   │   └── resolver.py          # AgentProfile 运行时解析
 │   ├── skills/                  # Skill 插件系统
 │   │   ├── manager.py           # Skill 管理器
 │   │   ├── loader.py            # 加载器
@@ -189,6 +202,8 @@ src/
 │   │   ├── builtin.py           # 内置 Skill 注册
 │   │   ├── manifest.py          # 清单管理
 │   │   ├── installer.py         # Skill 安装
+│   │   ├── runtime_spec.py      # SkillRuntimeSpec 与权限归一化
+│   │   ├── policy.py            # Skill 权限策略
 │   │   ├── code_executor.py     # 代码执行 Skill（沙箱调用）
 │   │   ├── http_request.py      # HTTP 请求 Skill
 │   │   ├── web_search.py        # 网页搜索 Skill
@@ -201,7 +216,13 @@ src/
 │   │   ├── tasks.py             # 记忆相关后台任务
 │   │   └── semantic_entry.py    # 语义记忆条目模型引用
 │   ├── llm/                     # LLM Provider 抽象
-│   │   └── provider.py          # LiteLLM 适配 + Cost 追踪
+│   │   ├── provider.py          # LiteLLM 适配 + Cost 追踪
+│   │   └── router.py            # ModelRoute 解析
+│   ├── pipeline/                # Pipeline Catalog + StageRuntime
+│   ├── governance/              # GovernancePolicy
+│   ├── delivery/                # 本地写回、GitHub PR、zip Delivery
+│   ├── bridge/                  # 本地/上传 Mount 只读上下文
+│   ├── evaluation/              # EvalEvent 记录与聚合
 │   ├── exporter/                # 数据导出
 │   │   ├── manager.py           # 导出任务管理
 │   │   └── anonymizer.py        # PII 脱敏
@@ -234,6 +255,10 @@ src/
 │   │   ├── api_key.py           # API Key
 │   │   ├── audit_log.py         # 审计日志
 │   │   ├── export_task.py       # 导出任务
+│   │   ├── project.py           # Project / ProjectMount / Artifact
+│   │   ├── pipeline.py          # PipelineRun / PipelineStageState
+│   │   ├── llm.py               # LLM Provider / Model / Credential / Route
+│   │   ├── evaluation.py        # EvalEvent
 │   │   ├── webhook.py           # Webhook
 │   │   ├── user_agent_settings.py # 用户-Agent 设置
 │   │   └── __init__.py          # 统一导出
@@ -262,9 +287,13 @@ src/
 │       ├── agents.py            # Agent 管理
 │       ├── auth.py              # 认证
 │       ├── dashboard.py         # 仪表盘
+│       ├── evaluation.py        # Evaluation summary
 │       ├── health.py            # 健康检查
 │       ├── llm.py               # LLM 配置
 │       ├── memory.py            # 记忆 CRUD
+│       ├── pipeline_catalog.py  # Pipeline Catalog
+│       ├── pipeline_runs.py     # PipelineRun / StageState
+│       ├── projects.py          # Project / Mount / Artifact / Delivery
 │       ├── sandboxes.py         # 沙箱管理
 │       ├── sessions.py          # 会话管理
 │       ├── skills.py            # Skill 管理
