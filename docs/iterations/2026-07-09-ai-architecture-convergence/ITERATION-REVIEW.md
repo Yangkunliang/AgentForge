@@ -77,9 +77,9 @@ rg -n "AI Runtime|ModelRoute|AgentProfile|SkillRuntime|EvalFeedback" docs MEMORY
 | Stage 级 Skill 白名单 | TASK-035 已完成 StageSkillPolicy 工具过滤，StageRuntime 会按阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 tools | 后续可做高风险 Skill 临时授权 |
 | LLM token/cost 明细 | ModelRoute 已进入运行时，EvalEvent 有 token/cost 字段；LLMProvider 级细粒度写入还可继续增强 | 在 LLM 调用完成后写入 `llm_completed` EvalEvent |
 | Artifact 运行时引用 | EvalEvent 已记录 AgentProfile/ModelRoute/Skill/Delivery；Artifact 表自身尚未持久化完整运行时引用 | 如前端需要按 Artifact 展示生成来源，再补 Artifact 字段或关联表 |
-| MCP 权限归一化 | 外部 Skill Manifest 已归一化；MCP Tool 尚未全部转成带 permissions 的 SkillRuntimeSpec | 引入 MCP RuntimeSpec adapter |
+| MCP 权限归一化 | TASK-036 已完成 MCP RuntimeSpec adapter；未声明 permissions 的 MCP 默认按高风险处理 | 后续可做 MCP 管理 UI |
 | 本地依赖健康 | FastAPI 可启动，但 health 在未启动数据库、RabbitMQ、Redis 时 degraded | 开发环境启动脚本继续提示依赖状态 |
 
 ## 6. 后续建议
 
-TASK-035 已完成 Stage 级 SkillPolicy 编排，让 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 开始决定每个阶段可用工具集合。下一步更适合推进 MCP RuntimeSpec adapter 或高风险 Skill 临时授权。
+TASK-035 已完成 Stage 级 SkillPolicy 编排，让 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 开始决定每个阶段可用工具集合。TASK-036 进一步完成 MCP RuntimeSpec adapter。下一步更适合推进内置 Skill RuntimeSpec 补齐或高风险 Skill 临时授权。

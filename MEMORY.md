@@ -23,7 +23,7 @@
 ## 架构蓝图 (docs/architecture/)
 - [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
 - [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery；增强阶段按 TASK-020 服务端可信交付、TASK-021 交互复盘、TASK-022 交付扩展设计、TASK-023～TASK-026 实现推进
-- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-034 的架构基线
+- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-036 的架构基线
 
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-026 路线图
@@ -101,7 +101,7 @@
 - TASK-024 已完成：GitHub PR Delivery preview/apply API、`expected_base_sha` 二次校验、branch/commit/PR 创建、失败报告、`delivery.github.*` 审计事件和 Artifact Viewer GitHub PR 模式已落地。
 - TASK-025 已完成：zip Delivery preview/apply/download API、deterministic zip sha256、manifest/report、下载权限隔离、过期清理、`delivery.zip.*` 审计事件和 Artifact Viewer zip 包模式已落地。
 - TASK-026 已完成：Upload Mount multipart 上传 API、manifest 范围读取、Bridge/Chat 上下文读取、路径/数量/大小/扩展名限制、`upload_mount.*` 审计、Project 创建向导上传模式和 ContextPicker upload 文件源已落地。
-- TASK-027 已完成：新增 AI Runtime 收敛架构基线，明确 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路、当前代码映射、目标运行时契约和 TASK-028～TASK-034 迁移边界。
+- TASK-027 已完成：新增 AI Runtime 收敛架构基线，明确 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路、当前代码映射、目标运行时契约和 TASK-028～TASK-036 迁移边界。
 - TASK-028 已完成：新增 `src/agent_forge/pipeline/catalog.py` 和 `/api/v1/pipeline/catalog`，将 intent -> StageDefinition 收敛为后端唯一事实源；StageRuntime、PipelineService 与前端 Pipeline Store 已消费 Catalog，阶段定义包含确认策略、输出产物类型、默认 Agent selector、ModelRoute key 和 SkillPolicy key。
 - TASK-029 已完成：新增 `src/agent_forge/agents/resolver.py`，按用户覆盖、项目默认、StageDefinition.default_agent_selector、系统默认解析 AgentProfile；StageRuntime 会把 `agent_profile_id/name/source` 写入 `PipelineStageState`，并将 AgentProfile 注入 SkillExecutionEngine 上下文；新增 `/api/v1/agents/runtime/candidates` 返回运行时 active Agent 候选。
 - TASK-030 已完成：新增 `src/agent_forge/llm/router.py`、`src/agent_forge/models/llm.py` 和 `016_llm_model_routes.py`；LLM 设置页和 `/api/v1/llm/*` 支持 Provider / Model / Credential / Route，Credential 加密存储且 API 只返回 masked 信息；StageRuntime 会解析 ModelRoute、写入 StageState 模型追踪字段并将非敏感 route 上下注入 SkillExecutionEngine。
@@ -110,6 +110,7 @@
 - TASK-033 已完成：新增 `src/agent_forge/evaluation/service.py`、`src/agent_forge/models/evaluation.py` 和 `019_eval_events.py`；StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 会以非阻塞方式写入 `EvalEvent`；新增 `/api/v1/evaluation/summary`、Dashboard evaluation 指标和 `eval_events` / `evaluation` JSONL 导出类型。
 - TASK-034 已完成：更新 Agent 模型、核心开发闭环、AI Runtime 主线、ARCHITECTURE、LLM-CONFIG、API-SPEC、DATABASE、SECURITY、DATA-EXPORT、docs README、MEMORY、CLAUDE，并新增 AI Runtime 迭代复盘；当前推荐阅读路径是 `docs/README.md` → `docs/architecture/AI-RUNTIME-CONVERGENCE.md` → `docs/iterations/2026-07-09-ai-architecture-convergence/ITERATION-REVIEW.md`。
 - TASK-035 已完成：新增 `filter_tool_defs_for_runtime()` 和 StageSkillPolicy 过滤报告；AgentResolver 从 `agent_skills` 生成 `AgentProfile.allowed_skill_names`；StageRuntime 调用 SkillExecutionEngine 前按阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 tools，SkillDispatcher 权限校验继续作为第二道防线。
+- TASK-036 已完成：`MCPServerConfig` 支持 permissions 声明，未声明权限默认按 `credential` 高风险处理；MCP 注册到 SkillRegistry 时生成 `source_type=mcp`、`executor_kind=mcp` 的 RuntimeSpec，并复用 StageSkillPolicy 过滤高风险 MCP tool。
 
 ---
 

@@ -23,7 +23,11 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent_forge.skills.runtime_spec import normalize_permissions
+
 logger = logging.getLogger(__name__)
+
+DEFAULT_UNDECLARED_MCP_PERMISSIONS = ["credential"]
 
 
 # ── 配置数据类 ───────────────────────────────────────────────
@@ -45,6 +49,13 @@ class MCPServerConfig:
     url: str = ""
     headers: dict[str, str] = field(default_factory=dict)
 
+    # MCP Server 能力边界。未声明时按未知高风险处理，避免第三方工具绕过 SkillPolicy。
+    permissions: list[str] = field(default_factory=lambda: DEFAULT_UNDECLARED_MCP_PERMISSIONS.copy())
+
+    def __post_init__(self) -> None:
+        raw_permissions = self.permissions or DEFAULT_UNDECLARED_MCP_PERMISSIONS
+        self.permissions = normalize_permissions(list(raw_permissions))
+
     @classmethod
     def from_dict(cls, name: str, data: dict) -> "MCPServerConfig":
         server_type = data.get("type", "stdio")
@@ -56,6 +67,7 @@ class MCPServerConfig:
             env=data.get("env", {}),
             url=data.get("url", ""),
             headers=data.get("headers", {}),
+            permissions=data.get("permissions") or DEFAULT_UNDECLARED_MCP_PERMISSIONS,
         )
 
 
@@ -69,6 +81,6 @@ def load_mcp_configs() -> list[MCPServerConfig]:
         configs = [MCPServerConfig.from_dict(name, cfg) for name, cfg in data.items()]
         logger.info("Loaded %d MCP server config(s): %s", len(configs), [c.name for c in configs])
         return configs
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
         logger.warning("Failed to parse MCP_SERVERS env var: %s", e)
         return []

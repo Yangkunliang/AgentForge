@@ -104,6 +104,7 @@ docs/
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
 | TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | ✅ 已完成 |
 | TASK-035 | 2026-07-10 | Stage 级 SkillPolicy 编排 | ✅ 已完成 |
+| TASK-036 | 2026-07-10 | MCP RuntimeSpec 权限归一 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -211,6 +212,16 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-10-stage-skill-policy/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-10-stage-skill-policy/ITERATION-REVIEW.md)
 - **核心功能**：StageRuntime 在调用 SkillExecutionEngine 前按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见工具；SkillDispatcher 继续保留调用前权限校验。
+
+### TASK-036 详细信息
+- **目录**：`docs/iterations/2026-07-10-mcp-runtime-spec/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-10-mcp-runtime-spec/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-10-mcp-runtime-spec/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-10-mcp-runtime-spec/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-10-mcp-runtime-spec/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-10-mcp-runtime-spec/ITERATION-REVIEW.md)
+- **核心功能**：MCP Server 配置支持 permissions 声明；未声明 permissions 的 MCP 默认按 `credential` 高风险处理；MCP 注册到 SkillRegistry 时写入 `source_type=mcp` 的 RuntimeSpec，并复用 StageSkillPolicy 过滤。
 
 ## 版本号规范
 

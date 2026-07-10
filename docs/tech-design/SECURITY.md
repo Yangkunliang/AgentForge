@@ -314,7 +314,7 @@ class UserRegisterRequest(BaseModel):
 | 只读/无副作用（天气、搜索）| 进程内执行 + `resource.setrlimit` | 轻量，无额外开销 |
 | 外部读取（文件读、URL抓取）| 独立子进程 + 路径白名单 | 隔离文件系统访问 |
 | 代码执行（`code_executor`）| Docker 容器（一次性）| 最强隔离，防逃逸 |
-| MCP Server | 独立子进程（stdio 模式）| MCP 协议天然隔离 |
+| MCP Server | 独立子进程（stdio 模式）或远程 SSE | 必须声明最小权限；未声明时按未知高风险处理 |
 
 ### 5.2 轻量沙箱（`resource.setrlimit`）
 
@@ -595,6 +595,8 @@ TASK-026 后，Upload Mount 支持用户主动上传 UTF-8 文本文件作为只
 - MCP Server 所需的凭证（GitHub Token、DB URL 等）存储在 `.env` 文件或 Vault
 - 不写入数据库，不出现在 SSE 事件流中
 - 每个 MCP Server 使用独立的最小权限凭证
+- MCP Server 配置必须声明最小 `permissions`；未声明时运行时按 `credential` 高风险处理，不会在默认 StageSkillPolicy 下主动暴露给 LLM。
+- MCP tool 注册到 SkillRegistry 时会写入 `source_type=mcp` 的 RuntimeSpec，复用 StageSkillPolicy 过滤和 SkillDispatcher 调用前权限校验。
 
 ### 8.3 密码存储
 
@@ -714,6 +716,7 @@ TASK-023 后，GitHub OAuth Mount 使用服务端加密凭据表保存 access to
 - EvalEvent 仅记录结构化执行事实和非敏感 metadata，禁止写入明文 API Key、OAuth token、文件正文或用户源码内容；`eval_events` 导出同样应用脱敏策略。
 - TASK-034 后，ModelRoute、SkillRuntime 和 EvalEvent 均按“运行时可追溯、密钥不出服务端”的安全基线维护：API、SSE、日志、导出和 prompt 上下文不得包含明文凭据。
 - TASK-035 后，StageRuntime 会先过滤 LLM 可见工具列表：默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential` 高风险权限工具，AgentSkill allowlist 进一步限制当前 Agent 可见 Skill；SkillDispatcher 调用前权限校验仍作为第二道防线。
+- TASK-036 后，MCP 外部工具也必须进入 SkillRuntimeSpec 权限模型；未声明 permissions 的 MCP Server 默认视为未知高风险，避免第三方工具通过 MCP 注册绕过 Stage 级工具过滤。
 
 ---
 

@@ -6,7 +6,7 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
-> 当前状态（TASK-034）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
+> 当前状态（TASK-036）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
 
 ## 2. 整体架构
 
@@ -165,7 +165,8 @@
 
 ### 3.11 MCP 集成
 - **MCP 客户端**：Model Context Protocol 客户端，Agent 可调用外部工具（`mcp/client.py`）
-- **MCP 配置**：工具列表、传输层配置（`mcp/config.py`）
+- **MCP 配置**：工具列表、传输层配置和 permissions 声明（`mcp/config.py`）
+- **MCP RuntimeSpec**：MCP Server 注册为 `mcp_<server>` Skill，写入 `source_type=mcp`、`executor_kind=mcp` 和权限声明，复用 StageSkillPolicy 与 SkillDispatcher 治理。
 
 ### 3.12 Webhook 集成
 - **Webhook 管理器**：事件驱动的外部通知（`webhooks/manager.py`）
@@ -276,8 +277,8 @@ src/
 │   │   ├── jwt.py               # JWT 工具
 │   │   └── permissions.py       # 权限校验
 │   ├── mcp/                     # MCP 集成
-│   │   ├── client.py            # MCP 客户端
-│   │   └── config.py            # MCP 配置
+│   │   ├── client.py            # MCP 客户端 + RuntimeSpec 注册
+│   │   └── config.py            # MCP 配置 + permissions 声明
 │   └── webhooks/                # Webhook 集成
 │       └── manager.py           # Webhook 管理器
 ├── api/                         # FastAPI 外部 API

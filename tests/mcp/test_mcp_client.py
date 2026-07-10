@@ -42,6 +42,16 @@ class TestMCPServerConfig:
         data = {"command": "echo", "args": ["hello"]}
         config = MCPServerConfig.from_dict("test", data)
         assert config.server_type == "stdio"
+        assert config.permissions == ["credential"]
+
+    def test_from_dict_normalizes_permissions(self):
+        data = {
+            "type": "stdio",
+            "command": "npx",
+            "permissions": ["filesystem", "shell", "filesystem"],
+        }
+        config = MCPServerConfig.from_dict("filesystem", data)
+        assert config.permissions == ["filesystem", "shell"]
 
 
 class TestMCPConfigLoader:
@@ -120,6 +130,71 @@ class TestMCPClientPool:
         pool = MCPClientPool()
         await pool.stop_all()
         assert pool.active_servers == []
+
+    async def test_register_to_skill_registry_adds_mcp_runtime_spec(self):
+        pool = MCPClientPool()
+        config = MCPServerConfig(
+            name="filesystem",
+            server_type="stdio",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem"],
+            permissions=["filesystem", "filesystem"],
+        )
+        client = MagicMock()
+        client.config = config
+        client.tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "mcp__filesystem__read_file",
+                    "description": "Read a file",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+                "_mcp_server": "filesystem",
+                "_mcp_tool": "read_file",
+            }
+        ]
+        pool._clients["filesystem"] = client
+
+        from agent_forge.skills.registry import get_skill_registry
+
+        registry = get_skill_registry()
+        pool._register_to_skill_registry()
+
+        try:
+            runtime_spec = registry.get_runtime_spec("mcp_filesystem")
+            assert runtime_spec is not None
+            assert runtime_spec["name"] == "mcp_filesystem"
+            assert runtime_spec["source_type"] == "mcp"
+            assert runtime_spec["executor_kind"] == "mcp"
+            assert runtime_spec["permissions"] == ["filesystem"]
+            assert runtime_spec["mcp_server"] == "filesystem"
+            assert runtime_spec["mcp_transport"] == "stdio"
+            assert runtime_spec["tool_defs"][0]["function"]["name"] == "mcp__filesystem__read_file"
+
+            from agent_forge.skills.policy import filter_tool_defs_for_runtime
+
+            registered_mcp_tools = [
+                tool
+                for tool in registry.get_all_tool_defs()
+                if tool["function"]["name"] == "mcp__filesystem__read_file"
+            ]
+            filtered, report = filter_tool_defs_for_runtime(
+                registered_mcp_tools,
+                registry=registry,
+                skill_policy_key="default",
+            )
+            assert filtered == []
+            assert report.excluded_tools == [
+                {
+                    "tool_name": "mcp__filesystem__read_file",
+                    "skill_name": "mcp_filesystem",
+                    "reason": "permission_denied",
+                    "permissions": ["filesystem"],
+                }
+            ]
+        finally:
+            registry.unregister("mcp_filesystem")
 
 
 class TestMCPClientPoolSingleton:

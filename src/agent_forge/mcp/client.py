@@ -14,11 +14,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 from typing import Any
 
 from agent_forge.mcp.config import MCPServerConfig
+from agent_forge.skills.runtime_spec import SkillRuntimeSpec
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +288,7 @@ class MCPClientPool:
                 skill_name=f"mcp_{server_name}",
                 tool_defs=clean_tool_defs,
                 executors=executors,
+                runtime_spec=_build_mcp_runtime_spec(client.config, clean_tool_defs),
             )
             logger.info(
                 "Registered MCP server '%s' with %d tools",
@@ -333,6 +336,46 @@ def _make_mcp_executor(client: MCPServerClient, mcp_tool_name: str):
     async def executor(**kwargs: Any) -> str:
         return await client.call_tool(mcp_tool_name, kwargs)
     return executor
+
+
+def _build_mcp_runtime_spec(config: MCPServerConfig, tool_defs: list[dict[str, Any]]) -> dict[str, Any]:
+    skill_name = f"mcp_{config.name}"
+    spec = SkillRuntimeSpec(
+        name=skill_name,
+        version="dynamic",
+        source_type="mcp",
+        manifest_hash=_mcp_manifest_hash(config, tool_defs),
+        tool_defs=tool_defs,
+        permissions=config.permissions,
+        executor_kind="mcp",
+        executor_entry_point=f"{config.server_type}:{config.name}",
+        audit_level="standard",
+        source=_mcp_source(config),
+    ).to_dict()
+    spec["mcp_server"] = config.name
+    spec["mcp_transport"] = config.server_type
+    return spec
+
+
+def _mcp_manifest_hash(config: MCPServerConfig, tool_defs: list[dict[str, Any]]) -> str:
+    payload = {
+        "name": config.name,
+        "server_type": config.server_type,
+        "command": config.command,
+        "args": config.args,
+        "url": config.url,
+        "permissions": config.permissions,
+        "tool_names": [tool["function"]["name"] for tool in tool_defs],
+    }
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _mcp_source(config: MCPServerConfig) -> str:
+    if config.server_type == "sse":
+        return config.url
+    command = " ".join([config.command, *config.args]).strip()
+    return command or config.name
 
 
 # ── 全局单例 ──────────────────────────────────────────────

@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-035 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-036 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，MCP 外部工具也归一到 SkillRuntimeSpec 权限模型。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-035，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
+截至 TASK-036，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
 
 ### 2.1 请求到执行
 
@@ -87,12 +87,13 @@ src/agent_forge/skills/dispatcher.py
 - `SkillInstaller` 支持外部 Skill import preview/install，安装前展示来源、工具、权限、风险和确认要求。
 - `SkillManifest` 支持 `agentforge-skill.yaml` 优先、`skill.md` 兼容，统一生成 `SkillRuntimeSpec`。
 - `SkillRegistry` 保存 runtime spec 和 tool -> skill 映射，安装后可刷新第三方 Skill executor。
+- MCP Server 配置支持声明 permissions；未声明时默认按 `credential` 高风险处理；MCP 注册时写入 `source_type=mcp`、`executor_kind=mcp` 的 RuntimeSpec。
 
 缺口：
 
 - `filter_tool_defs_for_runtime()` 会按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见工具。
 - GovernancePolicy 已兜底高风险 Skill 权限确认；默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential` 高风险权限工具。
-- MCP Tool 尚未全部归一化成带权限声明的 SkillRuntimeSpec。
+- 内置 Skill 尚未全部补齐 RuntimeSpec，后续应继续收敛。
 
 ### 2.4 LLM Provider
 
@@ -319,10 +320,11 @@ audit_level
 - `SkillRegistry` 记录 tool_defs、executor、runtime_spec 和 tool -> skill 映射。
 - `SkillInstaller` 支持本地、Git/GitHub、PyPI 源的安装前预览；本地安装会复制到 `skills/installed/` 并刷新 registry。
 - `SkillDispatcher` 调用前检查权限，调用后写审计并发出 `skill_eval` 事件。
+- `MCPClientPool` 注册 MCP Server 时生成 `source_type=mcp` 的 RuntimeSpec，并复用 StageSkillPolicy 过滤。
 
 后续收敛：
 
-- TASK-032 已将高风险权限确认接入 GovernancePolicy，并把拒绝审计写入 `governance_decision`；Stage 级可用 Skill 白名单仍可后续增强。
+- TASK-032 已将高风险权限确认接入 GovernancePolicy，并把拒绝审计写入 `governance_decision`；TASK-035/TASK-036 已让普通 Skill 和 MCP tool 进入 Stage 级可见工具过滤。
 - `skill_eval` SSE 事件已沉淀为结构化 EvalEvent。
 
 ### 3.7 GovernanceDecision
@@ -434,7 +436,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义，并写入 Governance 确认上下文 | 后续增强 |
 | AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | 后续增强 |
 | ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | 后续增强 |
-| SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py` | Manifest、权限、runtime spec、registry 刷新、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地 | 后续增强 |
+| SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py`、`mcp/client.py`、`mcp/config.py` | Manifest、权限、runtime spec、registry 刷新、MCP RuntimeSpec、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地 | 后续增强 |
 | GovernanceDecision | `governance/policy.py`、`pipeline/service.py`、`pipeline_runs.py`、`projects.py`、`skills/policy.py` | 阶段、交付和高风险 Skill 调用已走统一决策，并写入确认上下文、审计 payload 和 EvalEvent 确认事实 | 后续增强 |
 | EvalFeedback | `evaluation/service.py`、`models/evaluation.py`、`api/routes/evaluation.py`、StageRuntime、SkillDispatcher、Delivery | EvalEvent、Evaluation summary、Dashboard 聚合和 JSONL 导出已落地 | 后续增强 |
 | 架构文档 | `docs/architecture/`、`docs/tech-design/`、`docs/README.md`、`MEMORY.md`、`CLAUDE.md` | 已完成 AI Runtime 主线、核心闭环、Agent、LLM、Skill、安全、API、数据库和导出文档收敛 | 持续维护 |
@@ -528,6 +530,28 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 - 不删除历史文档。
 - 不把未实现能力写成已实现能力。
 
+### TASK-035: Stage 级 SkillPolicy 编排
+
+目标：让 StageRuntime 在调用 SkillExecutionEngine 前按阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 LLM 可见工具。
+
+完成状态：已落地 `filter_tool_defs_for_runtime()`、StageSkillPolicy 过滤报告、AgentSkill allowlist 接入和 StageRuntime skill_policy 上下文。
+
+不做：
+
+- 不移除 SkillDispatcher 的调用前权限校验。
+- 不让前端自行决定工具安全边界。
+
+### TASK-036: MCP RuntimeSpec 权限归一
+
+目标：让 MCP 外部工具和普通 Skill 进入同一套 RuntimeSpec、StageSkillPolicy 和高风险权限语义。
+
+完成状态：已落地 `MCPServerConfig.permissions`、未声明权限高风险 fallback、MCP RuntimeSpec adapter，以及 MCP tool 默认 StagePolicy 过滤测试。
+
+不做：
+
+- 不实现 MCP 市场 UI。
+- 不按工具返回内容自动猜测权限。
+
 ## 8. 当前风险
 
 | 风险 | 表现 | 对应任务 |
@@ -535,7 +559,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
 | Agent 配置空转 | AgentProfile 已进入 StageRuntime，AgentSkill allowlist 已参与 Stage 级 SkillPolicy 编排 | 后续增强 |
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
-| Skill 安全边界不足 | Manifest、权限、风险、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地；MCP 权限归一化可继续增强 | 后续增强 |
+| Skill 安全边界不足 | Manifest、权限、风险、Stage 级工具过滤、MCP RuntimeSpec、调用审计和高风险 Governance 决策已落地；内置 Skill RuntimeSpec 可继续增强 | 后续增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
 | 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认和失败事实；LLM token/cost 明细可继续增强 | 后续增强 |
 | 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |
