@@ -100,6 +100,7 @@
 - TASK-029 已完成：新增 `src/agent_forge/agents/resolver.py`，按用户覆盖、项目默认、StageDefinition.default_agent_selector、系统默认解析 AgentProfile；StageRuntime 会把 `agent_profile_id/name/source` 写入 `PipelineStageState`，并将 AgentProfile 注入 SkillExecutionEngine 上下文；新增 `/api/v1/agents/runtime/candidates` 返回运行时 active Agent 候选。
 - TASK-030 已完成：新增 `src/agent_forge/llm/router.py`、`src/agent_forge/models/llm.py` 和 `016_llm_model_routes.py`；LLM 设置页和 `/api/v1/llm/*` 支持 Provider / Model / Credential / Route，Credential 加密存储且 API 只返回 masked 信息；StageRuntime 会解析 ModelRoute、写入 StageState 模型追踪字段并将非敏感 route 上下注入 SkillExecutionEngine。
 - TASK-031 已完成：新增 `src/agent_forge/skills/runtime_spec.py`、`src/agent_forge/skills/policy.py` 和 `017_skill_runtime_policy.py`；Skill Manifest 支持 `agentforge-skill.yaml` 优先、`skill.md` 兼容，`/api/v1/skills/import/preview` 与 `/api/v1/skills/import/install` 会展示来源、工具、权限、风险和确认要求；安装后 Skill/SkillInstall 记录 manifest_hash、permissions、runtime_spec 和 preview，SkillRegistry 注册 runtime spec，SkillDispatcher 调用前执行权限校验并写入 `skill.invoke.*` 审计和 `skill_eval` 事件。
+- TASK-032 已完成：新增 `src/agent_forge/governance/policy.py` 和 `018_governance_confirmation_context.py`；`PipelineStageState` 记录确认类型、原因、影响范围和审计 payload；Pipeline 阶段确认、Delivery 未确认拒绝和高风险 Skill 调用拒绝均写入 `governance_decision`；ConfirmCard 渲染服务端策略生成的确认原因与影响范围。
 
 ---
 

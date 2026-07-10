@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -65,6 +65,10 @@ class PipelineStageState(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending", index=True)
     skip_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     confirmation_required: Mapped[bool] = mapped_column(nullable=False, default=False)
+    confirmation_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    confirmation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmation_impact_scope: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    confirmation_audit_payload: Mapped[dict] = mapped_column(JSON, default=dict)
     confirmation_action: Mapped[str | None] = mapped_column(String(30), nullable=True)
     confirmation_feedback: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     confirmation_resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)

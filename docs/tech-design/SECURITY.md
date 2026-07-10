@@ -470,8 +470,8 @@ def ssrf_check(url: str):
 - `SkillInstall.preview`、`manifest_hash`、`permissions`、`risk_level` 持久化，便于审计和回滚分析。
 - PyPI/GitHub/Git 预览会先下载或 clone 到临时目录；归档解压拒绝路径穿越和链接条目。
 - 本地安装会复制到 `skills/installed/<skill_name>/`，注册时只把 runtime spec、tool_defs 和 executor 引入 `SkillRegistry`。
-- Skill 调用前由 `SkillPermissionPolicy` 判断权限，拒绝时写入 `AuditLog.action=skill.invoke.denied`，成功、失败、超时也会发出 `skill_eval` 事件。
-- 后续 TASK-032 会把高风险 Skill 调用确认与阶段确认、写回确认统一到 GovernancePolicy。
+- Skill 调用前由 `SkillPermissionPolicy` 判断权限，高风险权限会先交给 `GovernancePolicy.evaluate_skill_call()` 生成 `skill_high_risk` 决策；拒绝时写入 `AuditLog.action=skill.invoke.denied`，并在 `details.governance_decision` 中记录权限、风险等级和影响范围。
+- 阶段确认、写回确认和高风险 Skill 调用确认共用 GovernancePolicy，前端只渲染服务端策略结果。
 
 ```yaml
 # 依赖白名单（可扩展）
@@ -687,6 +687,10 @@ TASK-023 后，GitHub OAuth Mount 使用服务端加密凭据表保存 access to
 | `delivery.github.apply.conflict` | WARN | GitHub PR Delivery base sha 冲突 |
 | `delivery.github.apply.failed` | ERROR | GitHub PR Delivery 失败 |
 | `delivery.github.apply.succeeded` | INFO | GitHub PR Delivery 成功 |
+| `delivery.apply.denied` | WARN | 本地写回未确认被拒绝 |
+| `delivery.zip.apply.denied` | WARN | zip Delivery 未确认被拒绝 |
+| `pipeline.confirm.*` | INFO | 用户处理 Pipeline 阶段确认 |
+| `skill.invoke.denied` | WARN | Skill 权限策略或 GovernancePolicy 拒绝调用 |
 
 ---
 

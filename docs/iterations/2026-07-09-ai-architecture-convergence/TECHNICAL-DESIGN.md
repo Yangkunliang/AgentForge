@@ -157,7 +157,23 @@ enabled
 audit_level
 ```
 
-### 3.7 ArtifactContract
+### 3.7 GovernanceDecision
+
+用途：统一表达阶段、交付和 Skill 调用是否允许、拒绝或要求人工确认。
+
+建议字段：
+
+```text
+decision
+reason
+risk_level
+confirmation_type
+reason_code
+impact_scope
+audit_payload
+```
+
+### 3.8 ArtifactContract
 
 用途：统一阶段输出和交付输入。
 
@@ -174,7 +190,7 @@ delivery_state
 created_by_agent_profile_id
 ```
 
-### 3.8 EvalFeedback
+### 3.9 EvalFeedback
 
 用途：记录执行质量、成本、延迟和用户反馈。
 
@@ -296,13 +312,26 @@ web/src/views/skills/List.vue
 - 技术选型、影响范围、写回交付、高风险 Skill 调用都走统一入口。
 - 前端 ConfirmCard 只渲染策略结果。
 
-建议新增或调整：
+实际新增或调整：
 
 ```text
 src/agent_forge/governance/policy.py
-src/agent_forge/governance/service.py
-src/agent_forge/models/governance_event.py
+src/agent_forge/models/pipeline.py
+src/agent_forge/pipeline/service.py
+src/api/routes/pipeline_runs.py
+src/api/routes/projects.py
+src/agent_forge/skills/policy.py
+src/agent_forge/skills/dispatcher.py
+web/src/components/chat/ConfirmCard.vue
 ```
+
+完成状态：
+
+- `GovernancePolicy` 统一输出 `allow`、`require_confirmation`、`deny` 三类决策。
+- Pipeline 创建阶段状态时写入确认类型、原因、影响范围和审计 payload。
+- Delivery 本地写回、GitHub PR、zip 包在缺少确认时写入统一治理决策。
+- 高风险 Skill 权限调用前由 SkillPermissionPolicy 复用 GovernancePolicy，拒绝审计包含权限和影响范围。
+- 前端 ConfirmCard 只渲染后端策略结果，不自行判断核心风险。
 
 ### 4.6 Eval Feedback
 

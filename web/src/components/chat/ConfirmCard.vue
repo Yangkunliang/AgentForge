@@ -33,6 +33,8 @@ const nextStageName = computed(() => {
 
 const confirmTitle = computed(() => `${props.stage.stage_name}等待确认`)
 const artifactName = computed(() => props.artifact?.name ?? '阶段产物已生成')
+const confirmationReason = computed(() => props.stage.confirmation_reason?.trim() ?? '')
+const impactScope = computed(() => props.stage.confirmation_impact_scope ?? [])
 const isBusy = computed(() => pendingAction.value !== null)
 
 async function submit(action: StageConfirmationAction) {
@@ -93,6 +95,26 @@ async function submit(action: StageConfirmationAction) {
         >
           查看产物并交付
         </RouterLink>
+      </div>
+
+      <div v-if="confirmationReason || impactScope.length" class="governance-box">
+        <div v-if="confirmationReason" class="governance-box__row">
+          <span class="governance-box__label">确认原因</span>
+          <span class="governance-box__text">{{ confirmationReason }}</span>
+        </div>
+        <div v-if="impactScope.length" class="governance-box__row">
+          <span class="governance-box__label">影响范围</span>
+          <div class="governance-box__scopes">
+            <span
+              v-for="scope in impactScope"
+              :key="`${scope.type}:${scope.id}`"
+              class="governance-box__scope"
+              :title="scope.id"
+            >
+              {{ scope.label }}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div v-if="showRevision" class="revision-box">
@@ -251,6 +273,60 @@ async function submit(action: StageConfirmationAction) {
     background: #ffefd0;
     border-color: #b45309;
   }
+}
+
+.governance-box {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.governance-box__row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.governance-box__label {
+  color: #8a6a2a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.governance-box__text {
+  color: #4b5563;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.governance-box__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.governance-box__scope {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #92400e;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  font-size: 12px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .revision-box {

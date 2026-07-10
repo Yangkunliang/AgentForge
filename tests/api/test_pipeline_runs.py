@@ -220,6 +220,15 @@ async def test_confirmation_api_approves_or_revises_waiting_stage(
     assert waiting["status"] == "waiting_confirmation"
     assert waiting["current_stage_id"] == "analysis"
     assert stage_by_id["analysis"]["status"] == "waiting_confirmation"
+    assert stage_by_id["analysis"]["confirmation_type"] == "prd_review"
+    assert "需求" in stage_by_id["analysis"]["confirmation_reason"]
+    assert stage_by_id["analysis"]["confirmation_impact_scope"] == [
+        {
+            "type": "pipeline_stage",
+            "id": "analysis",
+            "label": "需求分析",
+        }
+    ]
 
     direct_start_resp = async_client.post(
         f"/api/v1/pipeline-runs/{run['id']}/stages/analysis/start",
@@ -283,6 +292,8 @@ async def test_confirmation_api_approves_or_revises_waiting_stage(
         "pipeline.confirm.approve",
     ]
     assert audits[0].details["feedback"] == "补充异常场景"
+    assert audits[0].details["governance_decision"]["confirmation_type"] == "prd_review"
+    assert audits[0].details["governance_decision"]["impact_scope"][0]["id"] == "analysis"
 
 
 def test_chat_first_message_creates_pipeline_run(

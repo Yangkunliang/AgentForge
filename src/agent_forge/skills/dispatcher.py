@@ -76,7 +76,11 @@ class SkillDispatcher:
         permissions = list((runtime_spec or {}).get("permissions") or [])
         effective_policy = permission_policy or DEFAULT_SKILL_PERMISSION_POLICY
         if permissions:
-            decision = effective_policy.evaluate(permissions)
+            decision = effective_policy.evaluate(
+                permissions,
+                skill_name=skill_name,
+                tool_name=tool_name,
+            )
             if not decision.allowed:
                 err = f"工具 '{tool_name}' 权限不足：{', '.join(decision.denied_permissions)}。"
                 logger.warning("SkillDispatcher: permission denied for '%s': %s", tool_name, decision.denied_permissions)
@@ -91,7 +95,10 @@ class SkillDispatcher:
                     tool_call_id=tool_call_id,
                     runtime_spec=runtime_spec,
                     permissions=permissions,
-                    details={"denied_permissions": decision.denied_permissions},
+                    details={
+                        "denied_permissions": decision.denied_permissions,
+                        "governance_decision": decision.governance_decision,
+                    },
                 )
                 if on_event:
                     await on_event("skill_result", {

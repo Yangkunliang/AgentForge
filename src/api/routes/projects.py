@@ -48,6 +48,7 @@ from agent_forge.integrations.github import (
     exchange_github_oauth_code,
     fetch_github_repo,
 )
+from agent_forge.governance import GovernancePolicy
 from agent_forge.models import Artifact, AuditLog, OAuthCredential, OAuthState, Project, ProjectMount, User
 from agent_forge.models.session import Session
 from agent_forge.security.credentials import decrypt_secret, encrypt_secret
@@ -500,6 +501,24 @@ def _add_zip_delivery_audit(
             details=payload,
         )
     )
+
+
+def _delivery_governance_payload(
+    *,
+    channel: str,
+    artifact: Artifact,
+    target_path: str,
+    mount_id: str | None,
+    confirmed: bool,
+) -> dict:
+    decision = GovernancePolicy().evaluate_delivery_confirmation(
+        channel=channel,
+        target_path=target_path,
+        artifact_id=artifact.id,
+        mount_id=mount_id,
+        confirmed=confirmed,
+    )
+    return decision.audit_payload()
 
 
 def _add_upload_mount_audit(
@@ -1347,6 +1366,13 @@ async def apply_artifact_delivery_api(
     artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
     mount = await _get_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
     if not body.confirm_write:
+        governance_payload = _delivery_governance_payload(
+            channel="local",
+            artifact=artifact,
+            target_path=body.target_path,
+            mount_id=mount.id,
+            confirmed=False,
+        )
         _add_delivery_audit(
             db,
             action="delivery.apply.denied",
@@ -1355,7 +1381,10 @@ async def apply_artifact_delivery_api(
             artifact=artifact,
             mount=mount,
             target_path=body.target_path,
-            details={"reason": "missing_confirmation"},
+            details={
+                "reason": "missing_confirmation",
+                "governance_decision": governance_payload,
+            },
         )
         await db.commit()
         raise HTTPException(status_code=409, detail="Write confirmation is required before delivery")
@@ -1514,6 +1543,13 @@ async def apply_github_pr_delivery_api(
     artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
     mount = await _get_github_delivery_mount_or_404(db, artifact, body.mount_id, current_user.id)
     if not body.confirm_write:
+        governance_payload = _delivery_governance_payload(
+            channel="github",
+            artifact=artifact,
+            target_path=body.target_path,
+            mount_id=mount.id,
+            confirmed=False,
+        )
         _add_delivery_audit(
             db,
             action="delivery.github.apply.denied",
@@ -1522,7 +1558,10 @@ async def apply_github_pr_delivery_api(
             artifact=artifact,
             mount=mount,
             target_path=body.target_path,
-            details={"reason": "missing_confirmation"},
+            details={
+                "reason": "missing_confirmation",
+                "governance_decision": governance_payload,
+            },
         )
         await db.commit()
         raise HTTPException(status_code=409, detail="Write confirmation is required before GitHub PR delivery")
@@ -1662,6 +1701,13 @@ async def apply_zip_delivery_api(
     artifact = await _get_artifact_or_404(db, artifact_id, current_user.id)
     target_path = body.target_path or artifact.name
     if not body.confirm_write:
+        governance_payload = _delivery_governance_payload(
+            channel="zip",
+            artifact=artifact,
+            target_path=target_path,
+            mount_id="zip",
+            confirmed=False,
+        )
         _add_zip_delivery_audit(
             db,
             action="delivery.zip.apply.denied",
@@ -1669,7 +1715,10 @@ async def apply_zip_delivery_api(
             user_id=current_user.id,
             artifact=artifact,
             target_path=target_path,
-            details={"reason": "missing_confirmation"},
+            details={
+                "reason": "missing_confirmation",
+                "governance_decision": governance_payload,
+            },
         )
         await db.commit()
         raise HTTPException(status_code=409, detail="Write confirmation is required before zip delivery")

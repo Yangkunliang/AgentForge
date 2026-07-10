@@ -303,6 +303,9 @@ async def test_delivery_apply_without_confirmation_is_audited(
     assert denied.details["artifact_id"] == artifact["id"]
     assert denied.details["target_path"] == "src/main.py"
     assert denied.details["reason"] == "missing_confirmation"
+    assert denied.details["governance_decision"]["confirmation_type"] == "delivery_write"
+    assert denied.details["governance_decision"]["risk_level"] == "high"
+    assert denied.details["governance_decision"]["impact_scope"][-1]["id"] == "src/main.py"
 
 
 def _create_project(async_client: TestClient, fake_user: User, name: str) -> dict:

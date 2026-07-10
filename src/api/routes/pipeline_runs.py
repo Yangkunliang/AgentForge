@@ -50,6 +50,10 @@ class PipelineStageStateResponse(BaseModel):
     status: str
     skip_reason: str | None
     confirmation_required: bool
+    confirmation_type: str | None = None
+    confirmation_reason: str | None = None
+    confirmation_impact_scope: list[dict] = Field(default_factory=list)
+    confirmation_audit_payload: dict = Field(default_factory=dict)
     confirmation_action: str | None
     confirmation_feedback: str | None
     confirmation_resolved_at: datetime | None
@@ -183,7 +187,7 @@ async def confirm_pipeline_stage(
     run = await get_pipeline_run_for_user_or_404(db, run_id, current_user.id)
     stage = _stage_or_none(run, stage_id)
     resolve_stage_confirmation(run, stage_id, body.action, body.feedback)
-    _add_confirmation_audit(db, current_user.id, run, stage_id, body)
+    _add_confirmation_audit(db, current_user.id, run, stage_id, body, stage)
     task_id = await _confirmation_task_id(db, stage)
     await db.commit()
     await db.refresh(run, attribute_names=["stages"])
@@ -225,7 +229,9 @@ def _add_confirmation_audit(
     run: PipelineRun,
     stage_id: str,
     body: StageConfirmationRequest,
+    stage: PipelineStageState | None,
 ) -> None:
+    governance_payload = (stage.confirmation_audit_payload or {}) if stage else {}
     db.add(
         AuditLog(
             id=str(uuid.uuid4()),
@@ -241,6 +247,7 @@ def _add_confirmation_audit(
                 "session_id": run.session_id,
                 "stage_id": stage_id,
                 "feedback": body.feedback,
+                "governance_decision": governance_payload,
             },
         )
     )

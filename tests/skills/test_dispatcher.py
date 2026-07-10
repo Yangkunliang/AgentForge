@@ -229,6 +229,8 @@ class TestSkillDispatcher:
         assert audit.details["skill_name"] == "external-shell"
         assert audit.details["permission"] == ["shell"]
         assert audit.status == "denied"
+        assert audit.details["governance_decision"]["confirmation_type"] == "skill_high_risk"
+        assert audit.details["governance_decision"]["risk_level"] == "high"
         assert "skill_eval" in [event[0] for event in events]
 
         registry.unregister("external-shell")

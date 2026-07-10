@@ -217,6 +217,10 @@ TASK-023 后，GitHub Mount 的 `metadata` 只保存非敏感仓库信息和 `cr
 | status | String | pending/running/waiting_confirmation/completed/skipped/failed |
 | skip_reason | String | user_override/user_skipped 等跳过原因 |
 | confirmation_required | Boolean | 是否需要人工确认 |
+| confirmation_type | String | GovernancePolicy 输出的确认类型，如 `prd_review`、`delivery_write` |
+| confirmation_reason | Text | 面向用户展示的确认原因 |
+| confirmation_impact_scope | JSON | 确认影响范围，元素包含 type/id/label |
+| confirmation_audit_payload | JSON | 写入审计日志的治理决策 payload |
 | confirmation_action | String | 最近一次确认动作：approve/revise/cancel |
 | confirmation_feedback | Text | 用户修改意见，下一次同阶段执行会注入上下文 |
 | confirmation_resolved_at | DateTime | 最近一次确认处理时间 |

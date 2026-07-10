@@ -782,6 +782,20 @@ Authorization: Bearer <token>
       "status": "pending",
       "skip_reason": null,
       "confirmation_required": true,
+      "confirmation_type": "diff_review",
+      "confirmation_reason": "迭代差异会决定实际改动范围，继续前需要用户确认。",
+      "confirmation_impact_scope": [
+        {
+          "type": "pipeline_stage",
+          "id": "diff",
+          "label": "需求 Diff"
+        }
+      ],
+      "confirmation_audit_payload": {
+        "decision": "require_confirmation",
+        "risk_level": "medium",
+        "confirmation_type": "diff_review"
+      },
       "confirmation_action": null,
       "confirmation_feedback": null,
       "confirmation_resolved_at": null,
@@ -839,9 +853,9 @@ POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
 }
 ```
 
-`action=approve` 会把当前阶段置为 `completed` 并推进到下一阶段；`action=revise` 会把当前阶段回到 `pending`，`feedback` 注入下一次同阶段执行上下文；`action=cancel` 会把阶段置为 `failed`、run 置为 `cancelled`。每次确认会写入 `AuditLog.action=pipeline.confirm.{action}`。
+`action=approve` 会把当前阶段置为 `completed` 并推进到下一阶段；`action=revise` 会把当前阶段回到 `pending`，`feedback` 注入下一次同阶段执行上下文；`action=cancel` 会把阶段置为 `failed`、run 置为 `cancelled`。每次确认会写入 `AuditLog.action=pipeline.confirm.{action}`，并在 `details.governance_decision` 中记录确认类型、原因、风险等级和影响范围。
 
-StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。
+StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。确认原因和影响范围由服务端 `GovernancePolicy` 生成，前端只负责渲染。
 
 StageRuntime 启动阶段时会通过 AgentResolver 选择 AgentProfile，并写入当前 `PipelineStageState.agent_profile_id/name/source`。解析优先级为：用户本次阶段覆盖 → Project 默认 Agent policy → `StageDefinition.default_agent_selector` → 系统默认 Agent。第一版 Project 默认值通过运行时上下文预留，持久化项目策略后续继续扩展。
 

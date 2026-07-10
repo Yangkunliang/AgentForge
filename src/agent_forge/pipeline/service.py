@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from agent_forge.models import PipelineRun, PipelineStageState
 from agent_forge.models.session import Session
+from agent_forge.governance import GovernancePolicy
 from agent_forge.pipeline.catalog import get_stage_definitions_for_intent, normalize_intent
 
 TERMINAL_STAGE_STATUSES = {"completed", "skipped"}
@@ -43,6 +44,10 @@ def pipeline_run_to_dict(run: PipelineRun) -> dict:
                 "status": stage.status,
                 "skip_reason": stage.skip_reason,
                 "confirmation_required": stage.confirmation_required,
+                "confirmation_type": stage.confirmation_type,
+                "confirmation_reason": stage.confirmation_reason,
+                "confirmation_impact_scope": stage.confirmation_impact_scope or [],
+                "confirmation_audit_payload": stage.confirmation_audit_payload or {},
                 "confirmation_action": stage.confirmation_action,
                 "confirmation_feedback": stage.confirmation_feedback,
                 "confirmation_resolved_at": stage.confirmation_resolved_at,
@@ -84,8 +89,14 @@ async def create_pipeline_run_for_session(
 
     stages: list[PipelineStageState] = []
     overrides = stage_overrides or {}
+    governance = GovernancePolicy()
     for index, config in enumerate(get_stage_definitions_for_intent(normalized_intent)):
         skipped_by_user = overrides.get(config.stage_id) is False and not config.required
+        decision = governance.evaluate_stage_confirmation(
+            stage_id=config.stage_id,
+            stage_name=config.stage_name,
+            confirmation_gate=config.confirmation_gate if config.confirmation_required else None,
+        )
         stage = PipelineStageState(
             id=str(uuid.uuid4()),
             pipeline_run_id=run.id,
@@ -95,7 +106,11 @@ async def create_pipeline_run_for_session(
             required=config.required,
             status="skipped" if skipped_by_user else "pending",
             skip_reason="user_override" if skipped_by_user else None,
-            confirmation_required=config.confirmation_required,
+            confirmation_required=decision.decision == "require_confirmation",
+            confirmation_type=decision.confirmation_type,
+            confirmation_reason=decision.reason if decision.decision == "require_confirmation" else None,
+            confirmation_impact_scope=decision.impact_scope,
+            confirmation_audit_payload=decision.audit_payload(),
         )
         db.add(stage)
         stages.append(stage)

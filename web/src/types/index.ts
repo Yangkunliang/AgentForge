@@ -333,6 +333,12 @@ export type PipelineStageStatus =
   | 'skipped'
   | 'failed'
 
+export interface GovernanceImpactScope {
+  type: string
+  id: string
+  label: string
+}
+
 export interface PipelineStageState {
   id: string
   pipeline_run_id: string
@@ -343,6 +349,10 @@ export interface PipelineStageState {
   status: PipelineStageStatus
   skip_reason?: string | null
   confirmation_required: boolean
+  confirmation_type?: string | null
+  confirmation_reason?: string | null
+  confirmation_impact_scope: GovernanceImpactScope[]
+  confirmation_audit_payload?: Record<string, unknown> | null
   confirmation_action?: StageConfirmationAction | null
   confirmation_feedback?: string | null
   confirmation_resolved_at?: string | null
