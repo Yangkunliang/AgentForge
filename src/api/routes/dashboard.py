@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.database import get_async_session
+from agent_forge.evaluation import EvaluationService
 from agent_forge.models import Agent, Skill, Task, TaskStatus, User
 from middleware.auth import get_current_user
 
@@ -56,11 +57,20 @@ class RecentTask(BaseModel):
     created_at: str
 
 
+class EvaluationStats(BaseModel):
+    total_events: int
+    stage_success_rate: float
+    skill_success_rate: float
+    delivery_success_rate: float
+    average_stage_latency_ms: float
+
+
 class DashboardResponse(BaseModel):
     tasks: TaskStats
     agents: AgentStats
     skills: SkillStats
     cost: CostStats
+    evaluation: EvaluationStats
     recent_tasks: list[RecentTask]
 
 
@@ -75,6 +85,7 @@ async def get_dashboard(
     agent_stats = await _agent_stats(db)
     skill_stats = await _skill_stats(db)
     cost_stats = await _cost_stats(db)
+    evaluation_stats = await _get_evaluation_stats(db, user_id=current_user.id)
     recent = await _recent_tasks(db)
 
     return DashboardResponse(
@@ -82,6 +93,7 @@ async def get_dashboard(
         agents=agent_stats,
         skills=skill_stats,
         cost=cost_stats,
+        evaluation=evaluation_stats,
         recent_tasks=recent,
     ).model_dump()
 
@@ -146,6 +158,17 @@ async def _cost_stats(db: AsyncSession) -> CostStats:
         today_usd=round(today_usd, 2),
         trend_pct=round(trend_pct, 1),
         daily_7d=daily_7d,
+    )
+
+
+async def _get_evaluation_stats(db: AsyncSession, user_id: str | None = None) -> EvaluationStats:
+    summary = await EvaluationService.get_summary(db, user_id=user_id)
+    return EvaluationStats(
+        total_events=summary["total_events"],
+        stage_success_rate=summary["stages"]["success_rate"],
+        skill_success_rate=summary["skills"]["success_rate"],
+        delivery_success_rate=summary["delivery"]["success_rate"],
+        average_stage_latency_ms=summary["stages"]["average_latency_ms"],
     )
 
 

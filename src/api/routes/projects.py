@@ -24,7 +24,7 @@ from agent_forge.bridge.files import (
     root_path_for_mount,
 )
 from agent_forge.config import settings
-from agent_forge.database import get_async_session
+from agent_forge.database import async_session_factory, get_async_session
 from agent_forge.delivery import (
     DeliveryConsistencyError,
     GitHubDeliveryConsistencyError,
@@ -48,6 +48,7 @@ from agent_forge.integrations.github import (
     exchange_github_oauth_code,
     fetch_github_repo,
 )
+from agent_forge.evaluation import EvaluationService
 from agent_forge.governance import GovernancePolicy
 from agent_forge.models import Artifact, AuditLog, OAuthCredential, OAuthState, Project, ProjectMount, User
 from agent_forge.models.session import Session
@@ -519,6 +520,33 @@ def _delivery_governance_payload(
         confirmed=confirmed,
     )
     return decision.audit_payload()
+
+
+async def _record_delivery_eval(
+    *,
+    artifact: Artifact,
+    channel: str,
+    target_path: str,
+    event_type: str,
+    status: str,
+    failure_reason: str | None = None,
+    report: dict | None = None,
+) -> None:
+    await EvaluationService.safe_record_event(
+        async_session_factory,
+        project_id=artifact.project_id,
+        pipeline_run_id=artifact.pipeline_run_id,
+        event_type=event_type,
+        status=status,
+        artifact_id=artifact.id,
+        delivery_channel=channel,
+        failure_reason=failure_reason,
+        metadata={
+            "target_path": target_path,
+            "stage_state_id": artifact.stage_state_id,
+            "report": report or {},
+        },
+    )
 
 
 def _add_upload_mount_audit(
@@ -1387,6 +1415,15 @@ async def apply_artifact_delivery_api(
             },
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="local",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="missing_confirmation",
+            report={"governance_decision": governance_payload},
+        )
         raise HTTPException(status_code=409, detail="Write confirmation is required before delivery")
 
     try:
@@ -1409,6 +1446,15 @@ async def apply_artifact_delivery_api(
             details=exc.report,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="local",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="target_changed",
+            report=exc.report,
+        )
         raise HTTPException(status_code=409, detail=exc.detail) from exc
     except BridgeAccessError as exc:
         report = await mark_artifact_delivery_failed(
@@ -1432,6 +1478,15 @@ async def apply_artifact_delivery_api(
             details=report,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="local",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="bridge_access_error",
+            report=report,
+        )
         _raise_bridge_error(exc)
     except Exception as exc:
         report = await mark_artifact_delivery_failed(
@@ -1455,6 +1510,15 @@ async def apply_artifact_delivery_api(
             details=report,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="local",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="unexpected_error",
+            report=report,
+        )
         raise HTTPException(status_code=500, detail="Delivery failed unexpectedly") from exc
     _add_delivery_audit(
         db,
@@ -1472,6 +1536,14 @@ async def apply_artifact_delivery_api(
         },
     )
     await db.commit()
+    await _record_delivery_eval(
+        artifact=artifact,
+        channel="local",
+        target_path=delivery["target_path"],
+        event_type="delivery_succeeded",
+        status="success",
+        report=delivery["report"],
+    )
     await db.refresh(artifact)
     return delivery
 
@@ -1564,6 +1636,15 @@ async def apply_github_pr_delivery_api(
             },
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="github",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="missing_confirmation",
+            report={"governance_decision": governance_payload},
+        )
         raise HTTPException(status_code=409, detail="Write confirmation is required before GitHub PR delivery")
 
     access_token = await _github_mount_access_token(db, mount, current_user.id)
@@ -1593,6 +1674,15 @@ async def apply_github_pr_delivery_api(
             details=exc.report,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="github",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="github_base_changed",
+            report=exc.report,
+        )
         raise HTTPException(status_code=409, detail=exc.detail) from exc
     except GitHubDeliveryError as exc:
         details = exc.report or {
@@ -1611,6 +1701,15 @@ async def apply_github_pr_delivery_api(
             details=details,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="github",
+            target_path=body.target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason=details.get("error_code") or exc.error_code,
+            report=details,
+        )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     for event in delivery.get("_audit_events", []):
@@ -1643,6 +1742,14 @@ async def apply_github_pr_delivery_api(
         },
     )
     await db.commit()
+    await _record_delivery_eval(
+        artifact=artifact,
+        channel="github",
+        target_path=delivery["target_path"],
+        event_type="delivery_succeeded",
+        status="success",
+        report=delivery["report"],
+    )
     await db.refresh(artifact)
     delivery.pop("_audit_events", None)
     return delivery
@@ -1721,6 +1828,15 @@ async def apply_zip_delivery_api(
             },
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="zip",
+            target_path=target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="missing_confirmation",
+            report={"governance_decision": governance_payload},
+        )
         raise HTTPException(status_code=409, detail="Write confirmation is required before zip delivery")
 
     files = [item.model_dump() for item in body.files] if body.files else None
@@ -1753,6 +1869,15 @@ async def apply_zip_delivery_api(
             details=report,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="zip",
+            target_path=target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason=exc.error_code,
+            report=report,
+        )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except Exception as exc:
         report = await mark_zip_delivery_failed(
@@ -1774,6 +1899,15 @@ async def apply_zip_delivery_api(
             details=report,
         )
         await db.commit()
+        await _record_delivery_eval(
+            artifact=artifact,
+            channel="zip",
+            target_path=target_path,
+            event_type="delivery_failed",
+            status="failed",
+            failure_reason="zip_package_error",
+            report=report,
+        )
         raise HTTPException(status_code=500, detail="Zip delivery failed unexpectedly") from exc
 
     report = delivery["report"]
@@ -1794,6 +1928,14 @@ async def apply_zip_delivery_api(
         },
     )
     await db.commit()
+    await _record_delivery_eval(
+        artifact=artifact,
+        channel="zip",
+        target_path=delivery["target_path"],
+        event_type="delivery_succeeded",
+        status="success",
+        report=report,
+    )
     await db.refresh(artifact)
     return delivery
 

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.auth.jwt import get_current_active_user
 from agent_forge.database import get_async_session
+from agent_forge.evaluation import EvaluationService
 from agent_forge.models.agent import Agent
 from agent_forge.models.skill import Skill
 from agent_forge.models.task import Task, TaskStatus
@@ -50,11 +51,20 @@ class TaskSummary(BaseModel):
     created_at: str
 
 
+class EvaluationStats(BaseModel):
+    total_events: int
+    stage_success_rate: float
+    skill_success_rate: float
+    delivery_success_rate: float
+    average_stage_latency_ms: float
+
+
 class DashboardResponse(BaseModel):
     tasks: TaskStats
     agents: AgentStats
     skills: SkillStats
     cost: CostStats
+    evaluation: EvaluationStats
     recent_tasks: list[TaskSummary]
 
 
@@ -67,6 +77,7 @@ async def get_dashboard(
     agents = await _get_agent_stats(db)
     skills = await _get_skill_stats(db)
     cost = await _get_cost_stats(db)
+    evaluation = await _get_evaluation_stats(db, user_id=_.id)
     recent_tasks = await _get_recent_tasks(db)
 
     return DashboardResponse(
@@ -74,6 +85,7 @@ async def get_dashboard(
         agents=agents,
         skills=skills,
         cost=cost,
+        evaluation=evaluation,
         recent_tasks=recent_tasks,
     )
 
@@ -151,6 +163,17 @@ async def _get_cost_stats(db: AsyncSession) -> CostStats:
         today_usd=round(today_usd, 2),
         trend_pct=round(trend_pct, 1),
         daily_7d=daily_7d,
+    )
+
+
+async def _get_evaluation_stats(db: AsyncSession, user_id: str | None = None) -> EvaluationStats:
+    summary = await EvaluationService.get_summary(db, user_id=user_id)
+    return EvaluationStats(
+        total_events=summary["total_events"],
+        stage_success_rate=summary["stages"]["success_rate"],
+        skill_success_rate=summary["skills"]["success_rate"],
+        delivery_success_rate=summary["delivery"]["success_rate"],
+        average_stage_latency_ms=summary["stages"]["average_latency_ms"],
     )
 
 

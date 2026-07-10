@@ -16,7 +16,7 @@ acceptance:
   - PipelineRun、Stage、Agent、Model、Skill、Delivery 关键事件能结构化记录
   - 能按项目和时间范围查询基础质量指标
   - 不影响主执行链路成功率
-status: todo
+status: done
 ```
 
 ## 背景
@@ -43,14 +43,25 @@ status: todo
 
 ## 实施 checklist
 
-- 设计 EvalEvent 表。
-- 新增 EvaluationService。
-- StageRuntime 记录 stage_started、stage_completed、stage_failed。
-- SkillDispatcher 记录 skill_called、skill_succeeded、skill_failed。
-- ModelRouter 或 LLM Provider 记录模型耗时和成本。
-- DeliveryService 记录 delivery_succeeded、delivery_failed。
-- 新增 Evaluation API。
-- Dashboard 增加基础概览。
+- [x] 设计 EvalEvent 表。
+- [x] 新增 EvaluationService。
+- [x] StageRuntime 记录 stage_started、stage_completed、stage_failed。
+- [x] SkillDispatcher 记录 skill_called、skill_succeeded、skill_failed。
+- [x] StageRuntime 记录阶段 AgentProfile、ModelRoute 与耗时。
+- [x] DeliveryService 记录 delivery_succeeded、delivery_failed。
+- [x] 新增 Evaluation API。
+- [x] Dashboard 增加基础概览。
+- [x] ExportManager 支持 EvalEvent JSONL 导出。
+
+## 实现摘要
+
+- 新增 `EvalEvent` 模型和 `019_eval_events.py` 迁移，记录项目、PipelineRun、Stage、Agent、ModelRoute、Skill、Artifact、Delivery、耗时、成本、失败原因和扩展 metadata。
+- 新增 `EvaluationService.record_event()` 与 `safe_record_event()`；主链路打点使用独立 session，写入失败只记录日志，不阻断阶段执行、Skill 调用或交付。
+- `StageRuntime` 在阶段启动、完成、失败和 Artifact 创建时记录结构化事件。
+- `SkillDispatcher` 在 Skill 调用、成功、失败、超时和权限拒绝路径记录结构化事件。
+- 本地写回、GitHub PR、zip Delivery 在成功、确认缺失、目标变更和异常路径记录交付事件。
+- 新增 `/api/v1/evaluation/summary`，支持按 `project_id`、`pipeline_run_id`、时间范围过滤，并按当前登录用户做项目隔离。
+- Dashboard 返回 `evaluation` 基础指标；导出类型 `eval_events` / `evaluation` 可生成 EvalEvent JSONL。
 
 ## 验收标准
 
@@ -62,15 +73,15 @@ status: todo
 ## 验证
 
 ```bash
-uv run --extra dev pytest tests/api/test_dashboard.py tests/api/test_exports.py
-```
-
-```bash
-uv run --extra dev pytest tests/api/test_evaluation.py
+uv run --extra dev pytest -q tests/api/test_evaluation.py tests/api/test_dashboard.py tests/api/test_exports.py tests/api/test_delivery.py tests/api/test_github_delivery.py tests/api/test_zip_delivery.py tests/skills/test_dispatcher.py tests/pipeline/test_runtime.py
 ```
 
 ```bash
 npm run build
+```
+
+```bash
+PYTHONPATH=/Users/yangkl/AgentForge/.worktrees/task-033-eval-feedback/src JWT_SECRET_KEY=task033-startup-secret uv run --extra dev uvicorn api.main:app --host 127.0.0.1 --port 18098
 ```
 
 前端命令在 `/Users/yangkl/AgentForge/web` 下执行。

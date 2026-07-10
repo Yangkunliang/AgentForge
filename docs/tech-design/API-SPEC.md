@@ -1353,6 +1353,13 @@ Authorization: Bearer <token>
       { "date": "2026-06-17", "usd": 12.50 }
     ]
   },
+  "evaluation": {
+    "total_events": 128,
+    "stage_success_rate": 0.92,
+    "skill_success_rate": 0.88,
+    "delivery_success_rate": 0.95,
+    "average_stage_latency_ms": 2450
+  },
   "recent_tasks": [
     {
       "task_id": "task-152",
@@ -1365,7 +1372,97 @@ Authorization: Bearer <token>
 }
 ```
 
-**说明：** `trend_pct` 为正表示费用较昨日增加，为负表示减少。
+**说明：** `trend_pct` 为正表示费用较昨日增加，为负表示减少。`evaluation` 基于 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。
+
+---
+
+## 6.1 Evaluation API
+
+```http
+GET /api/v1/evaluation/summary?project_id=proj-001&pipeline_run_id=run-001&start_date=2026-07-01T00:00:00Z&end_date=2026-07-10T23:59:59Z
+Authorization: Bearer <token>
+```
+
+所有过滤参数均可选；传 `project_id` 时只返回当前登录用户有权访问的项目数据。
+
+**响应 200**:
+```json
+{
+  "project_id": "proj-001",
+  "pipeline_run_id": "run-001",
+  "total_events": 42,
+  "period": {
+    "start_date": "2026-07-01T00:00:00Z",
+    "end_date": "2026-07-10T23:59:59Z"
+  },
+  "pipelines": {
+    "total": 8,
+    "succeeded": 7,
+    "failed": 1,
+    "success_rate": 0.875,
+    "average_latency_ms": 2100
+  },
+  "stages": {
+    "total": 18,
+    "succeeded": 16,
+    "failed": 2,
+    "success_rate": 0.889,
+    "average_latency_ms": 2450
+  },
+  "skills": {
+    "total": 9,
+    "succeeded": 8,
+    "failed": 1,
+    "success_rate": 0.889,
+    "average_latency_ms": 420
+  },
+  "delivery": {
+    "total": 4,
+    "succeeded": 3,
+    "failed": 1,
+    "success_rate": 0.75,
+    "average_latency_ms": 0
+  },
+  "artifacts": {
+    "generated": 6,
+    "delivered": 3,
+    "failed": 1
+  },
+  "confirmations": {
+    "total": 5,
+    "revised": 1,
+    "revise_ratio": 0.2
+  },
+  "agents": [
+    {
+      "agent_profile_id": "agent-001",
+      "name": "Coder",
+      "usage_count": 5,
+      "failed": 1,
+      "failure_rate": 0.2,
+      "average_latency_ms": 2300,
+      "cost_usd": 0.0
+    }
+  ],
+  "models": [
+    {
+      "model_route_key": "default",
+      "name": "Default Route",
+      "model_name": "gpt-4o-mini",
+      "usage_count": 5,
+      "failed": 0,
+      "failure_rate": 0.0,
+      "average_latency_ms": 2300,
+      "cost_usd": 0.0
+    }
+  ],
+  "event_counts": {
+    "stage_started": 6,
+    "stage_completed": 5,
+    "delivery_failed": 1
+  }
+}
+```
 
 ---
 
@@ -1503,6 +1600,8 @@ Authorization: Bearer <token>   (需要 admin 权限)
   "delevel": "level_1"
 }
 ```
+
+`type` 也支持 `eval_events` / `evaluation`，用于导出结构化执行反馈事件。
 
 **响应 202**:
 ```json

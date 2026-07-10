@@ -17,6 +17,7 @@ from agent_forge.api.sse import (
 )
 from agent_forge.database import async_session_factory
 from agent_forge.agents.resolver import AgentProfile, resolve_agent_profile
+from agent_forge.evaluation import EvaluationService
 from agent_forge.llm.router import ModelRouteResolution, resolve_model_route
 from agent_forge.models import PipelineRun, PipelineStageState
 from agent_forge.pipeline.catalog import get_stage_definition, stage_definition_to_dict
@@ -64,9 +65,10 @@ class StageRuntime:
         blocked_reason: str | None = None
         agent_profile: AgentProfile | None = None
         model_route: ModelRouteResolution | None = None
+        eval_context: dict | None = None
         stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
-            active_stage_id, confirmation_context, blocked_reason, agent_profile, model_route = await self._start_current_stage(
+            active_stage_id, confirmation_context, blocked_reason, agent_profile, model_route, eval_context = await self._start_current_stage(
                 task_id=task_id,
                 pipeline_run_id=pipeline_run_id,
                 user_id=user_id,
@@ -93,6 +95,7 @@ class StageRuntime:
                     confirmation_context,
                     agent_profile,
                     model_route,
+                    eval_context,
                 ),
             )
 
@@ -123,7 +126,7 @@ class StageRuntime:
         user_id: str,
         fallback_agent_name: str,
         advanced_context: dict | None,
-    ) -> tuple[str | None, dict | None, str | None, AgentProfile | None, ModelRouteResolution | None]:
+    ) -> tuple[str | None, dict | None, str | None, AgentProfile | None, ModelRouteResolution | None, dict | None]:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
             await emit_pipeline_started(
@@ -136,13 +139,18 @@ class StageRuntime:
 
             stage_id = run.current_stage_id
             if not stage_id:
-                return None, None, None, None, None
+                return None, None, None, None, None, None
 
             stage = _find_stage(run, stage_id)
             if stage and stage.status == "waiting_confirmation":
-                return None, None, "waiting_confirmation", None, None
+                return None, None, "waiting_confirmation", None, None, None
 
             stage_definition = get_stage_definition(run.intent_type, stage_id)
+            eval_context = {
+                "project_id": run.project_id,
+                "pipeline_run_id": run.id,
+                "stage_id": stage_id,
+            }
             agent_profile = await resolve_agent_profile(
                 db,
                 stage_definition=stage_definition,
@@ -157,6 +165,7 @@ class StageRuntime:
                 fallback_model_name=agent_profile.model_name,
             )
             confirmation_context = _confirmation_context(stage, stage_definition)
+            should_record_started = bool(stage and stage.status == "pending")
             if stage and stage.status == "pending":
                 stage.agent_profile_id = agent_profile.id
                 stage.agent_profile_name = agent_profile.name
@@ -167,6 +176,21 @@ class StageRuntime:
                 stage.model_route_source = model_route.source
                 start_stage(run, stage_id)
                 await db.commit()
+                if should_record_started:
+                    await EvaluationService.safe_record_event(
+                        self.session_factory,
+                        project_id=run.project_id,
+                        pipeline_run_id=run.id,
+                        stage_id=stage.stage_id,
+                        event_type="stage_started",
+                        status="success",
+                        agent_profile_id=agent_profile.id,
+                        agent_profile_name=agent_profile.name,
+                        model_route_key=model_route.route_key,
+                        model_route_name=model_route.name,
+                        model_name=model_route.model_name,
+                        metadata={"stage_name": stage.stage_name},
+                    )
 
             await emit_stage_started(
                 task_id=task_id,
@@ -175,7 +199,7 @@ class StageRuntime:
                 pipeline_run_id=run.id,
                 stage_id=stage_id,
             )
-            return stage_id, confirmation_context, None, agent_profile, model_route
+            return stage_id, confirmation_context, None, agent_profile, model_route, eval_context
 
     async def _complete_stage(
         self,
@@ -212,7 +236,40 @@ class StageRuntime:
                 "name": artifact.name,
             }
             requires_confirmation = stage.status == "waiting_confirmation"
+            latency_ms = _stage_latency_ms(stage)
             await db.commit()
+            await EvaluationService.safe_record_event(
+                self.session_factory,
+                project_id=run.project_id,
+                pipeline_run_id=run.id,
+                stage_id=stage.stage_id,
+                event_type="stage_completed",
+                status="success",
+                agent_profile_id=stage.agent_profile_id,
+                agent_profile_name=stage.agent_profile_name,
+                model_route_key=stage.model_route_key,
+                model_route_name=stage.model_route_name,
+                model_name=stage.model_name,
+                artifact_id=artifact.id,
+                latency_ms=latency_ms,
+                metadata={
+                    "stage_name": stage.stage_name,
+                    "requires_confirmation": requires_confirmation,
+                },
+            )
+            await EvaluationService.safe_record_event(
+                self.session_factory,
+                project_id=artifact.project_id,
+                pipeline_run_id=artifact.pipeline_run_id,
+                stage_id=stage.stage_id,
+                event_type="artifact_created",
+                status="success",
+                artifact_id=artifact.id,
+                metadata={
+                    "artifact_type": artifact.artifact_type,
+                    "name": artifact.name,
+                },
+            )
             await emit_artifact_created(task_id=task_id, **artifact_payload)
             if requires_confirmation:
                 await emit_confirm_required(
@@ -242,11 +299,36 @@ class StageRuntime:
                 return
 
             fail_stage(run, stage_id)
+            latency_ms = _stage_latency_ms(stage)
             await db.commit()
+            await EvaluationService.safe_record_event(
+                self.session_factory,
+                project_id=run.project_id,
+                pipeline_run_id=run.id,
+                stage_id=stage.stage_id,
+                event_type="stage_failed",
+                status="failed",
+                agent_profile_id=stage.agent_profile_id,
+                agent_profile_name=stage.agent_profile_name,
+                model_route_key=stage.model_route_key,
+                model_route_name=stage.model_route_name,
+                model_name=stage.model_name,
+                latency_ms=latency_ms,
+                failure_reason="stage_runtime_exception",
+                metadata={"stage_name": stage.stage_name},
+            )
 
 
 def _find_stage(run: PipelineRun, stage_id: str) -> PipelineStageState | None:
     return next((stage for stage in run.stages if stage.stage_id == stage_id), None)
+
+
+def _stage_latency_ms(stage: PipelineStageState) -> int | None:
+    if not stage.started_at or not stage.completed_at:
+        return None
+    started_at = stage.started_at.replace(tzinfo=None)
+    completed_at = stage.completed_at.replace(tzinfo=None)
+    return max(0, int((completed_at - started_at).total_seconds() * 1000))
 
 
 def _confirmation_context(stage: PipelineStageState | None, stage_definition: Any | None = None) -> dict | None:
@@ -276,15 +358,18 @@ def _merge_runtime_context(
     confirmation: dict | None,
     agent_profile: AgentProfile | None,
     model_route: ModelRouteResolution | None,
+    eval_context: dict | None = None,
 ) -> dict | None:
     merged = _merge_confirmation_context(base, confirmation)
-    if not agent_profile and not model_route:
+    if not agent_profile and not model_route and not eval_context:
         return merged
     runtime_context = dict(merged or {})
     if agent_profile:
         runtime_context["agent_profile"] = agent_profile.to_context()
     if model_route:
         runtime_context["model_route"] = model_route.to_context()
+    if eval_context:
+        runtime_context["evaluation_context"] = eval_context
     return runtime_context
 
 

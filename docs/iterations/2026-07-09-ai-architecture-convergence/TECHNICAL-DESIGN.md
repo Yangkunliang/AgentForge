@@ -340,14 +340,20 @@ web/src/components/chat/ConfirmCard.vue
 - 记录 Pipeline、Stage、Agent、Model、Skill、Artifact、Delivery 维度指标。
 - 不在第一版做复杂评分，先保证事件结构化、可查询。
 
-建议新增：
+已落地：
 
 ```text
-src/agent_forge/evaluation/events.py
 src/agent_forge/evaluation/service.py
-src/agent_forge/models/eval_event.py
+src/agent_forge/models/evaluation.py
 src/api/routes/evaluation.py
 ```
+
+TASK-033 落地结果：
+
+- `EvalEvent` 表保存 project、pipeline_run、stage、agent_profile、model_route、skill、artifact、delivery、latency、cost、failure_reason 和 metadata。
+- `EvaluationService.safe_record_event()` 通过独立 session 非阻塞写入，失败只记录日志。
+- StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 成功/失败路径已接入 EvalEvent。
+- Dashboard 增加 `evaluation` 基础概览，Export 支持 `eval_events` / `evaluation` 导出类型。
 
 ## 5. 数据流
 
@@ -424,9 +430,7 @@ GET /api/skills
 ### 6.5 Evaluation API
 
 ```text
-GET /api/evaluation/summary
-GET /api/evaluation/pipeline-runs/{run_id}
-POST /api/evaluation/feedback
+GET /api/v1/evaluation/summary
 ```
 
 ## 7. 迁移策略

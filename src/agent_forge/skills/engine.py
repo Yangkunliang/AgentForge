@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import inspect
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -306,13 +307,16 @@ class SkillExecutionEngine:
                             "tool_call_id": tc.id,
                         })
 
-                    result_str = await self._dispatcher.invoke(
-                        tool_name=tc.function_name,
-                        tool_call_id=tc.id,
-                        arguments=tc.function_args,
-                        on_event=sse_publish,
-                        user_id=user_id,
-                    )
+                    dispatch_kwargs = {
+                        "tool_name": tc.function_name,
+                        "tool_call_id": tc.id,
+                        "arguments": tc.function_args,
+                        "on_event": sse_publish,
+                        "user_id": user_id,
+                    }
+                    if _dispatcher_accepts_runtime_context(self._dispatcher):
+                        dispatch_kwargs["runtime_context"] = advanced_context
+                    result_str = await self._dispatcher.invoke(**dispatch_kwargs)
 
                     if sse_publish:
                         try:
@@ -375,6 +379,17 @@ def _build_final_prompt(messages: list[dict]) -> str:
         f"工具返回的真实数据：\n{combined}\n\n"
         f"请用自然语言、清晰友好地整理并回答用户的问题，可以使用 markdown 格式，"
         f"但不要直接复制粘贴 JSON 原文。"
+    )
+
+
+def _dispatcher_accepts_runtime_context(dispatcher: Any) -> bool:
+    try:
+        params = inspect.signature(dispatcher.invoke).parameters
+    except (TypeError, ValueError):
+        return True
+    return "runtime_context" in params or any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in params.values()
     )
 
 

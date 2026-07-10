@@ -38,8 +38,8 @@ docs/
 | 文档 | 说明 | 状态 |
 |------|------|------|
 | [ARCHITECTURE.md](tech-design/ARCHITECTURE.md) | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 | ✅ |
-| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
-| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
+| [API-SPEC.md](tech-design/API-SPEC.md) | 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、Evaluation、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） | ✅ |
+| [DATABASE.md](tech-design/DATABASE.md) | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery/EvalEvent 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） | ✅ |
 | [SECURITY.md](tech-design/SECURITY.md) | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 | ✅ |
 | [LLM-CONFIG.md](tech-design/LLM-CONFIG.md) | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪 | ✅ |
 | [FRONTEND-ARCHITECTURE.md](tech-design/FRONTEND-ARCHITECTURE.md) | Vue 3 前端架构（Project Store、SSE 方案、Token 策略、权限模型、Store 同步） | ✅ |
@@ -102,7 +102,7 @@ docs/
 | TASK-024 | 2026-07-08 | GitHub PR Delivery | ✅ 已完成 |
 | TASK-025 | 2026-07-08 | zip Delivery Package | ✅ 已完成 |
 | TASK-026 | 2026-07-08 | Upload Mount 上下文兜底 | ✅ 已完成 |
-| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-032 已完成，TASK-033 待执行 |
+| TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | 🚧 TASK-033 已完成，TASK-034 待执行 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -198,7 +198,7 @@ docs/
   - [TASK-032.md](iterations/2026-07-09-ai-architecture-convergence/TASK-032.md)
   - [TASK-033.md](iterations/2026-07-09-ai-architecture-convergence/TASK-033.md)
   - [TASK-034.md](iterations/2026-07-09-ai-architecture-convergence/TASK-034.md)
-- **核心功能**：把 AgentForge 的长期 AI 架构收敛为 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路。TASK-027～TASK-032 已完成运行时契约、Pipeline Catalog、Agent 绑定、模型路由、第三方 Skill 导入闭环和 Governance 人工确认策略；后续继续推进 Eval Feedback 和文档收敛。
+- **核心功能**：把 AgentForge 的长期 AI 架构收敛为 Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback 主链路。TASK-027～TASK-033 已完成运行时契约、Pipeline Catalog、Agent 绑定、模型路由、第三方 Skill 导入闭环、Governance 人工确认策略和 Eval Feedback 结构化反馈闭环；后续继续推进文档收敛。
 
 ## 版本号规范
 

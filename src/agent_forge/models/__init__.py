@@ -8,6 +8,7 @@ from .api_key import APIKey
 from .audit_log import AuditLog
 from .conversation import Conversation
 from .export_task import ExportTask
+from .evaluation import EvalEvent
 from .llm import LLMCredential, LLMModelSetting, LLMProviderSetting, LLMRoute
 from .memory_entry import MemoryEntry
 from .oauth import OAuthCredential, OAuthState
@@ -31,6 +32,7 @@ __all__ = [
     "AgentSkill",
     "AuditLog",
     "Conversation",
+    "EvalEvent",
     "ExportTask",
     "Artifact",
     "LLMCredential",

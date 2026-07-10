@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.auth.jwt import create_access_token
 from agent_forge.exporter.anonymizer import DataAnonymizer
-from agent_forge.models import User
+from agent_forge.exporter.manager import ExportManager
+from agent_forge.models import EvalEvent, User
 from agent_forge.models.export_task import ExportTask
 
 
@@ -94,3 +95,22 @@ class TestExportRoutes:
         data = resp.json()
         assert data["total"] >= 1
         assert any(item["export_id"] == "export-route-test" for item in data["items"])
+
+    @pytest.mark.asyncio
+    async def test_build_eval_event_export_records(self, db: AsyncSession):
+        db.add(
+            EvalEvent(
+                id="eval-export-test",
+                project_id="project-export",
+                pipeline_run_id="run-export",
+                event_type="stage_completed",
+                status="success",
+                latency_ms=321,
+            )
+        )
+        await db.commit()
+
+        records = await ExportManager._build_eval_event_records(db, None, None, "level_1")
+
+        assert any(record["event_type"] == "stage_completed" for record in records)
+        assert any(record["pipeline_run_id"] == "run-export" for record in records)

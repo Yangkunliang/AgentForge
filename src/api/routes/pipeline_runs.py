@@ -12,7 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.api.sse import emit_confirm_resolved
-from agent_forge.database import get_async_session
+from agent_forge.database import async_session_factory, get_async_session
+from agent_forge.evaluation import EvaluationService
 from agent_forge.models import Artifact, AuditLog, PipelineRun, PipelineStageState, User
 from agent_forge.pipeline.service import (
     complete_stage,
@@ -190,6 +191,7 @@ async def confirm_pipeline_stage(
     _add_confirmation_audit(db, current_user.id, run, stage_id, body, stage)
     task_id = await _confirmation_task_id(db, stage)
     await db.commit()
+    await _record_confirmation_eval(run, stage_id, body, stage)
     await db.refresh(run, attribute_names=["stages"])
 
     if task_id:
@@ -213,8 +215,25 @@ async def fail_pipeline_stage(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     run = await get_pipeline_run_for_user_or_404(db, run_id, current_user.id)
+    stage = _stage_or_none(run, stage_id)
     fail_stage(run, stage_id)
     await db.commit()
+    if stage:
+        await EvaluationService.safe_record_event(
+            async_session_factory,
+            project_id=run.project_id,
+            pipeline_run_id=run.id,
+            stage_id=stage.stage_id,
+            event_type="stage_failed",
+            status="failed",
+            agent_profile_id=stage.agent_profile_id,
+            agent_profile_name=stage.agent_profile_name,
+            model_route_key=stage.model_route_key,
+            model_route_name=stage.model_route_name,
+            model_name=stage.model_name,
+            failure_reason="manual_stage_fail",
+            metadata={"stage_name": stage.stage_name},
+        )
     await db.refresh(run, attribute_names=["stages"])
     return pipeline_run_to_dict(run)
 
@@ -267,3 +286,34 @@ async def _confirmation_task_id(
     artifact = result.scalars().first()
     task_id = (artifact.metadata_json or {}).get("task_id") if artifact else None
     return task_id if isinstance(task_id, str) and task_id else None
+
+
+async def _record_confirmation_eval(
+    run: PipelineRun,
+    stage_id: str,
+    body: StageConfirmationRequest,
+    stage: PipelineStageState | None,
+) -> None:
+    event_type = {
+        "approve": "confirmation_approved",
+        "revise": "confirmation_revised",
+        "cancel": "confirmation_cancelled",
+    }[body.action]
+    await EvaluationService.safe_record_event(
+        async_session_factory,
+        project_id=run.project_id,
+        pipeline_run_id=run.id,
+        stage_id=stage_id,
+        event_type=event_type,
+        status="success",
+        agent_profile_id=stage.agent_profile_id if stage else None,
+        agent_profile_name=stage.agent_profile_name if stage else None,
+        model_route_key=stage.model_route_key if stage else None,
+        model_route_name=stage.model_route_name if stage else None,
+        model_name=stage.model_name if stage else None,
+        metadata={
+            "action": body.action,
+            "feedback": body.feedback,
+            "governance_decision": (stage.confirmation_audit_payload or {}) if stage else {},
+        },
+    )

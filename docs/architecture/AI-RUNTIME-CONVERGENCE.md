@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-032，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime 和 GovernanceDecision 逐步接入统一 AI Runtime Contract；Eval Feedback 仍需要继续收敛。
+截至 TASK-033，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、第三方 Skill Runtime、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
 
 ### 2.1 请求到执行
 
@@ -35,7 +35,6 @@ src/api/routes/sessions.py
 
 缺口：
 
-- 还没有按 Project / Stage / AgentProfile 解析模型路由。
 - SkillRuntime 已有权限校验和审计闭环，但还没有把 StageDefinition.skill_policy_key 与 AgentProfile.allowed_skill_names 统一编排成阶段级 Skill 过滤。
 - Agent 管理页创建的 active `Agent` 已可通过 AgentResolver 进入 StageRuntime 选择链路。
 
@@ -139,8 +138,8 @@ Artifact Viewer
 
 缺口：
 
-- Artifact 尚未记录生成它的 AgentProfile、ModelRoute、SkillRuntime。
-- Delivery 结果尚未进入统一 Eval Feedback。
+- Artifact 自身尚未持久化生成它的 AgentProfile、ModelRoute、SkillRuntime 引用；这些运行事实已进入 EvalEvent。
+- Delivery 结果已进入统一 Eval Feedback。
 
 ## 3. 目标运行时契约
 
@@ -325,7 +324,7 @@ audit_level
 后续收敛：
 
 - TASK-032 已将高风险权限确认接入 GovernancePolicy，并把拒绝审计写入 `governance_decision`；Stage 级可用 Skill 白名单仍可后续增强。
-- TASK-033 将 `skill_eval` 事件沉淀为结构化 EvalEvent。
+- `skill_eval` SSE 事件已沉淀为结构化 EvalEvent。
 
 ### 3.7 GovernanceDecision
 
@@ -379,12 +378,16 @@ score
 
 - LLMResponse 有 tokens_used、cost_usd、latency_ms。
 - SkillDispatcher span 记录 elapsed_ms、success、error。
-- Delivery report 记录交付结果。
+- `EvalEvent` 记录 project、pipeline_run、stage、agent_profile、model_route、skill、artifact、delivery、latency、cost、failure_reason 和 metadata。
+- `EvaluationService.safe_record_event()` 使用独立 session 写入，失败只记录日志，不阻断主链路。
+- StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 成功/失败路径已写入 EvalEvent。
+- Dashboard 和 `/api/v1/evaluation/summary` 已消费 EvalEvent 基础指标。
+- ExportManager 支持 `eval_events` / `evaluation` JSONL 导出。
 
 后续收敛：
 
-- TASK-033 新增 EvalEvent / EvaluationService。
-- Eval 写入失败不能影响主执行链路。
+- LLMProvider 级 token/cost 明细可继续接入 EvalEvent。
+- 用户采纳评分和长期质量 score 可作为后续反馈模型加入。
 
 ## 4. 目标数据流
 
@@ -431,10 +434,10 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | 后续增强 |
 | StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义，并写入 Governance 确认上下文 | 后续增强 |
 | AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | 后续增强 |
-| ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | TASK-033 |
+| ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | 后续增强 |
 | SkillRuntimeSpec | `skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py` | Manifest、权限、runtime spec、registry 刷新、调用审计和高风险 Governance 决策已落地；Stage 级白名单可后续增强 | 后续策略增强 |
-| GovernanceDecision | `governance/policy.py`、`pipeline/service.py`、`pipeline_runs.py`、`projects.py`、`skills/policy.py` | 阶段、交付和高风险 Skill 调用已走统一决策，并写入确认上下文和审计 payload | TASK-033 |
-| EvalFeedback | tracing、LLMResponse、Delivery report | 有零散指标，缺结构化 EvalEvent | TASK-033 |
+| GovernanceDecision | `governance/policy.py`、`pipeline/service.py`、`pipeline_runs.py`、`projects.py`、`skills/policy.py` | 阶段、交付和高风险 Skill 调用已走统一决策，并写入确认上下文、审计 payload 和 EvalEvent 确认事实 | 后续增强 |
+| EvalFeedback | `evaluation/service.py`、`models/evaluation.py`、`api/routes/evaluation.py`、StageRuntime、SkillDispatcher、Delivery | EvalEvent、Evaluation summary、Dashboard 聚合和 JSONL 导出已落地 | 后续增强 |
 | 架构文档 | `docs/architecture/`、`docs/tech-design/` | 核心闭环文档已存在，AI Runtime 主线新增 | TASK-034 |
 
 ## 6. 迁移原则
@@ -508,6 +511,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 
 目标：记录 Pipeline / Stage / Agent / Model / Skill / Artifact / Delivery 维度的执行事实。
 
+完成状态：已落地 `EvalEvent`、`EvaluationService`、`019_eval_events.py`、`/api/v1/evaluation/summary`、Dashboard evaluation 指标、`eval_events` / `evaluation` 导出，以及 StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 的非阻塞事件记录。
+
 不做：
 
 - 不在第一版实现复杂自动评分。
@@ -528,10 +533,10 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 |------|------|----------|
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
 | Agent 配置空转 | 已进入 StageRuntime；后续可接入 Stage 级 SkillPolicy 编排 | 后续策略增强 |
-| 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | TASK-033 |
+| 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
 | Skill 安全边界不足 | Manifest、权限、风险、调用审计和高风险 Governance 决策已落地；Stage 级可用 Skill 白名单可继续增强 | 后续策略增强 |
-| 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy；后续需要把确认事实纳入 EvalFeedback | TASK-033 |
-| 长期优化无数据 | 无法知道哪个阶段慢、贵、失败率高 | TASK-033 |
+| 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
+| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认和失败事实；LLM token/cost 明细可继续增强 | 后续增强 |
 | 文档和代码分叉 | 新人和 Agent 误读系统状态 | TASK-034 |
 
 ## 9. 完成定义

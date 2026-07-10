@@ -175,6 +175,13 @@ export interface DashboardStats {
     trend_pct: number
     daily_7d: Array<{ date: string; usd: number }>
   }
+  evaluation: {
+    total_events: number
+    stage_success_rate: number
+    skill_success_rate: number
+    delivery_success_rate: number
+    average_stage_latency_ms: number
+  }
   recent_tasks: Array<{
     task_id: string
     description: string

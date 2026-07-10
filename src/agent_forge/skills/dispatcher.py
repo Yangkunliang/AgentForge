@@ -27,6 +27,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.database import async_session_factory
+from agent_forge.evaluation import EvaluationService
 from agent_forge.models import AuditLog
 from agent_forge.skills.policy import DEFAULT_SKILL_PERMISSION_POLICY, SkillPermissionPolicy
 from agent_forge.skills.registry import get_skill_registry
@@ -52,6 +54,7 @@ class SkillDispatcher:
         user_id: str | None = None,
         db: AsyncSession | None = None,
         permission_policy: SkillPermissionPolicy | None = None,
+        runtime_context: dict[str, Any] | None = None,
     ) -> str:
         """执行一次 tool_call，返回结果 JSON 字符串。
 
@@ -74,6 +77,16 @@ class SkillDispatcher:
         skill_name = self._registry.get_skill_name_for_tool(tool_name)
         runtime_spec = self._registry.get_runtime_spec(skill_name) if skill_name else None
         permissions = list((runtime_spec or {}).get("permissions") or [])
+        eval_context = _runtime_eval_context(runtime_context)
+        await _record_skill_eval(
+            eval_context=eval_context,
+            event_type="skill_called",
+            status="success",
+            tool_name=tool_name,
+            skill_name=skill_name,
+            permissions=permissions,
+            metadata={"tool_call_id": tool_call_id},
+        )
         effective_policy = permission_policy or DEFAULT_SKILL_PERMISSION_POLICY
         if permissions:
             decision = effective_policy.evaluate(
@@ -96,6 +109,20 @@ class SkillDispatcher:
                     runtime_spec=runtime_spec,
                     permissions=permissions,
                     details={
+                        "denied_permissions": decision.denied_permissions,
+                        "governance_decision": decision.governance_decision,
+                    },
+                )
+                await _record_skill_eval(
+                    eval_context=eval_context,
+                    event_type="skill_failed",
+                    status="failed",
+                    tool_name=tool_name,
+                    skill_name=skill_name,
+                    permissions=permissions,
+                    failure_reason="permission_denied",
+                    metadata={
+                        "tool_call_id": tool_call_id,
                         "denied_permissions": decision.denied_permissions,
                         "governance_decision": decision.governance_decision,
                     },
@@ -172,6 +199,16 @@ class SkillDispatcher:
                 permissions=permissions,
                 details={"elapsed_ms": elapsed_ms},
             )
+            await _record_skill_eval(
+                eval_context=eval_context,
+                event_type="skill_succeeded",
+                status="success",
+                tool_name=tool_name,
+                skill_name=skill_name,
+                permissions=permissions,
+                latency_ms=elapsed_ms,
+                metadata={"tool_call_id": tool_call_id},
+            )
 
             return result_str
 
@@ -204,6 +241,17 @@ class SkillDispatcher:
                 permissions=permissions,
                 details={"elapsed_ms": elapsed_ms, "error": "timeout"},
             )
+            await _record_skill_eval(
+                eval_context=eval_context,
+                event_type="skill_failed",
+                status="failed",
+                tool_name=tool_name,
+                skill_name=skill_name,
+                permissions=permissions,
+                latency_ms=elapsed_ms,
+                failure_reason="timeout",
+                metadata={"tool_call_id": tool_call_id},
+            )
             return json.dumps({"error": err}, ensure_ascii=False)
 
         except Exception as e:
@@ -234,6 +282,17 @@ class SkillDispatcher:
                 runtime_spec=runtime_spec,
                 permissions=permissions,
                 details={"elapsed_ms": elapsed_ms, "error": str(e)[:500]},
+            )
+            await _record_skill_eval(
+                eval_context=eval_context,
+                event_type="skill_failed",
+                status="failed",
+                tool_name=tool_name,
+                skill_name=skill_name,
+                permissions=permissions,
+                latency_ms=elapsed_ms,
+                failure_reason=str(e)[:500],
+                metadata={"tool_call_id": tool_call_id},
             )
             return json.dumps({"error": err}, ensure_ascii=False)
 
@@ -275,3 +334,42 @@ async def _add_skill_audit(
         )
     )
     await db.flush()
+
+
+def _runtime_eval_context(runtime_context: dict[str, Any] | None) -> dict[str, Any]:
+    if not runtime_context:
+        return {}
+    value = runtime_context.get("evaluation_context")
+    return value if isinstance(value, dict) else {}
+
+
+async def _record_skill_eval(
+    *,
+    eval_context: dict[str, Any],
+    event_type: str,
+    status: str,
+    tool_name: str,
+    skill_name: str | None,
+    permissions: list[str],
+    latency_ms: int | None = None,
+    failure_reason: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    if not eval_context.get("project_id") and not eval_context.get("pipeline_run_id"):
+        return
+    await EvaluationService.safe_record_event(
+        async_session_factory,
+        project_id=eval_context.get("project_id"),
+        pipeline_run_id=eval_context.get("pipeline_run_id"),
+        stage_id=eval_context.get("stage_id"),
+        event_type=event_type,
+        status=status,
+        skill_name=skill_name,
+        tool_name=tool_name,
+        latency_ms=latency_ms,
+        failure_reason=failure_reason,
+        metadata={
+            "permissions": permissions,
+            **(metadata or {}),
+        },
+    )

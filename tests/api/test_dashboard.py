@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.api.routes.dashboard import (
+    _get_evaluation_stats,
     _get_agent_stats,
     _get_cost_stats,
     _get_recent_tasks,
@@ -13,6 +14,7 @@ from agent_forge.api.routes.dashboard import (
     _get_task_stats,
 )
 from agent_forge.models.agent import Agent
+from agent_forge.models.evaluation import EvalEvent
 from agent_forge.models.skill import Skill
 from agent_forge.models.task import Task, TaskStatus
 
@@ -62,3 +64,20 @@ class TestDashboardStats:
     async def test_get_recent_tasks(self, db: AsyncSession):
         tasks = await _get_recent_tasks(db)
         assert isinstance(tasks, list)
+
+    async def test_get_evaluation_stats(self, db: AsyncSession):
+        db.add(
+            EvalEvent(
+                id="eval-dashboard-test",
+                project_id="dashboard-project",
+                event_type="stage_completed",
+                status="success",
+                latency_ms=100,
+            )
+        )
+        await db.commit()
+
+        stats = await _get_evaluation_stats(db)
+
+        assert stats.total_events >= 1
+        assert stats.stage_success_rate >= 0

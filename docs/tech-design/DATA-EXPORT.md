@@ -44,6 +44,37 @@
 }
 ```
 
+### 2.3 EvalEvent 记录结构
+当导出 `type` 为 `eval_events` 或 `evaluation` 时，每行是一条结构化执行反馈事件：
+
+```json
+{
+  "event_id": "eval-001",
+  "timestamp": "2026-07-10T10:00:00Z",
+  "project_id": "proj-001",
+  "pipeline_run_id": "run-001",
+  "stage_id": "backend_dev",
+  "event_type": "stage_completed",
+  "status": "success",
+  "agent_profile_id": "agent-001",
+  "agent_profile_name": "Coder",
+  "model_route_key": "default",
+  "model_route_name": "Default Route",
+  "model_name": "gpt-4o-mini",
+  "skill_name": "code-review",
+  "tool_name": "review",
+  "artifact_id": "artifact-001",
+  "delivery_channel": "github_pr",
+  "latency_ms": 2450,
+  "cost_usd": 0.0,
+  "tokens_used": 0,
+  "failure_reason": null,
+  "metadata": {
+    "stage_name": "后端开发"
+  }
+}
+```
+
 ## 3. 数据收集
 
 ### 3.1 自动收集
@@ -97,6 +128,8 @@ Authorization: Bearer <token>
   "delevel": "level_1"
 }
 ```
+
+`type` 支持 `training_data`、`eval_events` 和 `evaluation`。Eval 导出会复用 `delevel` 脱敏策略，并默认排除密钥、文件正文和用户源码内容。
 
 **响应**:
 ```json

@@ -9,8 +9,8 @@
 
 ## 技术设计文档 (docs/tech-design/)
 - [ARCHITECTURE.md](docs/tech-design/ARCHITECTURE.md) — Harness 六层架构、消息总线、执行流程
-- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
-- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery 核心闭环表、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
+- [API-SPEC.md](docs/tech-design/API-SPEC.md) — 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、Evaluation、认证、任务、Agent、Skill、Dashboard、费用、SSE、Webhook、导出）
+- [DATABASE.md](docs/tech-design/DATABASE.md) — 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery/EvalEvent 核心闭环表、索引、关系图 + 记忆系统表（semantic_entries、user_memories、pgvector、chat_messages 全文索引）
 - [SECURITY.md](docs/tech-design/SECURITY.md) — 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测 + tool_call 分级）、Skill 沙箱分级、审计日志
 - [SANDBOX-RESEARCH.md](docs/tech-design/SANDBOX-RESEARCH.md) — 沙箱机制技术调研报告（方案一 Docker vs 方案二 CubeSandbox，含对比表格与选型依据）
 - [INTEGRATION-CUBESANDBOX.md](docs/tech-design/INTEGRATION-CUBESANDBOX.md) — CubeSandbox 集成详细设计（抽象层、E2B SDK / REST API 两种对接路径、API 设计、分级策略、实施计划）
@@ -101,6 +101,7 @@
 - TASK-030 已完成：新增 `src/agent_forge/llm/router.py`、`src/agent_forge/models/llm.py` 和 `016_llm_model_routes.py`；LLM 设置页和 `/api/v1/llm/*` 支持 Provider / Model / Credential / Route，Credential 加密存储且 API 只返回 masked 信息；StageRuntime 会解析 ModelRoute、写入 StageState 模型追踪字段并将非敏感 route 上下注入 SkillExecutionEngine。
 - TASK-031 已完成：新增 `src/agent_forge/skills/runtime_spec.py`、`src/agent_forge/skills/policy.py` 和 `017_skill_runtime_policy.py`；Skill Manifest 支持 `agentforge-skill.yaml` 优先、`skill.md` 兼容，`/api/v1/skills/import/preview` 与 `/api/v1/skills/import/install` 会展示来源、工具、权限、风险和确认要求；安装后 Skill/SkillInstall 记录 manifest_hash、permissions、runtime_spec 和 preview，SkillRegistry 注册 runtime spec，SkillDispatcher 调用前执行权限校验并写入 `skill.invoke.*` 审计和 `skill_eval` 事件。
 - TASK-032 已完成：新增 `src/agent_forge/governance/policy.py` 和 `018_governance_confirmation_context.py`；`PipelineStageState` 记录确认类型、原因、影响范围和审计 payload；Pipeline 阶段确认、Delivery 未确认拒绝和高风险 Skill 调用拒绝均写入 `governance_decision`；ConfirmCard 渲染服务端策略生成的确认原因与影响范围。
+- TASK-033 已完成：新增 `src/agent_forge/evaluation/service.py`、`src/agent_forge/models/evaluation.py` 和 `019_eval_events.py`；StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 会以非阻塞方式写入 `EvalEvent`；新增 `/api/v1/evaluation/summary`、Dashboard evaluation 指标和 `eval_events` / `evaluation` JSONL 导出类型。
 
 ---
 
