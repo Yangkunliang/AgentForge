@@ -105,6 +105,7 @@ docs/
 | TASK-027～TASK-034 | 2026-07-09 | AI 架构收敛计划 | ✅ 已完成 |
 | TASK-035 | 2026-07-10 | Stage 级 SkillPolicy 编排 | ✅ 已完成 |
 | TASK-036 | 2026-07-10 | MCP RuntimeSpec 权限归一 | ✅ 已完成 |
+| TASK-037 | 2026-07-10 | 内置 Skill RuntimeSpec 补齐 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -222,6 +223,16 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-10-mcp-runtime-spec/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-10-mcp-runtime-spec/ITERATION-REVIEW.md)
 - **核心功能**：MCP Server 配置支持 permissions 声明；未声明 permissions 的 MCP 默认按 `credential` 高风险处理；MCP 注册到 SkillRegistry 时写入 `source_type=mcp` 的 RuntimeSpec，并复用 StageSkillPolicy 过滤。
+
+### TASK-037 详细信息
+- **目录**：`docs/iterations/2026-07-10-builtin-runtime-spec/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-10-builtin-runtime-spec/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-10-builtin-runtime-spec/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-10-builtin-runtime-spec/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-10-builtin-runtime-spec/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-10-builtin-runtime-spec/ITERATION-REVIEW.md)
+- **核心功能**：新增 `external_side_effect` 高风险权限；五个内置 Skill 注册时写入 `source_type=builtin` 的 RuntimeSpec；默认 StageSkillPolicy 只暴露 `web_search` 和 `get_weather`。
 
 ## 版本号规范
 

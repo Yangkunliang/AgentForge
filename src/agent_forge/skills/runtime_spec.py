@@ -11,8 +11,9 @@ ALLOWED_SKILL_PERMISSIONS = {
     "shell",
     "credential",
     "project_context",
+    "external_side_effect",
 }
-HIGH_RISK_PERMISSIONS = {"filesystem", "shell", "credential"}
+HIGH_RISK_PERMISSIONS = {"filesystem", "shell", "credential", "external_side_effect"}
 MEDIUM_RISK_PERMISSIONS = {"network", "project_context"}
 
 

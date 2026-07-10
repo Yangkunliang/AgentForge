@@ -7,13 +7,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.database import async_session_factory
 from agent_forge.skills.manager import SkillManager
 from agent_forge.skills.registry import get_skill_registry
+from agent_forge.skills.runtime_spec import SkillRuntimeSpec
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +60,13 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
                 },
             },
         }
+        web_search_runtime_spec = _builtin_runtime_spec(
+            name="web-search",
+            version="1.0.0",
+            tool_defs=[web_search_tool_def],
+            permissions=["network"],
+            entry_point="agent_forge.skills.web_search:web_search",
+        )
 
         try:
             await SkillManager.register_skill(
@@ -65,6 +76,9 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
                 description="Web search skill supporting DuckDuckGo and SearxNG",
                 entry_point="agent_forge.skills.web_search:web_search",
                 manifest={"tool": web_search_tool_def["function"]},
+                manifest_hash=web_search_runtime_spec["manifest_hash"],
+                permissions=web_search_runtime_spec["permissions"],
+                runtime_spec=web_search_runtime_spec,
                 source_type="builtin",
             )
         except Exception as e:
@@ -74,10 +88,18 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             skill_name="web-search",
             tool_defs=[web_search_tool_def],
             executors={"web_search": web_search},
+            runtime_spec=web_search_runtime_spec,
         )
 
         # ── 2. weather Skill ──────────────────────────────────
         from agent_forge.skills.weather import GET_WEATHER_TOOL, get_weather
+        weather_runtime_spec = _builtin_runtime_spec(
+            name="weather",
+            version="1.0.0",
+            tool_defs=[GET_WEATHER_TOOL],
+            permissions=["network"],
+            entry_point="agent_forge.skills.weather:get_weather",
+        )
 
         try:
             await SkillManager.register_skill(
@@ -87,6 +109,9 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
                 description="实时天气查询 Skill（Open-Meteo，免费无 API Key）",
                 entry_point="agent_forge.skills.weather:get_weather",
                 manifest={"tool": GET_WEATHER_TOOL["function"]},
+                manifest_hash=weather_runtime_spec["manifest_hash"],
+                permissions=weather_runtime_spec["permissions"],
+                runtime_spec=weather_runtime_spec,
                 source_type="builtin",
             )
         except Exception as e:
@@ -96,10 +121,18 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             skill_name="weather",
             tool_defs=[GET_WEATHER_TOOL],
             executors={"get_weather": get_weather},
+            runtime_spec=weather_runtime_spec,
         )
 
         # ── 3. http-request Skill ──────────────────────────────
         from agent_forge.skills.http_request import HTTP_REQUEST_TOOL, http_request
+        http_request_runtime_spec = _builtin_runtime_spec(
+            name="http-request",
+            version="1.0.0",
+            tool_defs=[HTTP_REQUEST_TOOL],
+            permissions=["network", "external_side_effect"],
+            entry_point="agent_forge.skills.http_request:http_request",
+        )
 
         try:
             await SkillManager.register_skill(
@@ -109,6 +142,9 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
                 description="HTTP 请求工具，支持 GET/POST/PUT/PATCH/DELETE，可调用任意 REST API",
                 entry_point="agent_forge.skills.http_request:http_request",
                 manifest={"tool": HTTP_REQUEST_TOOL["function"]},
+                manifest_hash=http_request_runtime_spec["manifest_hash"],
+                permissions=http_request_runtime_spec["permissions"],
+                runtime_spec=http_request_runtime_spec,
                 source_type="builtin",
             )
         except Exception as e:
@@ -118,10 +154,18 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             skill_name="http-request",
             tool_defs=[HTTP_REQUEST_TOOL],
             executors={"http_request": http_request},
+            runtime_spec=http_request_runtime_spec,
         )
 
         # ── 4. update-profile Skill ──────────────────────────────
         from agent_forge.skills.update_profile import UPDATE_PROFILE_TOOL, update_profile
+        update_profile_runtime_spec = _builtin_runtime_spec(
+            name="update-profile",
+            version="1.0.0",
+            tool_defs=[UPDATE_PROFILE_TOOL],
+            permissions=["external_side_effect"],
+            entry_point="agent_forge.skills.update_profile:update_profile",
+        )
 
         try:
             await SkillManager.register_skill(
@@ -131,6 +175,9 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
                 description="更新用户个人资料（昵称、头像）",
                 entry_point="agent_forge.skills.update_profile:update_profile",
                 manifest={"tool": UPDATE_PROFILE_TOOL["function"]},
+                manifest_hash=update_profile_runtime_spec["manifest_hash"],
+                permissions=update_profile_runtime_spec["permissions"],
+                runtime_spec=update_profile_runtime_spec,
                 source_type="builtin",
             )
         except Exception as e:
@@ -140,10 +187,18 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             skill_name="update-profile",
             tool_defs=[UPDATE_PROFILE_TOOL],
             executors={"update_profile": update_profile},
+            runtime_spec=update_profile_runtime_spec,
         )
 
         # ── 5. code-executor Skill ──────────────────────────────
         from agent_forge.skills.code_executor import CODE_EXECUTOR_TOOL, code_executor
+        code_executor_runtime_spec = _builtin_runtime_spec(
+            name="code-executor",
+            version="1.0.0",
+            tool_defs=[CODE_EXECUTOR_TOOL],
+            permissions=["shell"],
+            entry_point="agent_forge.skills.code_executor:code_executor",
+        )
 
         try:
             await SkillManager.register_skill(
@@ -153,6 +208,9 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
                 description="在隔离沙箱中执行 Python 代码",
                 entry_point="agent_forge.skills.code_executor:code_executor",
                 manifest={"tool": CODE_EXECUTOR_TOOL["function"]},
+                manifest_hash=code_executor_runtime_spec["manifest_hash"],
+                permissions=code_executor_runtime_spec["permissions"],
+                runtime_spec=code_executor_runtime_spec,
                 source_type="builtin",
             )
         except Exception as e:
@@ -162,6 +220,7 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
             skill_name="code-executor",
             tool_defs=[CODE_EXECUTOR_TOOL],
             executors={"code_executor": code_executor},
+            runtime_spec=code_executor_runtime_spec,
         )
 
         logger.info("Built-in skills registered: %s", registry.list_registered())
@@ -171,3 +230,41 @@ async def register_builtin_skills(db: AsyncSession | None = None) -> None:
     finally:
         if close_session:
             await db.close()
+
+
+def _builtin_runtime_spec(
+    *,
+    name: str,
+    version: str,
+    tool_defs: list[dict[str, Any]],
+    permissions: list[str],
+    entry_point: str,
+) -> dict[str, Any]:
+    return SkillRuntimeSpec(
+        name=name,
+        version=version,
+        source_type="builtin",
+        manifest_hash=_builtin_manifest_hash(name, version, tool_defs, permissions),
+        tool_defs=tool_defs,
+        permissions=permissions,
+        executor_kind="python",
+        executor_entry_point=entry_point,
+        audit_level="standard",
+        source="builtin",
+    ).to_dict()
+
+
+def _builtin_manifest_hash(
+    name: str,
+    version: str,
+    tool_defs: list[dict[str, Any]],
+    permissions: list[str],
+) -> str:
+    payload = {
+        "name": name,
+        "version": version,
+        "permissions": permissions,
+        "tool_names": [tool["function"]["name"] for tool in tool_defs],
+    }
+    raw = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()

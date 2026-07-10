@@ -865,6 +865,8 @@ TASK-035 后，StageRuntime 会在调用 SkillExecutionEngine 前按 `StageDefin
 
 TASK-036 后，MCP Server 注册的外部 tool 也会生成 `source_type=mcp` 的 RuntimeSpec；MCP 配置未声明 permissions 时默认按 `credential` 高风险处理，因此不会绕过 Stage 级工具过滤。
 
+TASK-037 后，内置 Skill 注册时也会生成 `source_type=builtin` 的 RuntimeSpec；`external_side_effect` 被归为高风险权限，默认 StageSkillPolicy 会过滤 `http_request`、`update_profile`、`code_executor`。
+
 ---
 
 ## LLM 设置 API
@@ -1244,7 +1246,7 @@ Authorization: Bearer <token>   (需要 admin 权限)
 }
 ```
 
-高风险权限（`filesystem`、`shell`、`credential`）未确认时响应 `409`：
+高风险权限（`filesystem`、`shell`、`credential`、`external_side_effect`）未确认时响应 `409`：
 
 ```json
 {

@@ -465,8 +465,8 @@ def ssrf_check(url: str):
 ```
 
 - 安装源支持本地目录、GitHub URL、通用 Git URL 和 PyPI 包名；平台不会自动扫描用户代码库。
-- Manifest 优先使用 `agentforge-skill.yaml`，兼容旧 `skill.md`，必须声明 tool，权限只允许 `network`、`filesystem`、`shell`、`credential`、`project_context`。
-- `filesystem`、`shell`、`credential` 被归为高风险权限，安装 API 未收到明确 `confirm_risk=true` 时返回 409，并回传 preview 供前端展示。
+- Manifest 优先使用 `agentforge-skill.yaml`，兼容旧 `skill.md`，必须声明 tool，权限只允许 `network`、`filesystem`、`shell`、`credential`、`project_context`、`external_side_effect`。
+- `filesystem`、`shell`、`credential`、`external_side_effect` 被归为高风险权限，安装 API 未收到明确 `confirm_risk=true` 时返回 409，并回传 preview 供前端展示。
 - `SkillInstall.preview`、`manifest_hash`、`permissions`、`risk_level` 持久化，便于审计和回滚分析。
 - PyPI/GitHub/Git 预览会先下载或 clone 到临时目录；归档解压拒绝路径穿越和链接条目。
 - 本地安装会复制到 `skills/installed/<skill_name>/`，注册时只把 runtime spec、tool_defs 和 executor 引入 `SkillRegistry`。
@@ -715,8 +715,9 @@ TASK-023 后，GitHub OAuth Mount 使用服务端加密凭据表保存 access to
 - 可配置脱敏级别（Level 0/1/2），详见 DATA-EXPORT.md
 - EvalEvent 仅记录结构化执行事实和非敏感 metadata，禁止写入明文 API Key、OAuth token、文件正文或用户源码内容；`eval_events` 导出同样应用脱敏策略。
 - TASK-034 后，ModelRoute、SkillRuntime 和 EvalEvent 均按“运行时可追溯、密钥不出服务端”的安全基线维护：API、SSE、日志、导出和 prompt 上下文不得包含明文凭据。
-- TASK-035 后，StageRuntime 会先过滤 LLM 可见工具列表：默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential` 高风险权限工具，AgentSkill allowlist 进一步限制当前 Agent 可见 Skill；SkillDispatcher 调用前权限校验仍作为第二道防线。
+- TASK-035 后，StageRuntime 会先过滤 LLM 可见工具列表：默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential`、`external_side_effect` 高风险权限工具，AgentSkill allowlist 进一步限制当前 Agent 可见 Skill；SkillDispatcher 调用前权限校验仍作为第二道防线。
 - TASK-036 后，MCP 外部工具也必须进入 SkillRuntimeSpec 权限模型；未声明 permissions 的 MCP Server 默认视为未知高风险，避免第三方工具通过 MCP 注册绕过 Stage 级工具过滤。
+- TASK-037 后，内置 Skill 也必须进入 SkillRuntimeSpec 权限模型；`http_request`、`update_profile`、`code_executor` 默认不暴露给 LLM，除非后续高风险授权策略明确放行。
 
 ---
 

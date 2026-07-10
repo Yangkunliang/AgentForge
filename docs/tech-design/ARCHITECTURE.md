@@ -6,7 +6,7 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
-> 当前状态（TASK-036）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
+> 当前状态（TASK-037）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源。
 
 ## 2. 整体架构
 
@@ -96,7 +96,7 @@
 - **SkillRegistry**：注册 Skill tool_defs、executor、runtime_spec 和 tool -> skill 映射。
 - **SkillInstaller**：第三方 Skill 安装前预览 Manifest、权限、风险和工具，安装后刷新 runtime registry。
 - **StageSkillPolicy**：根据阶段策略、Agent allowlist 和 SkillRuntimeSpec permissions 过滤 LLM 可见工具。
-- **热加载**：内置 Skill 启动注册，第三方 Skill 安装后显式刷新。
+- **热加载**：内置 Skill 启动注册时写入 RuntimeSpec，第三方 Skill 安装后显式刷新。
 
 ### 3.3 路由分发 (Router)
 - **Pipeline Catalog**：按 intent 返回 StageDefinition，是阶段语义后端事实源。
