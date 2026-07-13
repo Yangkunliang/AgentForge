@@ -38,6 +38,16 @@ const isMarkdown = computed(() =>
 const renderedMarkdown = computed(() =>
   artifact.value ? renderMarkdown(artifact.value.content) : ''
 )
+const runtimeMetadata = computed(() => metadataObject(artifact.value?.metadata?.runtime))
+const runtimeAgent = computed(() => metadataObject(runtimeMetadata.value?.agent_profile))
+const runtimeModelRoute = computed(() => metadataObject(runtimeMetadata.value?.model_route))
+const runtimeAgentLabel = computed(() =>
+  metadataText(runtimeAgent.value, 'name') || metadataText(runtimeAgent.value, 'id')
+)
+const runtimeModelLabel = computed(() => metadataText(runtimeMetadata.value, 'model_name'))
+const runtimeRouteLabel = computed(() =>
+  metadataText(runtimeModelRoute.value, 'name') || metadataText(runtimeModelRoute.value, 'route_key')
+)
 const projectMounts = computed(() => {
   const projectId = artifact.value?.project_id
   return projectId ? projectStore.mountsByProject[projectId] ?? [] : []
@@ -274,6 +284,17 @@ function reportTextFromArtifact(key: string): string {
   return ''
 }
 
+function metadataObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+}
+
+function metadataText(record: Record<string, unknown> | null, key: string): string {
+  const value = record?.[key]
+  return typeof value === 'string' && value.trim() ? value : ''
+}
+
 function selectDeliveryMode(mode: DeliveryMode) {
   if (deliveryMode.value === mode) return
   deliveryMode.value = mode
@@ -362,6 +383,9 @@ watch(selectedMountId, () => {
         <span>{{ artifact.file_type ?? 'markdown' }}</span>
         <span v-if="artifact.pipeline_run_id">Pipeline {{ artifact.pipeline_run_id.slice(0, 8) }}</span>
         <span v-if="artifact.session_id">Session {{ artifact.session_id.slice(0, 8) }}</span>
+        <span v-if="runtimeAgentLabel">Agent {{ runtimeAgentLabel }}</span>
+        <span v-if="runtimeModelLabel">模型 {{ runtimeModelLabel }}</span>
+        <span v-if="runtimeRouteLabel">路由 {{ runtimeRouteLabel }}</span>
       </div>
 
       <section class="artifact-viewer__delivery">

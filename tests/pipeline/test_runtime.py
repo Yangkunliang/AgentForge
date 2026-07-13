@@ -763,7 +763,9 @@ async def test_stage_runtime_creates_artifact_for_completed_stage(
     assert artifact.file_type == "markdown"
     assert artifact.name == "问题定位.md"
     assert artifact.content == "stage output"
-    assert artifact.metadata_json == {
+    metadata = dict(artifact.metadata_json)
+    runtime_metadata = metadata.pop("runtime")
+    assert metadata == {
         "intent_type": "bug_fix",
         "stage_id": "locate",
         "stage_name": "问题定位",
@@ -771,6 +773,19 @@ async def test_stage_runtime_creates_artifact_for_completed_stage(
         "task_id": "task-artifact",
         "origin": "stage_runtime",
     }
+    assert runtime_metadata["agent_profile"]["id"]
+    assert runtime_metadata["agent_profile"]["name"]
+    assert runtime_metadata["agent_profile"]["source"] in {
+        "system_default",
+        "stage_default",
+        "project_default",
+        "user_override",
+    }
+    assert runtime_metadata["model_route"]["route_key"]
+    assert runtime_metadata["model_route"]["name"]
+    assert runtime_metadata["model_route"]["source"]
+    assert runtime_metadata["model_name"]
+    assert runtime_metadata["skill_policy_key"] == "default"
 
 
 @pytest.mark.asyncio

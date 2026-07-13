@@ -112,6 +112,7 @@ docs/
 | TASK-041 | 2026-07-13 | 高风险 Skill 授权聚合指标 | ✅ 已完成 |
 | TASK-042 | 2026-07-13 | Dashboard 高风险 Skill 授权指标 | ✅ 已完成 |
 | TASK-043 | 2026-07-13 | Dashboard 路由单一事实源 | ✅ 已完成 |
+| TASK-044 | 2026-07-13 | Artifact 运行时来源固化 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`

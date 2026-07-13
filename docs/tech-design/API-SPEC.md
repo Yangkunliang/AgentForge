@@ -424,6 +424,22 @@ Artifact 响应包含 Delivery 状态：
 
 ```json
 {
+  "metadata": {
+    "runtime": {
+      "agent_profile": {
+        "id": "system-default",
+        "name": "CodeSoul",
+        "source": "system_default"
+      },
+      "model_route": {
+        "route_key": "default",
+        "name": "Legacy Settings",
+        "source": "legacy_settings"
+      },
+      "model_name": "openai/deepseek-v4-pro",
+      "skill_policy_key": "default"
+    }
+  },
   "delivery_status": "pending",
   "delivery_target_path": null,
   "delivered_at": null,
@@ -431,7 +447,7 @@ Artifact 响应包含 Delivery 状态：
 }
 ```
 
-MVP 阶段 Artifact 正文保存在数据库 `content` 字段。TASK-016 已落地 Artifact Viewer、Chat ArtifactCard、Project 最近产物列表和作为 `context_files[type=artifact]` 复用；对象存储和多人共享权限不在本阶段范围内。
+MVP 阶段 Artifact 正文保存在数据库 `content` 字段。TASK-016 已落地 Artifact Viewer、Chat ArtifactCard、Project 最近产物列表和作为 `context_files[type=artifact]` 复用；TASK-044 后，StageRuntime 生成的 Artifact 会在 `metadata.runtime` 中返回非敏感运行来源，包含 AgentProfile、ModelRoute、model name 和 SkillPolicy key。对象存储和多人共享权限不在本阶段范围内。
 
 ### Artifact Delivery
 

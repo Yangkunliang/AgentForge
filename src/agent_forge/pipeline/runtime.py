@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agent_forge.artifacts.service import create_stage_artifact
+from agent_forge.artifacts.service import build_stage_runtime_metadata, create_stage_artifact
 from agent_forge.api.sse import (
     emit_artifact_created,
     emit_confirm_required,
@@ -165,6 +165,7 @@ class StageRuntime:
                     stage_id=active_stage_id,
                     stage_output="".join(stage_output_chunks),
                     source_message_id=source_message_id,
+                    skill_policy_key=skill_policy_key,
                 )
 
     async def _start_current_stage(
@@ -275,6 +276,7 @@ class StageRuntime:
         stage_id: str,
         stage_output: str,
         source_message_id: str | None,
+        skill_policy_key: str | None,
     ) -> None:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
@@ -290,6 +292,10 @@ class StageRuntime:
                 task_id=task_id,
                 content=stage_output,
                 source_message_id=source_message_id,
+                runtime_metadata=build_stage_runtime_metadata(
+                    stage,
+                    skill_policy_key=skill_policy_key,
+                ),
             )
             artifact_payload = {
                 "project_id": artifact.project_id,

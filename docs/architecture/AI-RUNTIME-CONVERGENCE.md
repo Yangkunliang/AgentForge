@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-042 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权、前端确认重试、Eval 聚合和 Dashboard 可视化。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-044 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权、前端确认重试、Eval 聚合和 Dashboard 可视化，Artifact metadata 会固化生成 Agent、模型路由和 SkillPolicy 来源。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-042，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标。
+截至 TASK-044，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标。
 
 ### 2.1 请求到执行
 
@@ -120,7 +120,7 @@ src/agent_forge/llm/router.py
 缺口：
 
 - 预算和重试策略字段已预留，尚未纳入统一 Governance / Eval 统计。
-- Artifact 尚未记录生成它的 ModelRoute 引用。
+- Artifact metadata 已记录生成它的 ModelRoute 摘要；预算和重试策略仍可继续进入 Governance / Eval 统计。
 
 ### 2.5 Artifact 和 Delivery
 
@@ -136,12 +136,13 @@ Artifact Viewer
 
 - 阶段输出会归档为 Artifact。
 - Artifact 可被 Chat、Project、Viewer 使用。
+- TASK-044 后，StageRuntime 创建 Artifact 时会把 AgentProfile、ModelRoute、model name 和 SkillPolicy key 写入 `metadata.runtime`。
 - Delivery 已支持本地写回、GitHub PR、zip 包。
 - Delivery preview/apply 有一致性校验和失败报告。
 
 缺口：
 
-- Artifact 自身尚未持久化生成它的 AgentProfile、ModelRoute、SkillRuntime 引用；这些运行事实已进入 EvalEvent。
+- Artifact metadata 已持久化生成 AgentProfile、ModelRoute 和 SkillPolicy 摘要；完整 Skill 调用明细仍以 EvalEvent 为准。
 - Delivery 结果已进入统一 Eval Feedback。
 
 ## 3. 目标运行时契约
@@ -623,6 +624,17 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 - 不新增告警或阈值配置。
 - 不改变 EvalEvent 表结构。
 
+### TASK-044: Artifact 运行时来源固化
+
+目标：让每个由 StageRuntime 生成的 Artifact 自带非敏感生成来源，便于用户在产物详情页判断由哪个 Agent、模型路由和 SkillPolicy 生成。
+
+完成状态：`Artifact.metadata.runtime` 已记录 AgentProfile、ModelRoute、model name 和 SkillPolicy key；Artifact 详情页展示 Agent、模型和路由。
+
+不做：
+
+- 不新增 Artifact 表字段。
+- 不把 Credential secret、API Key、prompt、用户文件正文写入 metadata。
+
 ## 8. 当前风险
 
 | 风险 | 表现 | 对应任务 |
@@ -632,7 +644,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
 | Skill 安全边界不足 | 内置/外部/MCP RuntimeSpec、Manifest、权限、风险、Stage 级工具过滤、临时授权上下文、授权确认入口、授权 Eval、调用审计和高风险 Governance 决策已落地 | 后续增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
-| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认、高风险授权和失败事实，Evaluation summary 已聚合高风险授权指标；LLM token/cost 明细可继续增强 | 后续增强 |
+| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认、高风险授权和失败事实，Artifact metadata 已固化生成来源，Evaluation summary 已聚合高风险授权指标；LLM token/cost 明细可继续增强 | 后续增强 |
 | 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |
 
 ## 9. 完成定义

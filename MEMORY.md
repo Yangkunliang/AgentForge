@@ -84,6 +84,7 @@
   - [ITERATION-REVIEW.md](docs/iterations/2026-07-09-ai-architecture-convergence/ITERATION-REVIEW.md) — TASK-027～TASK-034 完成情况、验证结果和遗留风险
 - [2026-07-13-dashboard-skill-authorization-metrics/](docs/iterations/2026-07-13-dashboard-skill-authorization-metrics/) — TASK-042 Dashboard 高风险 Skill 授权指标，将 TASK-041 summary 聚合接入 Dashboard API 和页面
 - [2026-07-13-dashboard-route-convergence/](docs/iterations/2026-07-13-dashboard-route-convergence/) — TASK-043 Dashboard 路由单一事实源，旧 `agent_forge.api.routes.dashboard` 仅 re-export 真实 `api.routes.dashboard`
+- [2026-07-13-artifact-runtime-provenance/](docs/iterations/2026-07-13-artifact-runtime-provenance/) — TASK-044 Artifact 运行时来源固化，将 StageRuntime 解析的 Agent / ModelRoute / SkillPolicy 写入 `metadata.runtime`
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -120,6 +121,7 @@
 - TASK-041 已完成：Evaluation summary 新增 `skill_authorizations` 聚合块，按 Skill 和 permission 输出 required、granted、grant_rate，便于后续 Dashboard 和策略优化消费。
 - TASK-042 已完成：Dashboard evaluation 返回 `skill_authorizations`，前端 Dashboard 展示高风险 Skill 授权请求、已授权、通过率，以及按 Skill / permission 的前 3 项排行。
 - TASK-043 已完成：Dashboard 运行时逻辑收敛到 `src/api/routes/dashboard.py`，旧 `src/agent_forge/api/routes/dashboard.py` 改为兼容 re-export；测试改为覆盖真实模块，并修正真实 Dashboard inactive Agent 统计。
+- TASK-044 已完成：StageRuntime 创建 Artifact 时会把 AgentProfile、ModelRoute、model name 和 SkillPolicy 写入 `metadata.runtime`，Artifact 详情页展示生成 Agent、模型和路由来源。
 
 ---
 

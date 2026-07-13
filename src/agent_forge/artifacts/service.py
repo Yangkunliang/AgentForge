@@ -43,10 +43,22 @@ async def create_stage_artifact(
     task_id: str,
     content: str,
     source_message_id: str | None = None,
+    runtime_metadata: dict | None = None,
 ) -> Artifact:
     """Persist the completed stage output as an Artifact."""
     normalized_content = content.strip() or "阶段未产生文本输出。"
     artifact_type = infer_stage_artifact_type(stage.stage_id)
+    metadata = {
+        "intent_type": run.intent_type,
+        "stage_id": stage.stage_id,
+        "stage_name": stage.stage_name,
+        "stage_order": stage.order_index,
+        "task_id": task_id,
+        "origin": "stage_runtime",
+    }
+    if runtime_metadata:
+        metadata["runtime"] = runtime_metadata
+
     artifact = Artifact(
         id=str(uuid.uuid4()),
         project_id=run.project_id,
@@ -58,15 +70,30 @@ async def create_stage_artifact(
         content=normalized_content,
         file_type="markdown",
         source_message_id=source_message_id,
-        metadata_json={
-            "intent_type": run.intent_type,
-            "stage_id": stage.stage_id,
-            "stage_name": stage.stage_name,
-            "stage_order": stage.order_index,
-            "task_id": task_id,
-            "origin": "stage_runtime",
-        },
+        metadata_json=metadata,
     )
     db.add(artifact)
     await db.flush()
     return artifact
+
+
+def build_stage_runtime_metadata(
+    stage: PipelineStageState,
+    *,
+    skill_policy_key: str | None = None,
+) -> dict:
+    """Build non-sensitive provenance for artifacts created by StageRuntime."""
+    return {
+        "agent_profile": {
+            "id": stage.agent_profile_id,
+            "name": stage.agent_profile_name,
+            "source": stage.agent_profile_source,
+        },
+        "model_route": {
+            "route_key": stage.model_route_key,
+            "name": stage.model_route_name,
+            "source": stage.model_route_source,
+        },
+        "model_name": stage.model_name,
+        "skill_policy_key": skill_policy_key or "default",
+    }
