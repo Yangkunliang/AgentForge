@@ -109,6 +109,7 @@ docs/
 | TASK-038 | 2026-07-10 | 高风险 Skill 临时授权 | ✅ 已完成 |
 | TASK-039 | 2026-07-10 | 高风险 Skill 授权确认入口 | ✅ 已完成 |
 | TASK-040 | 2026-07-10 | 高风险 Skill 授权可观测性 | ✅ 已完成 |
+| TASK-041 | 2026-07-13 | 高风险 Skill 授权聚合指标 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -266,6 +267,16 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-10-skill-authorization-observability/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-10-skill-authorization-observability/ITERATION-REVIEW.md)
 - **核心功能**：StageRuntime 将高风险 Skill 授权请求与授权使用写入 EvalEvent，事件类型为 `skill_authorization_required` / `skill_authorization_granted`，用于后续优化 AgentProfile、SkillPolicy 和默认权限策略。
+
+### TASK-041 详细信息
+- **目录**：`docs/iterations/2026-07-13-skill-authorization-summary/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-13-skill-authorization-summary/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-13-skill-authorization-summary/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-13-skill-authorization-summary/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-13-skill-authorization-summary/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-13-skill-authorization-summary/ITERATION-REVIEW.md)
+- **核心功能**：Evaluation summary 新增 `skill_authorizations` 聚合块，按 Skill 和 permission 展示授权请求数、授权使用数和授权率。
 
 ## 版本号规范
 

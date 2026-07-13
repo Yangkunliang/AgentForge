@@ -19,7 +19,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
 | Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | 可继续增强发布/回滚编排 |
-| Eval Feedback | 结构化记录阶段、Agent、模型、Skill、高风险授权、确认、Artifact 和 Delivery 执行事实 | 已支持 EvalEvent、EvaluationService、Dashboard 聚合、Evaluation summary API 和 Eval JSONL 导出 | 可继续增强 LLM token/cost 明细和质量评分 |
+| Eval Feedback | 结构化记录阶段、Agent、模型、Skill、高风险授权、确认、Artifact 和 Delivery 执行事实 | 已支持 EvalEvent、EvaluationService、Dashboard 聚合、Evaluation summary API、Skill 授权聚合和 Eval JSONL 导出 | 可继续增强 LLM token/cost 明细和质量评分 |
 
 ## 2. 用户路径
 

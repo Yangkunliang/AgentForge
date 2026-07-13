@@ -1479,6 +1479,27 @@ Authorization: Bearer <token>
     "revised": 1,
     "revise_ratio": 0.2
   },
+  "skill_authorizations": {
+    "required": 2,
+    "granted": 1,
+    "grant_rate": 0.5,
+    "by_skill": [
+      {
+        "skill_name": "code-executor",
+        "required": 1,
+        "granted": 1,
+        "grant_rate": 1.0
+      }
+    ],
+    "by_permission": [
+      {
+        "permission": "shell",
+        "required": 1,
+        "granted": 1,
+        "grant_rate": 1.0
+      }
+    ]
+  },
   "agents": [
     {
       "agent_profile_id": "agent-001",
@@ -1509,6 +1530,8 @@ Authorization: Bearer <token>
   }
 }
 ```
+
+`skill_authorizations` 只统计 `skill_authorization_required` 和 `skill_authorization_granted` EvalEvent。`by_permission` 从事件 metadata 的 `permissions` 数组聚合；空数据时 `required/granted/grant_rate` 为 0，明细列表为空。
 
 ---
 

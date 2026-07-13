@@ -601,6 +601,17 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 - 不新增持久授权。
 - 不把用户消息、源码、文件正文或凭据写入 EvalEvent metadata。
 
+### TASK-041: 高风险 Skill 授权聚合指标
+
+目标：让 Evaluation summary 直接返回高风险授权聚合指标，便于后续 Dashboard、导出分析和策略优化消费。
+
+完成状态：`EvaluationService.get_summary()` 已新增 `skill_authorizations`，包含 required、granted、grant_rate、by_skill 和 by_permission。
+
+不做：
+
+- 不新增 Dashboard UI。
+- 不改变 EvalEvent 表结构。
+
 ## 8. 当前风险
 
 | 风险 | 表现 | 对应任务 |
@@ -610,7 +621,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
 | Skill 安全边界不足 | 内置/外部/MCP RuntimeSpec、Manifest、权限、风险、Stage 级工具过滤、临时授权上下文、授权确认入口、授权 Eval、调用审计和高风险 Governance 决策已落地 | 后续增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
-| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认、高风险授权和失败事实；LLM token/cost 明细可继续增强 | 后续增强 |
+| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认、高风险授权和失败事实，Evaluation summary 已聚合高风险授权指标；LLM token/cost 明细可继续增强 | 后续增强 |
 | 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |
 
 ## 9. 完成定义

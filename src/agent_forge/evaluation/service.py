@@ -123,6 +123,7 @@ class EvaluationService:
             "delivery": _metric_block([event for event in events if event.event_type.startswith("delivery_")]),
             "artifacts": _artifact_block(events),
             "confirmations": _confirmation_block(events),
+            "skill_authorizations": _skill_authorization_block(events),
             "agents": _group_by_dimension(events, "agent_profile_id", "agent_profile_name"),
             "models": _group_by_dimension(events, "model_route_key", "model_route_name"),
             "event_counts": _event_counts(events),
@@ -160,6 +161,90 @@ def _confirmation_block(events: list[EvalEvent]) -> dict[str, Any]:
     }
 
 
+def _skill_authorization_block(events: list[EvalEvent]) -> dict[str, Any]:
+    authorization_events = [
+        event
+        for event in events
+        if event.event_type in {"skill_authorization_required", "skill_authorization_granted"}
+    ]
+    required_events = [
+        event for event in authorization_events if event.event_type == "skill_authorization_required"
+    ]
+    granted_events = [
+        event for event in authorization_events if event.event_type == "skill_authorization_granted"
+    ]
+    required = len(required_events)
+    granted = len(granted_events)
+    return {
+        "required": required,
+        "granted": granted,
+        "grant_rate": _rate(granted, required),
+        "by_skill": _authorization_group_by_skill(required_events, granted_events),
+        "by_permission": _authorization_group_by_permission(required_events, granted_events),
+    }
+
+
+def _authorization_group_by_skill(
+    required_events: list[EvalEvent],
+    granted_events: list[EvalEvent],
+) -> list[dict[str, Any]]:
+    keys = _ordered_unique(
+        [
+            event.skill_name
+            for event in [*required_events, *granted_events]
+            if event.skill_name
+        ]
+    )
+    rows: list[dict[str, Any]] = []
+    for skill_name in keys:
+        required = sum(1 for event in required_events if event.skill_name == skill_name)
+        granted = sum(1 for event in granted_events if event.skill_name == skill_name)
+        rows.append(
+            {
+                "skill_name": skill_name,
+                "required": required,
+                "granted": granted,
+                "grant_rate": _rate(granted, required),
+            }
+        )
+    return sorted(rows, key=lambda row: (-row["required"], -row["granted"], row["skill_name"]))
+
+
+def _authorization_group_by_permission(
+    required_events: list[EvalEvent],
+    granted_events: list[EvalEvent],
+) -> list[dict[str, Any]]:
+    required_counts = _permission_counts(required_events)
+    granted_counts = _permission_counts(granted_events)
+    keys = _ordered_unique([*required_counts.keys(), *granted_counts.keys()])
+    rows: list[dict[str, Any]] = []
+    for permission in keys:
+        required = required_counts.get(permission, 0)
+        granted = granted_counts.get(permission, 0)
+        rows.append(
+            {
+                "permission": permission,
+                "required": required,
+                "granted": granted,
+                "grant_rate": _rate(granted, required),
+            }
+        )
+    return sorted(rows, key=lambda row: (-row["required"], -row["granted"], row["permission"]))
+
+
+def _permission_counts(events: list[EvalEvent]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for event in events:
+        permissions = (event.metadata_json or {}).get("permissions")
+        if not isinstance(permissions, list):
+            continue
+        for permission in permissions:
+            if not isinstance(permission, str) or not permission:
+                continue
+            counts[permission] = counts.get(permission, 0) + 1
+    return counts
+
+
 def _group_by_dimension(events: list[EvalEvent], id_attr: str, name_attr: str) -> list[dict[str, Any]]:
     grouped: dict[str, list[EvalEvent]] = defaultdict(list)
     for event in events:
@@ -194,6 +279,18 @@ def _event_counts(events: list[EvalEvent]) -> dict[str, int]:
 def _average_latency(events: list[EvalEvent]) -> float:
     latencies = [event.latency_ms for event in events if event.latency_ms is not None]
     return round(sum(latencies) / len(latencies), 2) if latencies else 0.0
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    return round(numerator / denominator, 4) if denominator else 0.0
+
+
+def _ordered_unique(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
 
 
 def _is_success(event: EvalEvent) -> bool:

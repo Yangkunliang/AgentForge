@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,6 +64,97 @@ async def test_evaluation_service_records_and_summarizes_project_events(
     assert summary["delivery"]["succeeded"] == 1
     assert summary["agents"][0]["agent_profile_id"] == "agent-1"
     assert summary["models"][0]["model_route_key"] == "default"
+
+
+@pytest.mark.asyncio
+async def test_evaluation_service_summarizes_skill_authorizations(
+    db: AsyncSession,
+    fake_user: User,
+):
+    suffix = uuid.uuid4().hex[:8]
+    project = Project(id=f"project-auth-summary-{suffix}", user_id=fake_user.id, name="Auth Summary")
+    db.add(project)
+    await db.commit()
+
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-auth-{suffix}",
+        stage_id="locate",
+        event_type="skill_authorization_required",
+        status="blocked",
+        skill_name="code-executor",
+        tool_name="code_executor",
+        metadata={"permissions": ["shell"], "policy_key": "default"},
+    )
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-auth-{suffix}",
+        stage_id="locate",
+        event_type="skill_authorization_required",
+        status="blocked",
+        skill_name="http-request",
+        tool_name="http_request",
+        metadata={"permissions": ["external_side_effect"], "policy_key": "default"},
+    )
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-auth-{suffix}",
+        stage_id="locate",
+        event_type="skill_authorization_granted",
+        status="success",
+        skill_name="code-executor",
+        tool_name="code_executor",
+        metadata={"permissions": ["shell"], "source": "user_confirmation"},
+    )
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-auth-{suffix}",
+        event_type="skill_called",
+        status="success",
+        skill_name="code-executor",
+        tool_name="code_executor",
+    )
+    await db.commit()
+
+    summary = await EvaluationService.get_summary(db, user_id=fake_user.id, project_id=project.id)
+
+    assert summary["skill_authorizations"] == {
+        "required": 2,
+        "granted": 1,
+        "grant_rate": 0.5,
+        "by_skill": [
+            {
+                "skill_name": "code-executor",
+                "required": 1,
+                "granted": 1,
+                "grant_rate": 1.0,
+            },
+            {
+                "skill_name": "http-request",
+                "required": 1,
+                "granted": 0,
+                "grant_rate": 0.0,
+            },
+        ],
+        "by_permission": [
+            {
+                "permission": "shell",
+                "required": 1,
+                "granted": 1,
+                "grant_rate": 1.0,
+            },
+            {
+                "permission": "external_side_effect",
+                "required": 1,
+                "granted": 0,
+                "grant_rate": 0.0,
+            },
+        ],
+    }
 
 
 @pytest.mark.asyncio
