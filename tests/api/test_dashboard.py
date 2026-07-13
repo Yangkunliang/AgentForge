@@ -7,20 +7,26 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes.dashboard import _get_evaluation_stats as _get_runtime_evaluation_stats
-from agent_forge.api.routes.dashboard import (
+from api.routes import dashboard as runtime_dashboard
+from api.routes.dashboard import (
+    _agent_stats as _get_agent_stats,
+    _cost_stats as _get_cost_stats,
     _get_evaluation_stats,
-    _get_agent_stats,
-    _get_cost_stats,
-    _get_recent_tasks,
-    _get_skill_stats,
-    _get_task_stats,
+    _recent_tasks as _get_recent_tasks,
+    _skill_stats as _get_skill_stats,
+    _task_stats as _get_task_stats,
 )
+from agent_forge.api.routes import dashboard as legacy_dashboard
 from agent_forge.models.agent import Agent
 from agent_forge.models.evaluation import EvalEvent
 from agent_forge.models.project import Project
 from agent_forge.models.skill import Skill
 from agent_forge.models.task import Task, TaskStatus
+
+
+def test_legacy_dashboard_module_reexports_runtime_dashboard():
+    assert legacy_dashboard.router is runtime_dashboard.router
+    assert legacy_dashboard._get_evaluation_stats is runtime_dashboard._get_evaluation_stats
 
 
 @pytest.mark.asyncio
@@ -124,7 +130,7 @@ class TestDashboardStats:
         )
         await db.commit()
 
-        stats = await _get_runtime_evaluation_stats(db, user_id=user_id)
+        stats = await _get_evaluation_stats(db, user_id=user_id)
 
         assert stats.skill_authorizations.model_dump() == {
             "required": 2,

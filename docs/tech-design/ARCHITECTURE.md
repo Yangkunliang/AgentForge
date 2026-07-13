@@ -155,7 +155,7 @@
 - **EvalEvent**：记录 Stage、AgentProfile、ModelRoute、Skill、Artifact、Delivery、确认、高风险授权、耗时、成本和失败原因。
 - **EvaluationService**：主链路非阻塞写入，失败只打日志，不阻断执行。
 - **Evaluation API**：`GET /api/v1/evaluation/summary` 提供项目、时间范围和高风险 Skill 授权维度聚合。
-- **Dashboard**：显示阶段、Skill、Delivery 成功率、平均阶段耗时和高风险 Skill 授权指标。
+- **Dashboard**：显示阶段、Skill、Delivery 成功率、平均阶段耗时和高风险 Skill 授权指标；真实路由单一事实源为 `src/api/routes/dashboard.py`，旧 `agent_forge.api.routes.dashboard` 仅兼容导出。
 
 ### 3.10 认证 (Auth)
 - **JWT 工具**：access_token / refresh_token 签发与校验（`auth/jwt.py`）

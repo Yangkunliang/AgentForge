@@ -138,9 +138,12 @@ async def _task_stats(db: AsyncSession) -> TaskStats:
 
 
 async def _agent_stats(db: AsyncSession) -> AgentStats:
-    total_r = await db.execute(select(func.count(Agent.id)))
-    total = int(total_r.scalar_one() or 0)
-    return AgentStats(active=total, inactive=0)
+    active_r = await db.execute(select(func.count(Agent.id)).where(Agent.status == "active"))
+    inactive_r = await db.execute(select(func.count(Agent.id)).where(Agent.status == "inactive"))
+    return AgentStats(
+        active=int(active_r.scalar_one() or 0),
+        inactive=int(inactive_r.scalar_one() or 0),
+    )
 
 
 async def _skill_stats(db: AsyncSession) -> SkillStats:

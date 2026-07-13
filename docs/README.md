@@ -111,6 +111,7 @@ docs/
 | TASK-040 | 2026-07-10 | 高风险 Skill 授权可观测性 | ✅ 已完成 |
 | TASK-041 | 2026-07-13 | 高风险 Skill 授权聚合指标 | ✅ 已完成 |
 | TASK-042 | 2026-07-13 | Dashboard 高风险 Skill 授权指标 | ✅ 已完成 |
+| TASK-043 | 2026-07-13 | Dashboard 路由单一事实源 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -289,6 +290,16 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/ITERATION-REVIEW.md)
 - **核心功能**：Dashboard evaluation 返回并展示高风险 Skill 授权请求数、授权通过率、按 Skill 排行和按 permission 排行。
+
+### TASK-043 详细信息
+- **目录**：`docs/iterations/2026-07-13-dashboard-route-convergence/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-13-dashboard-route-convergence/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-13-dashboard-route-convergence/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-13-dashboard-route-convergence/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-13-dashboard-route-convergence/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-13-dashboard-route-convergence/ITERATION-REVIEW.md)
+- **核心功能**：Dashboard 真实路由收敛为 `src/api/routes/dashboard.py`，旧 `agent_forge.api.routes.dashboard` 只做兼容 re-export，并修正 inactive Agent 统计。
 
 ## 版本号规范
 
