@@ -12,6 +12,7 @@ from agent_forge.models import (
     Agent,
     AgentSkill,
     Artifact,
+    EvalEvent,
     LLMCredential,
     LLMModelSetting,
     LLMProviderSetting,
@@ -434,6 +435,20 @@ async def test_stage_runtime_passes_temporary_high_risk_skill_authorization(
     assert policy_context["authorized_permissions"] == ["shell"]
     assert policy_context["excluded_tools"] == []
 
+    result = await db_session.execute(
+        select(EvalEvent).where(
+            EvalEvent.pipeline_run_id == run_id,
+            EvalEvent.event_type == "skill_authorization_granted",
+        )
+    )
+    [event] = result.scalars().all()
+    assert event.status == "success"
+    assert event.stage_id == "locate"
+    assert event.skill_name == shell_skill_name
+    assert event.tool_name == "runtime_authorized_shell_tool"
+    assert event.metadata_json["permissions"] == ["shell"]
+    assert event.metadata_json["source"] == "user_confirmation"
+
 
 @pytest.mark.asyncio
 async def test_stage_runtime_emits_skill_authorization_required_for_bound_high_risk_skill(
@@ -539,6 +554,23 @@ async def test_stage_runtime_emits_skill_authorization_required_for_bound_high_r
             "permissions": ["shell"],
         }
     ]
+
+    result = await db_session.execute(
+        select(EvalEvent).where(
+            EvalEvent.pipeline_run_id == run_id,
+            EvalEvent.event_type == "skill_authorization_required",
+        )
+    )
+    [eval_event] = result.scalars().all()
+    assert eval_event.status == "blocked"
+    assert eval_event.stage_id == "locate"
+    assert eval_event.skill_name == shell_skill_name
+    assert eval_event.tool_name == "runtime_event_shell_tool"
+    assert eval_event.metadata_json == {
+        "permissions": ["shell"],
+        "policy_key": "default",
+        "reason": "permission_denied",
+    }
 
 
 @pytest.mark.asyncio

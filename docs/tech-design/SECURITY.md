@@ -720,6 +720,7 @@ TASK-023 后，GitHub OAuth Mount 使用服务端加密凭据表保存 access to
 - TASK-037 后，内置 Skill 也必须进入 SkillRuntimeSpec 权限模型；`http_request`、`update_profile`、`code_executor` 默认不暴露给 LLM，除非当前阶段的高风险授权上下文明示放行。
 - TASK-038 后，高风险 Skill 临时授权只通过 `advanced_context.skill_authorization` 影响当前 StageRuntime；授权不会越过 AgentSkill allowlist，也不会持久化为长期权限。运行时过滤报告会记录授权 Skill 和权限，便于后续审计与 Eval 分析。
 - TASK-039 后，前端只会对 `permission_denied` 且已绑定到当前 Agent 的 Skill 展示授权卡；`agent_not_allowed` 不会触发授权提示。`skill_authorization_required` SSE 不携带用户源码或消息正文。
+- TASK-040 后，高风险 Skill 授权请求和授权使用会写入 EvalEvent：`skill_authorization_required` / `skill_authorization_granted`。metadata 只允许结构化权限、策略、Skill、Tool 和授权来源信息，禁止写入用户消息、源码、文件正文或凭据。
 
 ---
 

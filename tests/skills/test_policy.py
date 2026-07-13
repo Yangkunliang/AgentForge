@@ -143,6 +143,14 @@ def test_filter_tool_defs_accepts_temporary_high_risk_authorization():
     assert report.authorized_skill_names == ["authorized-shell-skill"]
     assert report.authorized_permissions == ["shell"]
     assert report.to_context()["authorized_skill_names"] == ["authorized-shell-skill"]
+    assert report.authorized_tools == [
+        {
+            "tool_name": "policy_authorized_shell_tool",
+            "skill_name": "authorized-shell-skill",
+            "permissions": ["shell"],
+            "authorized_by": "skill_name",
+        }
+    ]
     assert report.excluded_tools == [
         {
             "tool_name": "policy_side_effect_tool",

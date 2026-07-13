@@ -25,6 +25,7 @@ class SkillToolFilterReport:
     agent_allowed_skill_names: list[str] = field(default_factory=list)
     authorized_skill_names: list[str] = field(default_factory=list)
     authorized_permissions: list[str] = field(default_factory=list)
+    authorized_tools: list[dict[str, Any]] = field(default_factory=list)
     excluded_tools: list[dict[str, Any]] = field(default_factory=list)
 
     def to_context(self) -> dict[str, Any]:
@@ -35,6 +36,7 @@ class SkillToolFilterReport:
             "agent_allowed_skill_names": self.agent_allowed_skill_names,
             "authorized_skill_names": self.authorized_skill_names,
             "authorized_permissions": self.authorized_permissions,
+            "authorized_tools": self.authorized_tools,
             "excluded_tools": self.excluded_tools,
         }
 
@@ -128,6 +130,7 @@ def filter_tool_defs_for_runtime(
     authorized_perms = _normalize_authorized_permissions(authorized_permissions)
     authorized_perm_set = set(authorized_perms)
     filtered: list[dict] = []
+    authorized_tools: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
 
     for tool_def in tool_defs:
@@ -160,6 +163,16 @@ def filter_tool_defs_for_runtime(
             )
             if skill_authorized or permission_authorized:
                 filtered.append(tool_def)
+                authorized_tools.append(
+                    _authorized_tool(
+                        tool_name,
+                        skill_name,
+                        permissions,
+                        authorized_by=(
+                            "skill_name" if skill_authorized else "permission"
+                        ),
+                    )
+                )
                 continue
             excluded.append(_excluded_tool(tool_name, skill_name, "permission_denied", permissions))
             continue
@@ -173,6 +186,7 @@ def filter_tool_defs_for_runtime(
         agent_allowed_skill_names=allowed_skill_names,
         authorized_skill_names=authorized_names,
         authorized_permissions=authorized_perms,
+        authorized_tools=authorized_tools,
         excluded_tools=excluded,
     )
 
@@ -223,4 +237,19 @@ def _excluded_tool(
         "skill_name": skill_name,
         "reason": reason,
         "permissions": permissions,
+    }
+
+
+def _authorized_tool(
+    tool_name: str,
+    skill_name: str | None,
+    permissions: list[str],
+    *,
+    authorized_by: str,
+) -> dict[str, Any]:
+    return {
+        "tool_name": tool_name,
+        "skill_name": skill_name,
+        "permissions": permissions,
+        "authorized_by": authorized_by,
     }

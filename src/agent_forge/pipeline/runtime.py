@@ -114,6 +114,21 @@ class StageRuntime:
                     skill_filter_report=skill_filter_report,
                     sse_publish=sse_publish,
                 )
+                await _record_skill_authorization_required(
+                    session_factory=self.session_factory,
+                    eval_context=eval_context,
+                    skill_filter_report=skill_filter_report,
+                    agent_profile=agent_profile,
+                    model_route=model_route,
+                )
+                await _record_skill_authorization_granted(
+                    session_factory=self.session_factory,
+                    eval_context=eval_context,
+                    skill_filter_report=skill_filter_report,
+                    authorization_source=_skill_authorization_source_from_context(advanced_context),
+                    agent_profile=agent_profile,
+                    model_route=model_route,
+                )
             async_gen = await self.engine.run(
                 user_message=user_message,
                 conversation_history=conversation_history,
@@ -497,6 +512,90 @@ def _authorization_required_skills(report: SkillToolFilterReport) -> list[dict[s
             }
         )
     return result
+
+
+async def _record_skill_authorization_required(
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    eval_context: dict | None,
+    skill_filter_report: SkillToolFilterReport | None,
+    agent_profile: AgentProfile | None,
+    model_route: ModelRouteResolution | None,
+) -> None:
+    if not eval_context or not skill_filter_report:
+        return
+    for item in _authorization_required_skills(skill_filter_report):
+        await EvaluationService.safe_record_event(
+            session_factory,
+            project_id=eval_context.get("project_id"),
+            pipeline_run_id=eval_context.get("pipeline_run_id"),
+            stage_id=eval_context.get("stage_id"),
+            event_type="skill_authorization_required",
+            status="blocked",
+            agent_profile_id=agent_profile.id if agent_profile else None,
+            agent_profile_name=agent_profile.name if agent_profile else None,
+            model_route_key=model_route.route_key if model_route else None,
+            model_route_name=model_route.name if model_route else None,
+            model_name=model_route.model_name if model_route else None,
+            skill_name=item.get("skill_name"),
+            tool_name=item.get("tool_name"),
+            metadata={
+                "permissions": list(item.get("permissions") or []),
+                "policy_key": skill_filter_report.policy_key,
+                "reason": "permission_denied",
+            },
+        )
+
+
+async def _record_skill_authorization_granted(
+    *,
+    session_factory: async_sessionmaker[AsyncSession],
+    eval_context: dict | None,
+    skill_filter_report: SkillToolFilterReport | None,
+    authorization_source: str,
+    agent_profile: AgentProfile | None,
+    model_route: ModelRouteResolution | None,
+) -> None:
+    if not eval_context or not skill_filter_report:
+        return
+    for item in skill_filter_report.authorized_tools:
+        skill_name = item.get("skill_name")
+        tool_name = item.get("tool_name")
+        if not skill_name or not tool_name:
+            continue
+        await EvaluationService.safe_record_event(
+            session_factory,
+            project_id=eval_context.get("project_id"),
+            pipeline_run_id=eval_context.get("pipeline_run_id"),
+            stage_id=eval_context.get("stage_id"),
+            event_type="skill_authorization_granted",
+            status="success",
+            agent_profile_id=agent_profile.id if agent_profile else None,
+            agent_profile_name=agent_profile.name if agent_profile else None,
+            model_route_key=model_route.route_key if model_route else None,
+            model_route_name=model_route.name if model_route else None,
+            model_name=model_route.model_name if model_route else None,
+            skill_name=str(skill_name),
+            tool_name=str(tool_name),
+            metadata={
+                "permissions": list(item.get("permissions") or []),
+                "authorized_skill_names": skill_filter_report.authorized_skill_names,
+                "authorized_permissions": skill_filter_report.authorized_permissions,
+                "authorized_by": item.get("authorized_by"),
+                "source": authorization_source,
+                "policy_key": skill_filter_report.policy_key,
+            },
+        )
+
+
+def _skill_authorization_source_from_context(context: dict | None) -> str:
+    if not context:
+        return "runtime"
+    authorization = context.get("skill_authorization")
+    if not isinstance(authorization, dict):
+        return "runtime"
+    source = str(authorization.get("source") or "").strip()
+    return source or "runtime"
 
 
 def _string_list_from_context(value: Any) -> list[str]:

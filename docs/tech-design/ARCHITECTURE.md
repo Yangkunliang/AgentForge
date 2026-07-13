@@ -152,7 +152,7 @@
 - **导出用途**：Agent 路由优化、Skill 模板优化、模型选择优化
 
 ### 3.9.1 Eval Feedback
-- **EvalEvent**：记录 Stage、AgentProfile、ModelRoute、Skill、Artifact、Delivery、确认、耗时、成本和失败原因。
+- **EvalEvent**：记录 Stage、AgentProfile、ModelRoute、Skill、Artifact、Delivery、确认、高风险授权、耗时、成本和失败原因。
 - **EvaluationService**：主链路非阻塞写入，失败只打日志，不阻断执行。
 - **Evaluation API**：`GET /api/v1/evaluation/summary` 提供项目和时间范围维度聚合。
 - **Dashboard**：显示阶段、Skill 和 Delivery 成功率与平均阶段耗时。

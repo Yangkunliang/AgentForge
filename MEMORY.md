@@ -114,6 +114,7 @@
 - TASK-037 已完成：新增 `external_side_effect` 高风险权限；内置 Skill 注册时生成 `source_type=builtin` 的 RuntimeSpec；默认 StageSkillPolicy 只暴露 `web_search` 和 `get_weather`，过滤 `http_request`、`update_profile`、`code_executor`。
 - TASK-038 已完成：StageRuntime 支持 `advanced_context.skill_authorization` 阶段级临时授权；`filter_tool_defs_for_runtime()` 可按 `authorized_skill_names` / `authorized_permissions` 临时放行高风险 Skill，但不会绕过 AgentSkill allowlist，过滤报告会记录授权范围。
 - TASK-039 已完成：Chat API 支持一次性 `skill_authorization` payload；StageRuntime 会对可授权的高风险 Skill 发出 `skill_authorization_required` SSE；前端新增 `SkillAuthorizationCard`，用户确认后以同一条消息和临时授权 payload 重试当前阶段。
+- TASK-040 已完成：`SkillToolFilterReport` 记录 `authorized_tools`；StageRuntime 将 `skill_authorization_required` 和 `skill_authorization_granted` 写入 EvalEvent，后续可按阶段、Skill、Tool 和权限分析高风险授权频率。
 
 ---
 
