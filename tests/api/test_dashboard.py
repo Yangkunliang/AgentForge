@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.routes.dashboard import _get_evaluation_stats as _get_runtime_evaluation_stats
 from agent_forge.api.routes.dashboard import (
     _get_evaluation_stats,
     _get_agent_stats,
@@ -15,6 +18,7 @@ from agent_forge.api.routes.dashboard import (
 )
 from agent_forge.models.agent import Agent
 from agent_forge.models.evaluation import EvalEvent
+from agent_forge.models.project import Project
 from agent_forge.models.skill import Skill
 from agent_forge.models.task import Task, TaskStatus
 
@@ -81,3 +85,77 @@ class TestDashboardStats:
 
         assert stats.total_events >= 1
         assert stats.stage_success_rate >= 0
+
+    async def test_runtime_dashboard_evaluation_stats_include_skill_authorizations(self, db: AsyncSession):
+        suffix = uuid.uuid4().hex[:8]
+        user_id = f"dashboard-auth-user-{suffix}"
+        project = Project(id=f"dashboard-auth-project-{suffix}", user_id=user_id, name="Dashboard Auth")
+        db.add(project)
+        db.add_all(
+            [
+                EvalEvent(
+                    id=f"eval-dashboard-auth-required-code-{suffix}",
+                    project_id=project.id,
+                    event_type="skill_authorization_required",
+                    status="blocked",
+                    skill_name="code-executor",
+                    tool_name="code_executor",
+                    metadata_json={"permissions": ["shell"]},
+                ),
+                EvalEvent(
+                    id=f"eval-dashboard-auth-required-http-{suffix}",
+                    project_id=project.id,
+                    event_type="skill_authorization_required",
+                    status="blocked",
+                    skill_name="http-request",
+                    tool_name="http_request",
+                    metadata_json={"permissions": ["external_side_effect"]},
+                ),
+                EvalEvent(
+                    id=f"eval-dashboard-auth-granted-code-{suffix}",
+                    project_id=project.id,
+                    event_type="skill_authorization_granted",
+                    status="success",
+                    skill_name="code-executor",
+                    tool_name="code_executor",
+                    metadata_json={"permissions": ["shell"]},
+                ),
+            ]
+        )
+        await db.commit()
+
+        stats = await _get_runtime_evaluation_stats(db, user_id=user_id)
+
+        assert stats.skill_authorizations.model_dump() == {
+            "required": 2,
+            "granted": 1,
+            "grant_rate": 0.5,
+            "by_skill": [
+                {
+                    "skill_name": "code-executor",
+                    "required": 1,
+                    "granted": 1,
+                    "grant_rate": 1.0,
+                },
+                {
+                    "skill_name": "http-request",
+                    "required": 1,
+                    "granted": 0,
+                    "grant_rate": 0.0,
+                },
+            ],
+            "by_permission": [
+                {
+                    "permission": "shell",
+                    "required": 1,
+                    "granted": 1,
+                    "grant_rate": 1.0,
+                },
+                {
+                    "permission": "external_side_effect",
+                    "required": 1,
+                    "granted": 0,
+                    "grant_rate": 0.0,
+                },
+            ],
+        }

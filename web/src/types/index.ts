@@ -155,6 +155,25 @@ export interface SkillImportPreview {
 }
 
 // Dashboard 相关
+export interface SkillAuthorizationDimension {
+  required: number
+  granted: number
+  grant_rate: number
+}
+
+export interface SkillAuthorizationBySkill extends SkillAuthorizationDimension {
+  skill_name: string
+}
+
+export interface SkillAuthorizationByPermission extends SkillAuthorizationDimension {
+  permission: string
+}
+
+export interface SkillAuthorizationStats extends SkillAuthorizationDimension {
+  by_skill: SkillAuthorizationBySkill[]
+  by_permission: SkillAuthorizationByPermission[]
+}
+
 export interface DashboardStats {
   tasks: {
     total: number
@@ -181,6 +200,7 @@ export interface DashboardStats {
     skill_success_rate: number
     delivery_success_rate: number
     average_stage_latency_ms: number
+    skill_authorizations?: SkillAuthorizationStats
   }
   recent_tasks: Array<{
     task_id: string

@@ -110,6 +110,7 @@ docs/
 | TASK-039 | 2026-07-10 | 高风险 Skill 授权确认入口 | ✅ 已完成 |
 | TASK-040 | 2026-07-10 | 高风险 Skill 授权可观测性 | ✅ 已完成 |
 | TASK-041 | 2026-07-13 | 高风险 Skill 授权聚合指标 | ✅ 已完成 |
+| TASK-042 | 2026-07-13 | Dashboard 高风险 Skill 授权指标 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -277,6 +278,17 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-13-skill-authorization-summary/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-13-skill-authorization-summary/ITERATION-REVIEW.md)
 - **核心功能**：Evaluation summary 新增 `skill_authorizations` 聚合块，按 Skill 和 permission 展示授权请求数、授权使用数和授权率。
+
+### TASK-042 详细信息
+- **目录**：`docs/iterations/2026-07-13-dashboard-skill-authorization-metrics/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/TECHNICAL-DESIGN.md)
+  - [UI-DESIGN.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/UI-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-13-dashboard-skill-authorization-metrics/ITERATION-REVIEW.md)
+- **核心功能**：Dashboard evaluation 返回并展示高风险 Skill 授权请求数、授权通过率、按 Skill 排行和按 permission 排行。
 
 ## 版本号规范
 

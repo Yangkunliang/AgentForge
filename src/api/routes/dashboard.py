@@ -57,12 +57,32 @@ class RecentTask(BaseModel):
     created_at: str
 
 
+class SkillAuthorizationDimension(BaseModel):
+    required: int
+    granted: int
+    grant_rate: float
+
+
+class SkillAuthorizationBySkill(SkillAuthorizationDimension):
+    skill_name: str
+
+
+class SkillAuthorizationByPermission(SkillAuthorizationDimension):
+    permission: str
+
+
+class SkillAuthorizationStats(SkillAuthorizationDimension):
+    by_skill: list[SkillAuthorizationBySkill]
+    by_permission: list[SkillAuthorizationByPermission]
+
+
 class EvaluationStats(BaseModel):
     total_events: int
     stage_success_rate: float
     skill_success_rate: float
     delivery_success_rate: float
     average_stage_latency_ms: float
+    skill_authorizations: SkillAuthorizationStats
 
 
 class DashboardResponse(BaseModel):
@@ -169,6 +189,7 @@ async def _get_evaluation_stats(db: AsyncSession, user_id: str | None = None) ->
         skill_success_rate=summary["skills"]["success_rate"],
         delivery_success_rate=summary["delivery"]["success_rate"],
         average_stage_latency_ms=summary["stages"]["average_latency_ms"],
+        skill_authorizations=summary["skill_authorizations"],
     )
 
 

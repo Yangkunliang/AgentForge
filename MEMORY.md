@@ -82,6 +82,7 @@
   - [TECHNICAL-DESIGN.md](docs/iterations/2026-07-09-ai-architecture-convergence/TECHNICAL-DESIGN.md) — Pipeline Catalog、AgentResolver、ModelRouter、SkillRuntime、GovernancePolicy 和 EvalEvent 设计边界
   - [TEST-PLAN.md](docs/iterations/2026-07-09-ai-architecture-convergence/TEST-PLAN.md) — AI Runtime 收敛测试矩阵
   - [ITERATION-REVIEW.md](docs/iterations/2026-07-09-ai-architecture-convergence/ITERATION-REVIEW.md) — TASK-027～TASK-034 完成情况、验证结果和遗留风险
+- [2026-07-13-dashboard-skill-authorization-metrics/](docs/iterations/2026-07-13-dashboard-skill-authorization-metrics/) — TASK-042 Dashboard 高风险 Skill 授权指标，将 TASK-041 summary 聚合接入 Dashboard API 和页面
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -116,6 +117,7 @@
 - TASK-039 已完成：Chat API 支持一次性 `skill_authorization` payload；StageRuntime 会对可授权的高风险 Skill 发出 `skill_authorization_required` SSE；前端新增 `SkillAuthorizationCard`，用户确认后以同一条消息和临时授权 payload 重试当前阶段。
 - TASK-040 已完成：`SkillToolFilterReport` 记录 `authorized_tools`；StageRuntime 将 `skill_authorization_required` 和 `skill_authorization_granted` 写入 EvalEvent，后续可按阶段、Skill、Tool 和权限分析高风险授权频率。
 - TASK-041 已完成：Evaluation summary 新增 `skill_authorizations` 聚合块，按 Skill 和 permission 输出 required、granted、grant_rate，便于后续 Dashboard 和策略优化消费。
+- TASK-042 已完成：Dashboard evaluation 返回 `skill_authorizations`，前端 Dashboard 展示高风险 Skill 授权请求、已授权、通过率，以及按 Skill / permission 的前 3 项排行。
 
 ---
 

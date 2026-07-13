@@ -1404,7 +1404,28 @@ Authorization: Bearer <token>
     "stage_success_rate": 0.92,
     "skill_success_rate": 0.88,
     "delivery_success_rate": 0.95,
-    "average_stage_latency_ms": 2450
+    "average_stage_latency_ms": 2450,
+    "skill_authorizations": {
+      "required": 12,
+      "granted": 9,
+      "grant_rate": 0.75,
+      "by_skill": [
+        {
+          "skill_name": "code-executor",
+          "required": 8,
+          "granted": 7,
+          "grant_rate": 0.875
+        }
+      ],
+      "by_permission": [
+        {
+          "permission": "shell",
+          "required": 8,
+          "granted": 7,
+          "grant_rate": 0.875
+        }
+      ]
+    }
   },
   "recent_tasks": [
     {
@@ -1418,7 +1439,7 @@ Authorization: Bearer <token>
 }
 ```
 
-**说明：** `trend_pct` 为正表示费用较昨日增加，为负表示减少。`evaluation` 基于 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。
+**说明：** `trend_pct` 为正表示费用较昨日增加，为负表示减少。`evaluation` 基于 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。TASK-042 后，Dashboard evaluation 同步返回高风险 Skill 授权聚合指标，前端用于展示授权请求、授权通过率以及 Skill / permission 排行。
 
 ---
 

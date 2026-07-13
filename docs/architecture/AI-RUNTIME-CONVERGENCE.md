@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-039 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权和前端确认重试入口。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-042 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权、前端确认重试、Eval 聚合和 Dashboard 可视化。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-039，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract。
+截至 TASK-042，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标。
 
 ### 2.1 请求到执行
 
@@ -610,6 +610,17 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 不做：
 
 - 不新增 Dashboard UI。
+- 不改变 EvalEvent 表结构。
+
+### TASK-042: Dashboard 高风险 Skill 授权指标
+
+目标：把 TASK-041 的授权聚合指标接入 Dashboard，让平台用户和维护者能直接看到授权请求、授权通过率、Skill 排行和 permission 排行。
+
+完成状态：`/api/v1/dashboard.evaluation.skill_authorizations` 已返回授权聚合块；Dashboard 页面新增「高风险 Skill 授权」卡片，展示总览、通过率进度和前 3 项排行。
+
+不做：
+
+- 不新增告警或阈值配置。
 - 不改变 EvalEvent 表结构。
 
 ## 8. 当前风险
