@@ -165,3 +165,96 @@ class TestDashboardStats:
                 },
             ],
         }
+
+    async def test_runtime_dashboard_evaluation_stats_include_llm_usage(self, db: AsyncSession):
+        suffix = uuid.uuid4().hex[:8]
+        user_id = f"dashboard-llm-user-{suffix}"
+        project = Project(id=f"dashboard-llm-project-{suffix}", user_id=user_id, name="Dashboard LLM")
+        db.add(project)
+        for index, (route_key, route_name, stage_id, stage_name, cost) in enumerate(
+            [
+                ("quality", "Quality Route", "backend_dev", "后端开发", 0.04),
+                ("fast", "Fast Route", "analysis", "需求分析", 0.03),
+                ("balanced", "Balanced Route", "testing", "回归测试", 0.02),
+                ("economy", "Economy Route", "documentation", "文档整理", 0.01),
+            ],
+            start=1,
+        ):
+            db.add(
+                EvalEvent(
+                    id=f"eval-dashboard-llm-{index}-{suffix}",
+                    project_id=project.id,
+                    pipeline_run_id=f"dashboard-llm-run-{suffix}",
+                    stage_id=stage_id,
+                    event_type="llm_tool_use_completed",
+                    status="success",
+                    model_route_key=route_key,
+                    model_route_name=route_name,
+                    latency_ms=index * 100,
+                    cost_usd=cost,
+                    tokens_used=index * 100,
+                    metadata_json={"stage_name": stage_name},
+                )
+            )
+        await db.commit()
+
+        stats = await _get_evaluation_stats(db, user_id=user_id)
+
+        assert stats.llm.model_dump() == {
+            "total_calls": 4,
+            "tokens_used": 1000,
+            "cost_usd": 0.1,
+            "average_latency_ms": 250.0,
+            "by_model_route": [
+                {
+                    "model_route_key": "quality",
+                    "name": "Quality Route",
+                    "total_calls": 1,
+                    "tokens_used": 100,
+                    "cost_usd": 0.04,
+                    "average_latency_ms": 100.0,
+                },
+                {
+                    "model_route_key": "fast",
+                    "name": "Fast Route",
+                    "total_calls": 1,
+                    "tokens_used": 200,
+                    "cost_usd": 0.03,
+                    "average_latency_ms": 200.0,
+                },
+                {
+                    "model_route_key": "balanced",
+                    "name": "Balanced Route",
+                    "total_calls": 1,
+                    "tokens_used": 300,
+                    "cost_usd": 0.02,
+                    "average_latency_ms": 300.0,
+                },
+            ],
+            "by_stage": [
+                {
+                    "stage_id": "backend_dev",
+                    "name": "后端开发",
+                    "total_calls": 1,
+                    "tokens_used": 100,
+                    "cost_usd": 0.04,
+                    "average_latency_ms": 100.0,
+                },
+                {
+                    "stage_id": "analysis",
+                    "name": "需求分析",
+                    "total_calls": 1,
+                    "tokens_used": 200,
+                    "cost_usd": 0.03,
+                    "average_latency_ms": 200.0,
+                },
+                {
+                    "stage_id": "testing",
+                    "name": "回归测试",
+                    "total_calls": 1,
+                    "tokens_used": 300,
+                    "cost_usd": 0.02,
+                    "average_latency_ms": 300.0,
+                },
+            ],
+        }

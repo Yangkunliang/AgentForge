@@ -76,6 +76,28 @@ class SkillAuthorizationStats(SkillAuthorizationDimension):
     by_permission: list[SkillAuthorizationByPermission]
 
 
+class LLMUsageDimension(BaseModel):
+    total_calls: int
+    tokens_used: int
+    cost_usd: float
+    average_latency_ms: float
+
+
+class LLMModelRouteUsage(LLMUsageDimension):
+    model_route_key: str
+    name: str
+
+
+class LLMStageUsage(LLMUsageDimension):
+    stage_id: str
+    name: str
+
+
+class LLMUsageStats(LLMUsageDimension):
+    by_model_route: list[LLMModelRouteUsage]
+    by_stage: list[LLMStageUsage]
+
+
 class EvaluationStats(BaseModel):
     total_events: int
     stage_success_rate: float
@@ -83,6 +105,7 @@ class EvaluationStats(BaseModel):
     delivery_success_rate: float
     average_stage_latency_ms: float
     skill_authorizations: SkillAuthorizationStats
+    llm: LLMUsageStats
 
 
 class DashboardResponse(BaseModel):
@@ -186,6 +209,7 @@ async def _cost_stats(db: AsyncSession) -> CostStats:
 
 async def _get_evaluation_stats(db: AsyncSession, user_id: str | None = None) -> EvaluationStats:
     summary = await EvaluationService.get_summary(db, user_id=user_id)
+    llm = summary["llm"]
     return EvaluationStats(
         total_events=summary["total_events"],
         stage_success_rate=summary["stages"]["success_rate"],
@@ -193,6 +217,14 @@ async def _get_evaluation_stats(db: AsyncSession, user_id: str | None = None) ->
         delivery_success_rate=summary["delivery"]["success_rate"],
         average_stage_latency_ms=summary["stages"]["average_latency_ms"],
         skill_authorizations=summary["skill_authorizations"],
+        llm=LLMUsageStats(
+            total_calls=llm["total"],
+            tokens_used=llm["tokens_used"],
+            cost_usd=llm["cost_usd"],
+            average_latency_ms=llm["average_latency_ms"],
+            by_model_route=summary["llm_by_model_route"][:3],
+            by_stage=summary["llm_by_stage"][:3],
+        ),
     )
 
 
