@@ -682,6 +682,12 @@ async def test_stage_runtime_records_resolved_model_route_and_passes_config(
         "fallback_route_keys": [],
         "requested_route_key": route_key,
     }
+    assert fake_engine.kwargs["advanced_context"]["evaluation_context"] == {
+        "project_id": project.id,
+        "pipeline_run_id": run_id,
+        "stage_id": "locate",
+        "stage_name": "问题定位",
+    }
 
     db_session.expire_all()
     refreshed = await get_pipeline_run_for_user_or_404(db_session, run_id, user_id)

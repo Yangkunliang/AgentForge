@@ -386,7 +386,9 @@ class SkillExecutionEngine:
         """Record deterministic non-streaming LLM usage without persisting prompt text."""
         if not isinstance(advanced_context, dict):
             return
-        eval_context = advanced_context.get("eval")
+        eval_context = advanced_context.get("evaluation_context")
+        if not isinstance(eval_context, dict):
+            eval_context = advanced_context.get("eval")
         if not isinstance(eval_context, dict):
             return
 
@@ -411,6 +413,21 @@ class SkillExecutionEngine:
 
         from agent_forge.evaluation.service import EvaluationService
 
+        metadata = {
+            "call_type": "tool_use_complete",
+            "round": round_num,
+            "tools_visible": len(tools),
+            "has_tool_calls": response.has_tool_calls,
+            "tool_call_names": [
+                tool_call.function_name
+                for tool_call in response.tool_calls
+                if tool_call.function_name
+            ],
+        }
+        stage_name = _as_non_empty_str(eval_context.get("stage_name"))
+        if stage_name:
+            metadata["stage_name"] = stage_name
+
         await EvaluationService.safe_record_event(
             session_factory,
             project_id=project_id,
@@ -426,17 +443,7 @@ class SkillExecutionEngine:
             latency_ms=response.latency_ms,
             cost_usd=response.cost_usd,
             tokens_used=response.tokens_used,
-            metadata={
-                "call_type": "tool_use_complete",
-                "round": round_num,
-                "tools_visible": len(tools),
-                "has_tool_calls": response.has_tool_calls,
-                "tool_call_names": [
-                    tool_call.function_name
-                    for tool_call in response.tool_calls
-                    if tool_call.function_name
-                ],
-            },
+            metadata=metadata,
         )
 
 

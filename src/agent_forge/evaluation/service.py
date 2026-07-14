@@ -108,6 +108,7 @@ class EvaluationService:
 
         result = await db.execute(stmt)
         events = list(result.scalars().all())
+        llm_events = [event for event in events if event.event_type.startswith("llm_")]
 
         return {
             "project_id": project_id,
@@ -119,7 +120,19 @@ class EvaluationService:
             },
             "pipelines": _metric_block([event for event in events if event.event_type.startswith("pipeline_")]),
             "stages": _metric_block([event for event in events if event.event_type.startswith("stage_")]),
-            "llm": _metric_block([event for event in events if event.event_type.startswith("llm_")]),
+            "llm": _metric_block(llm_events),
+            "llm_by_model_route": _group_llm_usage(
+                llm_events,
+                id_attr="model_route_key",
+                output_key="model_route_key",
+                name_attr="model_route_name",
+            ),
+            "llm_by_stage": _group_llm_usage(
+                llm_events,
+                id_attr="stage_id",
+                output_key="stage_id",
+                metadata_name_key="stage_name",
+            ),
             "skills": _metric_block([event for event in events if event.event_type.startswith("skill_")]),
             "delivery": _metric_block([event for event in events if event.event_type.startswith("delivery_")]),
             "artifacts": _artifact_block(events),
@@ -271,6 +284,56 @@ def _group_by_dimension(events: list[EvalEvent], id_attr: str, name_attr: str) -
             "tokens_used": _total_tokens(group),
         })
     return sorted(rows, key=lambda row: row["usage_count"], reverse=True)
+
+
+def _group_llm_usage(
+    events: list[EvalEvent],
+    *,
+    id_attr: str,
+    output_key: str,
+    name_attr: str | None = None,
+    metadata_name_key: str | None = None,
+) -> list[dict[str, Any]]:
+    grouped: dict[str, list[EvalEvent]] = defaultdict(list)
+    for event in events:
+        key = getattr(event, id_attr)
+        if key:
+            grouped[str(key)].append(event)
+
+    rows: list[dict[str, Any]] = []
+    for key, group in grouped.items():
+        name = None
+        if name_attr:
+            name = next((getattr(event, name_attr) for event in group if getattr(event, name_attr)), None)
+        elif metadata_name_key:
+            name = next(
+                (
+                    (event.metadata_json or {}).get(metadata_name_key)
+                    for event in group
+                    if isinstance((event.metadata_json or {}).get(metadata_name_key), str)
+                    and (event.metadata_json or {}).get(metadata_name_key)
+                ),
+                None,
+            )
+        rows.append(
+            {
+                output_key: key,
+                "name": name or key,
+                "total_calls": len(group),
+                "tokens_used": _total_tokens(group),
+                "cost_usd": _total_cost(group),
+                "average_latency_ms": _average_latency(group),
+            }
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            -row["cost_usd"],
+            -row["tokens_used"],
+            -row["total_calls"],
+            row[output_key],
+        ),
+    )
 
 
 def _event_counts(events: list[EvalEvent]) -> dict[str, int]:

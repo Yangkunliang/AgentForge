@@ -126,10 +126,11 @@ async def test_skill_engine_records_llm_tool_use_usage_event(db, test_session_fa
         config=LLMConfig(model="openai/gpt-4.1-mini"),
         sse_publish=None,
         advanced_context={
-            "eval": {
+            "evaluation_context": {
                 "project_id": "project-llm-eval",
                 "pipeline_run_id": "run-llm-eval",
                 "stage_id": "analysis",
+                "stage_name": "需求分析",
             },
             "agent_profile": {
                 "id": "agent-planner",
@@ -171,4 +172,5 @@ async def test_skill_engine_records_llm_tool_use_usage_event(db, test_session_fa
         "tools_visible": 0,
         "has_tool_calls": False,
         "tool_call_names": [],
+        "stage_name": "需求分析",
     }

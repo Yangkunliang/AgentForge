@@ -213,6 +213,135 @@ async def test_evaluation_service_summarizes_llm_usage(
 
 
 @pytest.mark.asyncio
+async def test_evaluation_service_summarizes_llm_usage_dimensions(
+    db: AsyncSession,
+    fake_user: User,
+):
+    suffix = uuid.uuid4().hex[:8]
+    project = Project(id=f"project-llm-dimensions-{suffix}", user_id=fake_user.id, name="LLM Dimensions")
+    db.add(project)
+    await db.commit()
+
+    events = [
+        {
+            "stage_id": "analysis",
+            "model_route_key": "fast",
+            "model_route_name": "Fast Route",
+            "latency_ms": 400,
+            "cost_usd": 0.01,
+            "tokens_used": 100,
+            "metadata": {"stage_name": "需求分析"},
+        },
+        {
+            "stage_id": "backend_dev",
+            "model_route_key": "quality",
+            "model_route_name": "Quality Route",
+            "latency_ms": 900,
+            "cost_usd": 0.03,
+            "tokens_used": 300,
+            "metadata": {"stage_name": "后端开发"},
+        },
+        {
+            "stage_id": "backend_dev",
+            "model_route_key": "quality",
+            "model_route_name": "Quality Route",
+            "latency_ms": 500,
+            "cost_usd": 0.02,
+            "tokens_used": 200,
+            "metadata": {"stage_name": "后端开发"},
+        },
+        {
+            "stage_id": "documentation",
+            "model_route_key": "economy",
+            "model_route_name": None,
+            "latency_ms": None,
+            "cost_usd": 0.005,
+            "tokens_used": 50,
+            "metadata": {},
+        },
+    ]
+    for event in events:
+        await EvaluationService.record_event(
+            db,
+            project_id=project.id,
+            pipeline_run_id=f"run-llm-dimensions-{suffix}",
+            event_type="llm_tool_use_completed",
+            status="success",
+            **event,
+        )
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-llm-dimensions-{suffix}",
+        stage_id="backend_dev",
+        event_type="stage_completed",
+        status="success",
+        model_route_key="quality",
+        model_route_name="Quality Route",
+        latency_ms=1000,
+        cost_usd=9.0,
+        tokens_used=9000,
+        metadata={"stage_name": "后端开发"},
+    )
+    await db.commit()
+
+    summary = await EvaluationService.get_summary(db, user_id=fake_user.id, project_id=project.id)
+
+    assert summary["llm_by_model_route"] == [
+        {
+            "model_route_key": "quality",
+            "name": "Quality Route",
+            "total_calls": 2,
+            "tokens_used": 500,
+            "cost_usd": 0.05,
+            "average_latency_ms": 700.0,
+        },
+        {
+            "model_route_key": "fast",
+            "name": "Fast Route",
+            "total_calls": 1,
+            "tokens_used": 100,
+            "cost_usd": 0.01,
+            "average_latency_ms": 400.0,
+        },
+        {
+            "model_route_key": "economy",
+            "name": "economy",
+            "total_calls": 1,
+            "tokens_used": 50,
+            "cost_usd": 0.005,
+            "average_latency_ms": 0.0,
+        },
+    ]
+    assert summary["llm_by_stage"] == [
+        {
+            "stage_id": "backend_dev",
+            "name": "后端开发",
+            "total_calls": 2,
+            "tokens_used": 500,
+            "cost_usd": 0.05,
+            "average_latency_ms": 700.0,
+        },
+        {
+            "stage_id": "analysis",
+            "name": "需求分析",
+            "total_calls": 1,
+            "tokens_used": 100,
+            "cost_usd": 0.01,
+            "average_latency_ms": 400.0,
+        },
+        {
+            "stage_id": "documentation",
+            "name": "documentation",
+            "total_calls": 1,
+            "tokens_used": 50,
+            "cost_usd": 0.005,
+            "average_latency_ms": 0.0,
+        },
+    ]
+
+
+@pytest.mark.asyncio
 async def test_evaluation_summary_api_filters_to_current_user_project(
     async_client: TestClient,
     db: AsyncSession,

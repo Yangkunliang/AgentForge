@@ -208,6 +208,7 @@ class StageRuntime:
                 "project_id": run.project_id,
                 "pipeline_run_id": run.id,
                 "stage_id": stage_id,
+                "stage_name": stage.stage_name if stage else stage_definition.stage_name,
             }
             agent_profile = await resolve_agent_profile(
                 db,
