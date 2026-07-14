@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { dashboardApi } from '@/api'
 import type {
   DashboardStats,
+  LLMUsageStats,
   SkillAuthorizationByPermission,
   SkillAuthorizationBySkill,
   SkillAuthorizationStats,
@@ -19,10 +20,19 @@ const emptySkillAuthorizationStats: SkillAuthorizationStats = {
   by_skill: [],
   by_permission: [],
 }
+const emptyLLMUsageStats: LLMUsageStats = {
+  total_calls: 0,
+  tokens_used: 0,
+  cost_usd: 0,
+  average_latency_ms: 0,
+  by_model_route: [],
+  by_stage: [],
+}
 
 const skillAuthorizationStats = computed(() => (
   stats.value?.evaluation.skill_authorizations ?? emptySkillAuthorizationStats
 ))
+const llmUsageStats = computed(() => stats.value?.evaluation.llm ?? emptyLLMUsageStats)
 const grantRateWidth = computed(() => `${Math.min(Math.max(skillAuthorizationStats.value.grant_rate, 0), 1) * 100}%`)
 const topAuthorizedSkills = computed(() => skillAuthorizationStats.value.by_skill.slice(0, 3))
 const topAuthorizedPermissions = computed(() => skillAuthorizationStats.value.by_permission.slice(0, 3))
@@ -47,6 +57,18 @@ function formatCost(cost: number): string {
 
 function formatPercent(rate: number): string {
   return `${(rate * 100).toFixed(rate === 0 || rate === 1 ? 0 : 1)}%`
+}
+
+function formatTokens(tokens: number): string {
+  return new Intl.NumberFormat('zh-CN').format(tokens)
+}
+
+function formatLatency(latencyMs: number): string {
+  if (latencyMs >= 1000) {
+    const seconds = latencyMs / 1000
+    return `${seconds.toFixed(Number.isInteger(seconds) ? 0 : 1)} s`
+  }
+  return `${Math.round(latencyMs)} ms`
 }
 
 function formatAuthRatio(item: SkillAuthorizationBySkill | SkillAuthorizationByPermission): string {
@@ -105,7 +127,7 @@ function goToTask(taskId: string) {
       <el-row :gutter="16" class="stats-row">
         <el-col :span="12">
           <div class="card">
-            <div class="card__header">今日费用</div>
+            <div class="card__header">任务费用（今日）</div>
             <div class="cost-display">
               <span class="cost-value">${{ formatCost(stats?.cost.today_usd ?? 0) }}</span>
               <span
@@ -133,6 +155,74 @@ function goToTask(taskId: string) {
           </div>
         </el-col>
       </el-row>
+
+      <section class="card llm-usage" data-testid="llm-usage-panel">
+        <div class="llm-usage__header">
+          <div class="card__header">LLM 实际用量</div>
+          <span class="llm-usage__scope">累计</span>
+        </div>
+
+        <div class="llm-usage__metrics">
+          <div class="llm-metric llm-metric--calls" data-testid="llm-total-calls">
+            <span class="llm-metric__label">已记录调用</span>
+            <strong class="llm-metric__value">{{ formatTokens(llmUsageStats.total_calls) }}</strong>
+          </div>
+          <div class="llm-metric llm-metric--cost" data-testid="llm-total-cost">
+            <span class="llm-metric__label">累计成本</span>
+            <strong class="llm-metric__value">${{ formatCost(llmUsageStats.cost_usd) }}</strong>
+          </div>
+          <div class="llm-metric llm-metric--tokens" data-testid="llm-total-tokens">
+            <span class="llm-metric__label">Token</span>
+            <strong class="llm-metric__value">{{ formatTokens(llmUsageStats.tokens_used) }}</strong>
+          </div>
+          <div class="llm-metric llm-metric--latency" data-testid="llm-average-latency">
+            <span class="llm-metric__label">平均延迟</span>
+            <strong class="llm-metric__value">{{ formatLatency(llmUsageStats.average_latency_ms) }}</strong>
+          </div>
+        </div>
+
+        <div class="llm-usage__rankings">
+          <section class="llm-ranking" aria-labelledby="llm-route-ranking-title">
+            <div class="llm-ranking__header">
+              <h2 id="llm-route-ranking-title">按 ModelRoute</h2>
+              <span>调用 / Token / 成本</span>
+            </div>
+            <div v-if="llmUsageStats.by_model_route.length === 0" class="llm-ranking__empty">
+              暂无 LLM 调用记录
+            </div>
+            <div
+              v-for="item in llmUsageStats.by_model_route"
+              :key="item.model_route_key"
+              class="llm-ranking__row"
+            >
+              <span class="llm-ranking__name" :title="item.name">{{ item.name }}</span>
+              <span class="llm-ranking__calls">{{ item.total_calls }} 次</span>
+              <span class="llm-ranking__tokens">{{ formatTokens(item.tokens_used) }}</span>
+              <span class="llm-ranking__cost">${{ formatCost(item.cost_usd) }}</span>
+            </div>
+          </section>
+
+          <section class="llm-ranking" aria-labelledby="llm-stage-ranking-title">
+            <div class="llm-ranking__header">
+              <h2 id="llm-stage-ranking-title">按 Stage</h2>
+              <span>调用 / Token / 成本</span>
+            </div>
+            <div v-if="llmUsageStats.by_stage.length === 0" class="llm-ranking__empty">
+              暂无 LLM 调用记录
+            </div>
+            <div
+              v-for="item in llmUsageStats.by_stage"
+              :key="item.stage_id"
+              class="llm-ranking__row"
+            >
+              <span class="llm-ranking__name" :title="item.name">{{ item.name }}</span>
+              <span class="llm-ranking__calls">{{ item.total_calls }} 次</span>
+              <span class="llm-ranking__tokens">{{ formatTokens(item.tokens_used) }}</span>
+              <span class="llm-ranking__cost">${{ formatCost(item.cost_usd) }}</span>
+            </div>
+          </section>
+        </div>
+      </section>
 
       <div class="card auth-metrics">
         <div class="card__header">高风险 Skill 授权</div>
@@ -278,6 +368,152 @@ function goToTask(taskId: string) {
   color: #606266;
 }
 
+.llm-usage {
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-md;
+  }
+
+  &__scope {
+    color: #73767a;
+    font-size: 12px;
+  }
+
+  &__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid #e4e7ed;
+    border-radius: $border-radius-sm;
+  }
+
+  &__rankings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $spacing-xl;
+    margin-top: $spacing-lg;
+  }
+}
+
+.llm-metric {
+  min-width: 0;
+  min-height: 96px;
+  padding: $spacing-md $spacing-lg;
+  border-top: 3px solid #606266;
+  border-right: 1px solid #e4e7ed;
+  background: #fff;
+
+  &:last-child {
+    border-right: 0;
+  }
+
+  &--calls {
+    border-top-color: #2563eb;
+  }
+
+  &--cost {
+    border-top-color: #0f766e;
+  }
+
+  &--tokens {
+    border-top-color: #b45309;
+  }
+
+  &--latency {
+    border-top-color: #52525b;
+  }
+
+  &__label {
+    display: block;
+    margin-bottom: $spacing-sm;
+    color: #73767a;
+    font-size: 13px;
+  }
+
+  &__value {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #1f2937;
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    line-height: 1.2;
+  }
+}
+
+.llm-ranking {
+  min-width: 0;
+
+  &__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: $spacing-md;
+    min-height: 30px;
+    padding-bottom: $spacing-sm;
+    border-bottom: 1px solid #dcdfe6;
+
+    h2 {
+      margin: 0;
+      color: #303133;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    span {
+      color: #a0a4aa;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+  }
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    min-height: 116px;
+    color: #909399;
+    font-size: 13px;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 52px 72px 84px;
+    align-items: center;
+    gap: $spacing-sm;
+    min-height: 40px;
+    border-bottom: 1px solid #f0f2f5;
+    color: #606266;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  &__name {
+    overflow: hidden;
+    color: #303133;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__calls,
+  &__tokens,
+  &__cost {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  &__cost {
+    color: #0f766e;
+    font-weight: 600;
+  }
+}
+
 .auth-metrics {
   &__summary {
     display: grid;
@@ -384,6 +620,55 @@ function goToTask(taskId: string) {
 }
 
 @media (max-width: $breakpoint-mobile) {
+  .llm-usage {
+    &__metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    &__rankings {
+      grid-template-columns: 1fr;
+      gap: $spacing-lg;
+    }
+  }
+
+  .llm-metric {
+    &:nth-child(2) {
+      border-right: 0;
+    }
+
+    &:nth-child(-n + 2) {
+      border-bottom: 1px solid #e4e7ed;
+    }
+  }
+
+  .llm-ranking__row {
+    grid-template-areas:
+      "name cost"
+      "calls tokens";
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: $spacing-xs $spacing-sm;
+    padding: $spacing-sm 0;
+  }
+
+  .llm-ranking {
+    &__name {
+      grid-area: name;
+    }
+
+    &__calls {
+      grid-area: calls;
+      text-align: left;
+    }
+
+    &__tokens {
+      grid-area: tokens;
+    }
+
+    &__cost {
+      grid-area: cost;
+    }
+  }
+
   .auth-metrics {
     &__summary,
     &__rank-grid {

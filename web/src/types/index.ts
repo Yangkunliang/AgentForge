@@ -174,6 +174,28 @@ export interface SkillAuthorizationStats extends SkillAuthorizationDimension {
   by_permission: SkillAuthorizationByPermission[]
 }
 
+export interface LLMUsageDimension {
+  total_calls: number
+  tokens_used: number
+  cost_usd: number
+  average_latency_ms: number
+}
+
+export interface LLMModelRouteUsage extends LLMUsageDimension {
+  model_route_key: string
+  name: string
+}
+
+export interface LLMStageUsage extends LLMUsageDimension {
+  stage_id: string
+  name: string
+}
+
+export interface LLMUsageStats extends LLMUsageDimension {
+  by_model_route: LLMModelRouteUsage[]
+  by_stage: LLMStageUsage[]
+}
+
 export interface DashboardStats {
   tasks: {
     total: number
@@ -201,6 +223,7 @@ export interface DashboardStats {
     delivery_success_rate: number
     average_stage_latency_ms: number
     skill_authorizations?: SkillAuthorizationStats
+    llm?: LLMUsageStats
   }
   recent_tasks: Array<{
     task_id: string
