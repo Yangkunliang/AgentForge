@@ -43,6 +43,9 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from agent_forge.llm.provider import LLMResponse
 
 logger = logging.getLogger(__name__)
 
@@ -181,8 +184,13 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
 class SkillExecutionEngine:
     """ReAct 多轮 tool_use 执行引擎"""
 
-    def __init__(self, dispatcher: "SkillDispatcher") -> None:
+    def __init__(
+        self,
+        dispatcher: "SkillDispatcher",
+        evaluation_session_factory: "async_sessionmaker[AsyncSession] | None" = None,
+    ) -> None:
         self._dispatcher = dispatcher
+        self._evaluation_session_factory = evaluation_session_factory
 
     async def run(
         self,
@@ -275,6 +283,12 @@ class SkillExecutionEngine:
 
             # ── 无工具结果 → tool_use_complete 做路由决策 ────────────
             response = await llm.tool_use_complete(messages, tools, config)
+            await self._record_llm_tool_use_event(
+                response=response,
+                round_num=round_num,
+                tools=tools,
+                advanced_context=advanced_context,
+            )
 
             if response.has_tool_calls:
                 # ── 有工具调用：执行工具，追加结果，进入下一轮 ──────
@@ -361,6 +375,70 @@ class SkillExecutionEngine:
             logger.error("SkillEngine fallback summary failed: %s", e)
             yield "已达到最大执行轮次，请重新提问。"
 
+    async def _record_llm_tool_use_event(
+        self,
+        *,
+        response: "LLMResponse",
+        round_num: int,
+        tools: list[dict],
+        advanced_context: dict[str, Any] | None,
+    ) -> None:
+        """Record deterministic non-streaming LLM usage without persisting prompt text."""
+        if not isinstance(advanced_context, dict):
+            return
+        eval_context = advanced_context.get("eval")
+        if not isinstance(eval_context, dict):
+            return
+
+        project_id = _as_non_empty_str(eval_context.get("project_id"))
+        pipeline_run_id = _as_non_empty_str(eval_context.get("pipeline_run_id"))
+        stage_id = _as_non_empty_str(eval_context.get("stage_id"))
+        if not (project_id or pipeline_run_id or stage_id):
+            return
+
+        agent_profile = advanced_context.get("agent_profile")
+        if not isinstance(agent_profile, dict):
+            agent_profile = {}
+        model_route = advanced_context.get("model_route")
+        if not isinstance(model_route, dict):
+            model_route = {}
+
+        session_factory = self._evaluation_session_factory
+        if session_factory is None:
+            from agent_forge.database import async_session_factory
+
+            session_factory = async_session_factory
+
+        from agent_forge.evaluation.service import EvaluationService
+
+        await EvaluationService.safe_record_event(
+            session_factory,
+            project_id=project_id,
+            pipeline_run_id=pipeline_run_id,
+            stage_id=stage_id,
+            event_type="llm_tool_use_completed",
+            status="success",
+            agent_profile_id=_as_non_empty_str(agent_profile.get("id")),
+            agent_profile_name=_as_non_empty_str(agent_profile.get("name")),
+            model_route_key=_as_non_empty_str(model_route.get("route_key")),
+            model_route_name=_as_non_empty_str(model_route.get("name")),
+            model_name=response.model or _as_non_empty_str(model_route.get("model_name")),
+            latency_ms=response.latency_ms,
+            cost_usd=response.cost_usd,
+            tokens_used=response.tokens_used,
+            metadata={
+                "call_type": "tool_use_complete",
+                "round": round_num,
+                "tools_visible": len(tools),
+                "has_tool_calls": response.has_tool_calls,
+                "tool_call_names": [
+                    tool_call.function_name
+                    for tool_call in response.tool_calls
+                    if tool_call.function_name
+                ],
+            },
+        )
+
 
 def _build_final_prompt(messages: list[dict]) -> str:
     """从 tool 结果构造流式最终回复的 prompt。"""
@@ -380,6 +458,13 @@ def _build_final_prompt(messages: list[dict]) -> str:
         f"请用自然语言、清晰友好地整理并回答用户的问题，可以使用 markdown 格式，"
         f"但不要直接复制粘贴 JSON 原文。"
     )
+
+
+def _as_non_empty_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _dispatcher_accepts_runtime_context(dispatcher: Any) -> bool:

@@ -158,6 +158,61 @@ async def test_evaluation_service_summarizes_skill_authorizations(
 
 
 @pytest.mark.asyncio
+async def test_evaluation_service_summarizes_llm_usage(
+    db: AsyncSession,
+    fake_user: User,
+):
+    suffix = uuid.uuid4().hex[:8]
+    project = Project(id=f"project-llm-summary-{suffix}", user_id=fake_user.id, name="LLM Summary")
+    db.add(project)
+    await db.commit()
+
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-llm-{suffix}",
+        stage_id="analysis",
+        event_type="llm_tool_use_completed",
+        status="success",
+        model_route_key="fast",
+        model_route_name="Fast Route",
+        model_name="openai/gpt-4.1-mini",
+        latency_ms=400,
+        cost_usd=0.01,
+        tokens_used=100,
+    )
+    await EvaluationService.record_event(
+        db,
+        project_id=project.id,
+        pipeline_run_id=f"run-llm-{suffix}",
+        stage_id="backend_dev",
+        event_type="llm_tool_use_completed",
+        status="success",
+        model_route_key="fast",
+        model_route_name="Fast Route",
+        model_name="openai/gpt-4.1-mini",
+        latency_ms=600,
+        cost_usd=0.02,
+        tokens_used=250,
+    )
+    await db.commit()
+
+    summary = await EvaluationService.get_summary(db, user_id=fake_user.id, project_id=project.id)
+
+    assert summary["llm"] == {
+        "total": 2,
+        "succeeded": 2,
+        "failed": 0,
+        "success_rate": 1.0,
+        "average_latency_ms": 500.0,
+        "cost_usd": 0.03,
+        "tokens_used": 350,
+    }
+    assert summary["models"][0]["model_route_key"] == "fast"
+    assert summary["models"][0]["cost_usd"] == 0.03
+
+
+@pytest.mark.asyncio
 async def test_evaluation_summary_api_filters_to_current_user_project(
     async_client: TestClient,
     db: AsyncSession,

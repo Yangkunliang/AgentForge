@@ -1,4 +1,9 @@
-from agent_forge.skills.engine import _build_system_prompt
+import pytest
+from sqlalchemy import select
+
+from agent_forge.llm.provider import LLMConfig, LLMResponse
+from agent_forge.models import EvalEvent
+from agent_forge.skills.engine import SkillExecutionEngine, _build_system_prompt
 
 
 def test_build_system_prompt_includes_advanced_task_context():
@@ -87,3 +92,83 @@ def test_build_system_prompt_includes_model_route_context():
     assert "当前阶段模型路由：Default Runtime Route（default，database）" in prompt
     assert "模型：anthropic/claude-3-5-sonnet，Provider：anthropic" in prompt
     assert "模型路由兜底：safe" in prompt
+
+
+@pytest.mark.asyncio
+async def test_skill_engine_records_llm_tool_use_usage_event(db, test_session_factory):
+    class NoopDispatcher:
+        async def invoke(self, **kwargs):
+            raise AssertionError("dispatcher should not be called when no tool_calls are returned")
+
+    class FakeLLM:
+        async def tool_use_complete(self, messages, tools, config):
+            return LLMResponse(
+                content="可以直接回答",
+                model="openai/gpt-4.1-mini",
+                tokens_used=321,
+                cost_usd=0.012345,
+                latency_ms=456,
+            )
+
+        async def stream_complete(self, prompt, config, **kwargs):
+            yield "最终回答"
+
+    engine = SkillExecutionEngine(
+        dispatcher=NoopDispatcher(),
+        evaluation_session_factory=test_session_factory,
+    )
+
+    gen = await engine.run(
+        user_message="帮我看一下这个需求",
+        conversation_history=[],
+        tools=[],
+        llm=FakeLLM(),
+        config=LLMConfig(model="openai/gpt-4.1-mini"),
+        sse_publish=None,
+        advanced_context={
+            "eval": {
+                "project_id": "project-llm-eval",
+                "pipeline_run_id": "run-llm-eval",
+                "stage_id": "analysis",
+            },
+            "agent_profile": {
+                "id": "agent-planner",
+                "name": "Planner Agent",
+            },
+            "model_route": {
+                "route_key": "fast",
+                "name": "Fast Route",
+                "model_name": "openai/gpt-4.1-mini",
+            },
+        },
+    )
+
+    chunks = [chunk async for chunk in gen]
+
+    assert chunks == ["最终回答"]
+    result = await db.execute(
+        select(EvalEvent).where(
+            EvalEvent.event_type == "llm_tool_use_completed",
+            EvalEvent.project_id == "project-llm-eval",
+            EvalEvent.pipeline_run_id == "run-llm-eval",
+        )
+    )
+    event = result.scalar_one()
+    assert event.project_id == "project-llm-eval"
+    assert event.pipeline_run_id == "run-llm-eval"
+    assert event.stage_id == "analysis"
+    assert event.agent_profile_id == "agent-planner"
+    assert event.agent_profile_name == "Planner Agent"
+    assert event.model_route_key == "fast"
+    assert event.model_route_name == "Fast Route"
+    assert event.model_name == "openai/gpt-4.1-mini"
+    assert event.tokens_used == 321
+    assert event.cost_usd == 0.012345
+    assert event.latency_ms == 456
+    assert event.metadata_json == {
+        "call_type": "tool_use_complete",
+        "round": 1,
+        "tools_visible": 0,
+        "has_tool_calls": False,
+        "tool_call_names": [],
+    }

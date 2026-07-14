@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-044 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权、前端确认重试、Eval 聚合和 Dashboard 可视化，Artifact metadata 会固化生成 Agent、模型路由和 SkillPolicy 来源。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-045 后，Stage 级 SkillPolicy 已进入运行时工具过滤链路，内置 Skill、外部 Skill 和 MCP 外部工具都归一到 SkillRuntimeSpec 权限模型，高风险 Skill 支持阶段级临时授权、前端确认重试、Eval 聚合和 Dashboard 可视化，Artifact metadata 会固化生成 Agent、模型路由和 SkillPolicy 来源，非流式 LLM tool-use 决策调用已写入 EvalEvent 成本指标。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-044，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标。
+截至 TASK-045，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标，LLM `tool_use_complete` 的 token、成本和延迟已进入 Evaluation summary。
 
 ### 2.1 请求到执行
 
@@ -96,7 +96,7 @@ src/agent_forge/skills/dispatcher.py
 
 - `filter_tool_defs_for_runtime()` 会按 `StageDefinition.skill_policy_key`、`AgentProfile.allowed_skill_names` 和 `SkillRuntimeSpec.permissions` 过滤 LLM 可见工具。
 - GovernancePolicy 已兜底高风险 Skill 权限确认；默认 StageSkillPolicy 不主动暴露 `shell`、`filesystem`、`credential`、`external_side_effect` 高风险权限工具。
-- 临时授权已具备 UI/API 闭环；后续可将授权事实写入 EvalEvent。
+- 临时授权已具备 UI/API 闭环，授权事实已写入 EvalEvent 并支持聚合。
 
 ### 2.4 LLM Provider
 
@@ -116,11 +116,12 @@ src/agent_forge/llm/router.py
 - FallbackLLMProvider 能在 litellm 不可用时降级。
 - `ModelRouter` 会按 requested route 解析 Provider / Model / Credential / Route，不可用时尝试 fallback_route_keys，最后退回 legacy settings。
 - LLM Credential 服务端加密存储，API 和运行时 prompt 只使用 masked 或非敏感引用。
+- SkillExecutionEngine 会把 `tool_use_complete` 返回的 `tokens_used`、`cost_usd` 和 `latency_ms` 写入 `llm_tool_use_completed` EvalEvent。
 
 缺口：
 
 - 预算和重试策略字段已预留，尚未纳入统一 Governance / Eval 统计。
-- Artifact metadata 已记录生成它的 ModelRoute 摘要；预算和重试策略仍可继续进入 Governance / Eval 统计。
+- `stream_complete` 暂未接入 token/cost EvalEvent，因为当前流式接口没有稳定 usage 返回；预算和重试策略仍可继续进入 Governance / Eval 统计。
 
 ### 2.5 Artifact 和 Delivery
 
@@ -387,13 +388,13 @@ score
 - SkillDispatcher span 记录 elapsed_ms、success、error。
 - `EvalEvent` 记录 project、pipeline_run、stage、agent_profile、model_route、skill、artifact、delivery、latency、cost、failure_reason 和 metadata。
 - `EvaluationService.safe_record_event()` 使用独立 session 写入，失败只记录日志，不阻断主链路。
-- StageRuntime、SkillDispatcher、Pipeline 确认和 Delivery 成功/失败路径已写入 EvalEvent。
-- Dashboard 和 `/api/v1/evaluation/summary` 已消费 EvalEvent 基础指标。
+- StageRuntime、SkillExecutionEngine、SkillDispatcher、Pipeline 确认和 Delivery 成功/失败路径已写入 EvalEvent。
+- Dashboard 和 `/api/v1/evaluation/summary` 已消费 EvalEvent 基础指标；summary 新增 `llm` 聚合块，返回 LLM 调用量、成功率、平均耗时、累计成本和 token。
 - ExportManager 支持 `eval_events` / `evaluation` JSONL 导出。
 
 后续收敛：
 
-- LLMProvider 级 token/cost 明细可继续接入 EvalEvent。
+- `stream_complete` token/cost 明细可在流式 usage 稳定后继续接入 EvalEvent。
 - 用户采纳评分和长期质量 score 可作为后续反馈模型加入。
 
 ## 4. 目标数据流
@@ -444,7 +445,7 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 | ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | 后续增强 |
 | SkillRuntimeSpec | `skills/builtin.py`、`skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py`、`mcp/client.py`、`mcp/config.py` | 内置/外部/MCP RuntimeSpec、Manifest、权限、registry 刷新、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地 | 后续增强 |
 | GovernanceDecision | `governance/policy.py`、`pipeline/service.py`、`pipeline_runs.py`、`projects.py`、`skills/policy.py` | 阶段、交付和高风险 Skill 调用已走统一决策，并写入确认上下文、审计 payload 和 EvalEvent 确认事实 | 后续增强 |
-| EvalFeedback | `evaluation/service.py`、`models/evaluation.py`、`api/routes/evaluation.py`、StageRuntime、SkillDispatcher、Delivery | EvalEvent、Evaluation summary、Dashboard 聚合和 JSONL 导出已落地 | 后续增强 |
+| EvalFeedback | `evaluation/service.py`、`models/evaluation.py`、`api/routes/evaluation.py`、StageRuntime、SkillExecutionEngine、SkillDispatcher、Delivery | EvalEvent、Evaluation summary、Dashboard 聚合、LLM tool-use 成本指标和 JSONL 导出已落地 | 后续增强 |
 | 架构文档 | `docs/architecture/`、`docs/tech-design/`、`docs/README.md`、`MEMORY.md`、`CLAUDE.md` | 已完成 AI Runtime 主线、核心闭环、Agent、LLM、Skill、安全、API、数据库和导出文档收敛 | 持续维护 |
 
 ## 6. 迁移原则
@@ -635,16 +636,28 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 - 不新增 Artifact 表字段。
 - 不把 Credential secret、API Key、prompt、用户文件正文写入 metadata。
 
+### TASK-045: LLM 成本评估事件
+
+目标：让 SkillExecutionEngine 的非流式 LLM tool-use 决策调用进入 Eval Feedback，补齐 token、成本和延迟事实。
+
+完成状态：`llm_tool_use_completed` EvalEvent 已记录 Project、PipelineRun、Stage、AgentProfile、ModelRoute、model name、token、成本和耗时；Evaluation summary 新增 `llm` 聚合块，Agent / ModelRoute 维度补充 `tokens_used`。
+
+不做：
+
+- 不记录 prompt、messages、用户输入、源码正文、工具返回正文或 Credential secret。
+- 不改 EvalEvent 表结构。
+- 不把 `stream_complete` usage 误标为已完成。
+
 ## 8. 当前风险
 
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
 | 阶段语义漂移 | 已通过后端 Pipeline Catalog 收敛，后续需保持前端只读 Catalog | TASK-034 |
 | Agent 配置空转 | AgentProfile 已进入 StageRuntime，AgentSkill allowlist 已参与 Stage 级 SkillPolicy 编排 | 后续增强 |
-| 模型配置不可治理 | Provider / Model / Credential / Route 已落地；后续接入成本和重试治理 | 后续增强 |
+| 模型配置不可治理 | Provider / Model / Credential / Route 已落地，LLM tool-use 成本指标已进入 EvalEvent；后续接入预算和重试治理 | 后续增强 |
 | Skill 安全边界不足 | 内置/外部/MCP RuntimeSpec、Manifest、权限、风险、Stage 级工具过滤、临时授权上下文、授权确认入口、授权 Eval、调用审计和高风险 Governance 决策已落地 | 后续增强 |
 | 人工确认逻辑分散 | 阶段、交付和高风险 Skill 已统一到 GovernancePolicy，确认事实已进入 EvalFeedback | 后续增强 |
-| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认、高风险授权和失败事实，Artifact metadata 已固化生成来源，Evaluation summary 已聚合高风险授权指标；LLM token/cost 明细可继续增强 | 后续增强 |
+| 长期优化无数据 | EvalEvent 已记录阶段、Skill、交付、确认、高风险授权、失败事实和非流式 LLM 成本事实，Artifact metadata 已固化生成来源，Evaluation summary 已聚合高风险授权和 LLM 指标；流式 LLM usage 可继续增强 | 后续增强 |
 | 文档和代码分叉 | 已通过 TASK-034 建立当前推荐阅读路径；后续架构级变更仍需同步文档 | 持续维护 |
 
 ## 9. 完成定义

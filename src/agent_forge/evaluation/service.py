@@ -119,6 +119,7 @@ class EvaluationService:
             },
             "pipelines": _metric_block([event for event in events if event.event_type.startswith("pipeline_")]),
             "stages": _metric_block([event for event in events if event.event_type.startswith("stage_")]),
+            "llm": _metric_block([event for event in events if event.event_type.startswith("llm_")]),
             "skills": _metric_block([event for event in events if event.event_type.startswith("skill_")]),
             "delivery": _metric_block([event for event in events if event.event_type.startswith("delivery_")]),
             "artifacts": _artifact_block(events),
@@ -140,6 +141,8 @@ def _metric_block(events: list[EvalEvent]) -> dict[str, Any]:
         "failed": failed,
         "success_rate": round(succeeded / total, 4) if total else 0.0,
         "average_latency_ms": _average_latency(events),
+        "cost_usd": _total_cost(events),
+        "tokens_used": _total_tokens(events),
     }
 
 
@@ -264,7 +267,8 @@ def _group_by_dimension(events: list[EvalEvent], id_attr: str, name_attr: str) -
             "failed": failed,
             "failure_rate": round(failed / len(group), 4) if group else 0.0,
             "average_latency_ms": _average_latency(group),
-            "cost_usd": round(sum(float(event.cost_usd or 0.0) for event in group), 6),
+            "cost_usd": _total_cost(group),
+            "tokens_used": _total_tokens(group),
         })
     return sorted(rows, key=lambda row: row["usage_count"], reverse=True)
 
@@ -279,6 +283,14 @@ def _event_counts(events: list[EvalEvent]) -> dict[str, int]:
 def _average_latency(events: list[EvalEvent]) -> float:
     latencies = [event.latency_ms for event in events if event.latency_ms is not None]
     return round(sum(latencies) / len(latencies), 2) if latencies else 0.0
+
+
+def _total_cost(events: list[EvalEvent]) -> float:
+    return round(sum(float(event.cost_usd or 0.0) for event in events), 6)
+
+
+def _total_tokens(events: list[EvalEvent]) -> int:
+    return sum(int(event.tokens_used or 0) for event in events)
 
 
 def _rate(numerator: int, denominator: int) -> float:

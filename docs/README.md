@@ -113,6 +113,7 @@ docs/
 | TASK-042 | 2026-07-13 | Dashboard 高风险 Skill 授权指标 | ✅ 已完成 |
 | TASK-043 | 2026-07-13 | Dashboard 路由单一事实源 | ✅ 已完成 |
 | TASK-044 | 2026-07-13 | Artifact 运行时来源固化 | ✅ 已完成 |
+| TASK-045 | 2026-07-14 | LLM 成本评估事件 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -301,6 +302,26 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-13-dashboard-route-convergence/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-13-dashboard-route-convergence/ITERATION-REVIEW.md)
 - **核心功能**：Dashboard 真实路由收敛为 `src/api/routes/dashboard.py`，旧 `agent_forge.api.routes.dashboard` 只做兼容 re-export，并修正 inactive Agent 统计。
+
+### TASK-044 详细信息
+- **目录**：`docs/iterations/2026-07-13-artifact-runtime-provenance/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-13-artifact-runtime-provenance/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-13-artifact-runtime-provenance/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-13-artifact-runtime-provenance/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-13-artifact-runtime-provenance/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-13-artifact-runtime-provenance/ITERATION-REVIEW.md)
+- **核心功能**：Artifact metadata 固化 StageRuntime 解析出的 AgentProfile、ModelRoute、model name 和 SkillPolicy key，Artifact 详情页展示生成来源。
+
+### TASK-045 详细信息
+- **目录**：`docs/iterations/2026-07-14-llm-cost-eval/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-14-llm-cost-eval/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-14-llm-cost-eval/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-14-llm-cost-eval/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-14-llm-cost-eval/TEST-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-14-llm-cost-eval/ITERATION-REVIEW.md)
+- **核心功能**：SkillExecutionEngine 将 `tool_use_complete` 的 `tokens_used`、`cost_usd`、`latency_ms` 写入 `llm_tool_use_completed` EvalEvent；Evaluation summary 新增 `llm` 聚合块，并在 Agent / ModelRoute 维度累计 `tokens_used`。
 
 ## 版本号规范
 

@@ -1483,28 +1483,45 @@ Authorization: Bearer <token>
     "succeeded": 7,
     "failed": 1,
     "success_rate": 0.875,
-    "average_latency_ms": 2100
+    "average_latency_ms": 2100,
+    "cost_usd": 0.0,
+    "tokens_used": 0
   },
   "stages": {
     "total": 18,
     "succeeded": 16,
     "failed": 2,
     "success_rate": 0.889,
-    "average_latency_ms": 2450
+    "average_latency_ms": 2450,
+    "cost_usd": 0.0,
+    "tokens_used": 0
+  },
+  "llm": {
+    "total": 6,
+    "succeeded": 6,
+    "failed": 0,
+    "success_rate": 1.0,
+    "average_latency_ms": 820,
+    "cost_usd": 0.034,
+    "tokens_used": 4820
   },
   "skills": {
     "total": 9,
     "succeeded": 8,
     "failed": 1,
     "success_rate": 0.889,
-    "average_latency_ms": 420
+    "average_latency_ms": 420,
+    "cost_usd": 0.0,
+    "tokens_used": 0
   },
   "delivery": {
     "total": 4,
     "succeeded": 3,
     "failed": 1,
     "success_rate": 0.75,
-    "average_latency_ms": 0
+    "average_latency_ms": 0,
+    "cost_usd": 0.0,
+    "tokens_used": 0
   },
   "artifacts": {
     "generated": 6,
@@ -1545,30 +1562,34 @@ Authorization: Bearer <token>
       "failed": 1,
       "failure_rate": 0.2,
       "average_latency_ms": 2300,
-      "cost_usd": 0.0
+      "cost_usd": 0.034,
+      "tokens_used": 4820
     }
   ],
   "models": [
     {
       "model_route_key": "default",
       "name": "Default Route",
-      "model_name": "gpt-4o-mini",
       "usage_count": 5,
       "failed": 0,
       "failure_rate": 0.0,
       "average_latency_ms": 2300,
-      "cost_usd": 0.0
+      "cost_usd": 0.034,
+      "tokens_used": 4820
     }
   ],
   "event_counts": {
     "stage_started": 6,
     "stage_completed": 5,
+    "llm_tool_use_completed": 6,
     "delivery_failed": 1
   }
 }
 ```
 
 `skill_authorizations` 只统计 `skill_authorization_required` 和 `skill_authorization_granted` EvalEvent。`by_permission` 从事件 metadata 的 `permissions` 数组聚合；空数据时 `required/granted/grant_rate` 为 0，明细列表为空。
+
+`llm` 统计 `llm_*` EvalEvent。TASK-045 后，SkillExecutionEngine 会在 `tool_use_complete` 成功返回时写入 `llm_tool_use_completed`，metadata 只包含 `call_type`、轮次、可见工具数量、是否产生 tool call 和 tool 名称，不包含 prompt、用户消息、源码正文或凭据。`stream_complete` 的 token / cost usage 仍待后续接入。
 
 ---
 

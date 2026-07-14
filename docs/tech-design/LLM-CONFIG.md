@@ -367,7 +367,14 @@ class LLMResponse:
 
 ### 7.2 持久化追踪
 
-每次任务执行后，token 用量和 cost 写入数据库：
+TASK-045 后，SkillExecutionEngine 会把非流式 `tool_use_complete` 返回的 token、cost 和 latency 写入 `EvalEvent`：
+
+- `event_type=llm_tool_use_completed`
+- `tokens_used` / `cost_usd` / `latency_ms` 来自 `LLMResponse`
+- `project_id`、`pipeline_run_id`、`stage_id`、`agent_profile_id`、`model_route_key` 来自 StageRuntime 注入的 `advanced_context`
+- `metadata_json` 只记录 call type、轮次、可见工具数量和 tool call 名称，不记录 prompt、messages、源码正文或凭据
+
+历史 Cost API 仍保留 Task / TaskExecution 维度：
 
 - `Task.total_cost_usd` — 任务总成本
 - `TaskExecution.model_used` / `TaskExecution.cost_usd` — 子任务级明细
@@ -429,7 +436,7 @@ GET /api/v1/cost?date=2026-06-28
 | 模型选择结果缓存 | 后续增强 | 可缓存 ModelRouter 解析结果，但必须尊重 Credential 变更 |
 | 每模型并发数限制 | 后续增强 | 不再采用旧 YAML 方案，建议纳入 Route policy |
 | 队列管理 | 后续增强 | 可与 RabbitMQ / PipelineRun 调度结合 |
-| token / cost 明细进入 EvalEvent | 后续增强 | EvalEvent 已有字段，Provider 级写入仍可继续完善 |
+| stream_complete token / cost 明细进入 EvalEvent | 后续增强 | tool_use_complete 已进入 EvalEvent；流式 usage 待 provider 返回稳定后接入 |
 
 ---
 

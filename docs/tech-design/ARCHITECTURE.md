@@ -6,7 +6,7 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
-> 当前状态（TASK-044）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源；Artifact metadata 已固化生成 Agent、模型路由和 SkillPolicy 来源。
+> 当前状态（TASK-045）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源；Artifact metadata 已固化生成 Agent、模型路由和 SkillPolicy 来源，非流式 LLM tool-use 调用的 token、成本和延迟已进入 EvalEvent。
 
 ## 2. 整体架构
 
@@ -154,8 +154,8 @@
 ### 3.9.1 Eval Feedback
 - **EvalEvent**：记录 Stage、AgentProfile、ModelRoute、Skill、Artifact、Delivery、确认、高风险授权、耗时、成本和失败原因。
 - **EvaluationService**：主链路非阻塞写入，失败只打日志，不阻断执行。
-- **Evaluation API**：`GET /api/v1/evaluation/summary` 提供项目、时间范围和高风险 Skill 授权维度聚合。
-- **Dashboard**：显示阶段、Skill、Delivery 成功率、平均阶段耗时和高风险 Skill 授权指标；真实路由单一事实源为 `src/api/routes/dashboard.py`，旧 `agent_forge.api.routes.dashboard` 仅兼容导出。
+- **Evaluation API**：`GET /api/v1/evaluation/summary` 提供项目、时间范围、LLM 成本和高风险 Skill 授权维度聚合。
+- **Dashboard**：显示阶段、Skill、Delivery 成功率、平均阶段耗时和高风险 Skill 授权指标；真实路由单一事实源为 `src/api/routes/dashboard.py`，旧 `agent_forge.api.routes.dashboard` 仅兼容导出。LLM 成本块已在 Evaluation summary 就绪，可后续接入 Dashboard。
 
 ### 3.10 认证 (Auth)
 - **JWT 工具**：access_token / refresh_token 签发与校验（`auth/jwt.py`）
