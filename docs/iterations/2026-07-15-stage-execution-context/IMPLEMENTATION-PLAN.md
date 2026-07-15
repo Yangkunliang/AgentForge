@@ -265,11 +265,11 @@
 **Interfaces:**
 - Produces: TASK-047 当前事实、验证证据和 TASK-048 输入边界。
 
-- [ ] **Step 1: 同步架构与迭代事实**
+- [x] **Step 1: 同步架构与迭代事实**
 
   更新推荐架构入口、任务索引、路线图状态和迭代复盘，不把计划行为写成已实现。
 
-- [ ] **Step 2: 执行相关和全量验证**
+- [x] **Step 2: 执行相关和全量验证**
 
   Run: `uv run --extra dev pytest -q tests/api/test_pipeline_catalog.py tests/pipeline/test_execution_context.py tests/pipeline/test_runtime.py tests/skills/test_engine_context.py tests/security/test_prompt_injection.py`
 
@@ -277,7 +277,7 @@
 
   Expected: 新增测试与基线全部通过，允许既有 skip/xfail/warning。
 
-- [ ] **Step 3: 验证 FastAPI 生命周期并恢复测试数据库**
+- [x] **Step 3: 验证 FastAPI 生命周期并恢复测试数据库**
 
   Run: `PYTHONPATH=src JWT_SECRET_KEY=test-secret .venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 18147`
 

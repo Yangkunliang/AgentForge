@@ -10,11 +10,13 @@
    - 同 Run 前序 Artifact 被加载。
    - 其他 Run、其他 Project、当前阶段和未来阶段 Artifact 被排除。
    - 单项 4000、总计 12000、最多 6 项限制生效。
+   - 同一阶段同类型的多次修订只选择最新 Artifact。
    - 缺失必需类型被稳定返回。
 
 3. `tests/pipeline/test_runtime.py`
    - StageRuntime 将 `stage_execution` 传给 FakeSkillEngine。
    - Runtime 创建的 Artifact 类型取自 StageDefinition。
+   - Artifact 持久化失败时当前 Stage 和 PipelineRun 进入 failed。
 
 4. `tests/skills/test_engine_context.py`
    - system prompt 包含阶段目标、输入/输出和完成标准，但不含 Artifact 正文。

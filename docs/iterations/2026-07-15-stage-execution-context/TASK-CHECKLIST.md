@@ -8,6 +8,6 @@
 - [x] 用红灯测试刻画 Engine 缺少阶段目标及不可信上游内容分层。
 - [x] 将 StageExecutionContext 接入 StageRuntime 和 SkillExecutionEngine。
 - [x] 收敛 Artifact 类型到 Pipeline Catalog 单一事实源。
-- [ ] 同步架构、API、索引、根上下文和迭代复盘。
-- [ ] 完成相关回归、后端全量和 FastAPI 生命周期验证。
+- [x] 同步架构、API、索引、根上下文和迭代复盘。
+- [x] 完成相关回归、后端全量和 FastAPI 生命周期验证。
 - [ ] 中文提交并推送功能分支，合并并推送 `main`。

@@ -75,7 +75,7 @@ class StageExecutionContext:
 - `max_artifact_content_chars = 4000`
 - `max_total_content_chars = 12000`
 
-必需类型存在时只选择相关类型；缺失类型写入上下文但暂不阻断，硬门禁留给 VerificationGate。
+必需类型存在时只选择相关类型；同一阶段反复 revise 产生多个同类型 Artifact 时，只保留 `created_at + id` 最新版本，避免旧版本挤占预算或覆盖已确认事实。缺失类型写入上下文但暂不阻断，硬门禁留给 VerificationGate。
 
 Artifact 查询边界由一个独立 helper 固定：
 
@@ -92,7 +92,7 @@ async def _load_run_artifacts(db: AsyncSession, run: PipelineRun) -> list[Artifa
     return list(result.scalars().all())
 ```
 
-`build_stage_execution_context()` 只在该结果上使用 `stage_state_id` 对应的 `order_index` 做前序过滤、按类型筛选和长度预算，不增加额外查询来源。
+`build_stage_execution_context()` 只在该结果上使用 `stage_state_id` 对应的 `order_index` 做前序过滤、按“阶段状态 + 类型”选择最新版本、按类型筛选和长度预算，不增加额外查询来源。最多 6 个入选项会公平分享 12000 字符总预算，单项仍受 4000 字符上限约束。
 
 ## Prompt 分层
 
@@ -102,7 +102,9 @@ async def _load_run_artifacts(db: AsyncSession, run: PipelineRun) -> list[Artifa
 
 ## Artifact 类型收敛
 
-删除 `_STAGE_ARTIFACT_TYPE` 语义映射。`infer_stage_artifact_type(stage_id, intent_type)` 和 StageRuntime 均从 Catalog 读取 `output_artifact_types[0]`；`create_stage_artifact()` 对传入类型做 allowlist 校验。当前每阶段只生成一个 Markdown Artifact，多产物拆分不在本任务范围。
+删除 `_STAGE_ARTIFACT_TYPE` 语义映射。`ArtifactType`、`ARTIFACT_TYPES`、`infer_stage_artifact_type(stage_id, intent_type)` 和 StageRuntime 均以 Catalog 为事实源；`create_stage_artifact()` 对传入类型做 allowlist 校验。当前每阶段只生成一个 Markdown Artifact，多产物拆分不在本任务范围。
+
+`StageRuntime._complete_stage()` 处于主执行 `try` 内；Artifact 校验、flush 或 commit 异常会进入 `_fail_stage()`，避免阶段永久滞留在 `running`。
 
 ## 兼容性与风险
 

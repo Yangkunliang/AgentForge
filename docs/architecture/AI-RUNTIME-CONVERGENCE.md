@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-046 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback 和 Dashboard 成本观测已进入真实运行时。TASK-047～TASK-053 在此基线上继续补齐阶段语义、结构化任务、授权工作区执行、真实测试门禁、统一编排和全链路验收。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-047 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测和 StageExecutionContext 已进入真实运行时。TASK-048～TASK-053 在此基线上继续补齐多租户隔离、结构化任务、授权工作区执行、真实测试门禁、统一编排和全链路验收。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-046，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标，LLM `tool_use_complete` 的 token、成本和延迟已进入 Evaluation summary，并可按 ModelRoute / Stage 在 Dashboard 观察。
+截至 TASK-047，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标，LLM `tool_use_complete` 的 token、成本和延迟已进入 Evaluation summary，并可按 ModelRoute / Stage 在 Dashboard 观察。
 
 ### 2.1 请求到执行
 
@@ -47,6 +47,7 @@ src/agent_forge/pipeline/service.py
   -> PipelineRun + PipelineStageState
 src/agent_forge/pipeline/runtime.py
   -> start_stage()
+  -> build_stage_execution_context()
   -> SkillExecutionEngine.run()
   -> complete_stage()
 ```
@@ -57,14 +58,17 @@ src/agent_forge/pipeline/runtime.py
 - `PipelineRun` 记录 intent、状态、current_stage_id。
 - `PipelineStageState` 记录阶段状态、是否 required、是否 confirmation_required，以及确认类型、原因、影响范围和审计 payload。
 - `StageRuntime` 从 Catalog 读取 StageDefinition，负责 stage started / completed / failed 与 SSE。
+- `StageDefinition` 已定义必需输入类型、预期输出类型和完成标准；`StageRuntime` 会构建有界 StageExecutionContext 并注入 SkillExecutionEngine。
+- 上游 Artifact 只读取当前 Project / PipelineRun 的前序阶段，按阶段和类型取最新版本，并受数量与字符预算约束。
 - confirmation_required 阶段完成后进入 `waiting_confirmation`。
 - 前端通过 `/api/v1/pipeline/catalog` 读取阶段定义、默认动作和 placeholder。
 
-缺口：
+已收敛与后续：
 
 - StageDefinition 已包含输出物类型、默认 Agent selector、模型路由 key 和 Skill policy key；`default_agent_selector` 已绑定 AgentResolver，`model_route_key` 已绑定 ModelRouter，`skill_policy_key` 已绑定 Stage 级工具过滤，确认策略已绑定 GovernancePolicy，SkillDispatcher 仍保留 Skill 调用前权限校验。
 - ConfirmCard 已渲染 GovernancePolicy 生成的确认原因和影响范围。
 - 前端仍保留 intent 展示 label/icon，但阶段业务语义已以后端 Catalog 为准。
+- 缺失输入当前只进入 `missing_input_artifact_types` 提示，尚未成为执行硬门禁。
 
 ### 2.3 Skill Runtime
 
@@ -216,8 +220,9 @@ name
 description
 order
 required
-required_inputs
+required_input_artifact_types
 output_artifact_types
+success_criteria
 confirmation_policy
 default_agent_selector
 model_route_key
@@ -228,15 +233,17 @@ can_restore
 
 当前映射：
 
-- `StageDefinition(stage_id, stage_name, description, required, confirmation_required, output_artifact_types, default_agent_selector, model_route_key, skill_policy_key)` 已存在。
+- `StageDefinition` 已包含 `required_input_artifact_types`、`output_artifact_types`、`success_criteria`、确认、Agent、ModelRoute 和 SkillPolicy 契约。
 - `PipelineStageState` 保存阶段运行状态。
 - `Pipeline Catalog API` 已向前端提供 intent 对应阶段、确认策略和默认快捷动作。
+- `StageExecutionContext` 已把可信阶段目标、输入/输出和完成标准，与不可信上游 Artifact 正文分层接入 SkillExecutionEngine。
 
 后续收敛：
 
 - `default_agent_selector` 已绑定到真实 AgentProfile。
 - `model_route_key` 已绑定到真实 ModelRoute。
 - `skill_policy_key` 已接入 Stage 级可用 Skill 过滤。
+- 缺失输入硬门禁和真实测试结果门禁由 TASK-051 VerificationGate 继续收敛。
 
 ### 3.4 AgentProfile
 
@@ -440,7 +447,8 @@ StageRuntime 是收敛点，不是所有逻辑都堆进 StageRuntime。它只负
 |----------|----------|----------|----------|
 | ProjectRuntimeContext | `models/project.py`、`bridge/`、`delivery/`、`sessions.py` | Project/Mount/Session 已落地，context 未统一对象化 | 后续增强 |
 | IntentDecision | `pipeline/catalog.py`、`sessions.py` | intent_type -> catalog 已落地，缺 confidence/reason/risk | 后续增强 |
-| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地，前端从 API 读取核心阶段语义，并写入 Governance 确认上下文 | 后续增强 |
+| StageDefinition | `pipeline/catalog.py`、`PipelineStageState` | 后端 Catalog 已落地输入、输出、完成标准和策略，前端从 API 读取核心阶段语义 | 后续增强 |
+| StageExecutionContext | `pipeline/execution_context.py`、`pipeline/runtime.py`、`skills/engine.py` | 当前 Project/Run 前序 Artifact 已按版本、阶段和预算受控进入运行时，可信元数据与不可信正文分层 | TASK-051 |
 | AgentProfile | `models/agent.py`、`agents/resolver.py`、`PipelineStageState` | active Agent 已绑定 StageRuntime，可追溯 agent_profile_id/name/source | 后续增强 |
 | ModelRoute | `llm/router.py`、`models/llm.py`、`PipelineStageState`、`api/routes/llm.py` | Provider/Model/Credential/Route 已落地，StageRuntime 可追溯 model route | 后续增强 |
 | SkillRuntimeSpec | `skills/builtin.py`、`skills/registry.py`、`skills/installer.py`、`skills/runtime_spec.py`、`skills/policy.py`、`mcp/client.py`、`mcp/config.py` | 内置/外部/MCP RuntimeSpec、Manifest、权限、registry 刷新、Stage 级工具过滤、调用审计和高风险 Governance 决策已落地 | 后续增强 |
@@ -673,7 +681,7 @@ StageExecutionContext
   -> Full-chain E2E
 ```
 
-当前状态：路线图和 TASK-047 设计已建立，生产代码尚未按该路线图完成。TASK-047 先解决 StageDefinition 没有进入执行提示、上游 Artifact 只靠聊天历史弱传递、Artifact 类型存在双重映射三个问题。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
+当前状态：TASK-047 已完成。StageDefinition 的输入、输出和完成标准已进入真实执行提示；上游 Artifact 按 Project、Run、阶段、类型、版本和字符预算构建上下文；Artifact 类型收敛到 Catalog；完成归档异常会落入 failed 状态。下一步 TASK-048 先修复 Dashboard 多租户隔离，再推进 TaskGraph 等执行链。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
 
 架构约束：
 
@@ -686,7 +694,7 @@ StageExecutionContext
 
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
-| 阶段语义漂移 | Catalog 已是定义事实源，但阶段目标、输入和完成标准尚未进入真实执行提示 | TASK-047 |
+| 阶段输入只提示不阻断 | StageExecutionContext 已报告缺失输入，但当前仍允许模型继续执行 | TASK-051 |
 | 任务拆解不可执行 | task_split 当前只生成 Markdown Artifact，没有结构化依赖和验收节点 | TASK-049 |
 | 开发阶段没有真实工作区执行 | 通用 SkillExecutionEngine 可回答文本，但没有受 Mount 约束的文件级 Patch 执行闭环 | TASK-050 |
 | 测试结论不可作为门禁 | 测试阶段尚未用真实命令结果阻断失败交付 | TASK-051 |

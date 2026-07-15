@@ -723,7 +723,12 @@ Authorization: Bearer <token>
             "type": "stage_output",
             "gate": "diff_review"
           },
+          "required_input_artifact_types": [],
           "output_artifact_types": ["diff"],
+          "success_criteria": [
+            "描述旧行为、新行为和不变范围。",
+            "给出验收差异。"
+          ],
           "default_agent_selector": "planner",
           "model_route_key": "default",
           "skill_policy_key": "default",
@@ -750,10 +755,20 @@ Authorization: Bearer <token>
 |------|------|
 | `stages[].required` | 是否为必需阶段；只有 `false` 阶段允许 skip/restore。 |
 | `stages[].confirmation_policy` | 当前阶段确认策略；StageState 初始化时由 GovernancePolicy 生成确认类型、原因和影响范围。 |
+| `stages[].required_input_artifact_types` | 阶段需要消费的前序 Artifact 类型；运行时会据此筛选上下文并报告缺失类型。 |
 | `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
+| `stages[].success_criteria` | 阶段完成标准；StageRuntime 会把它作为可信阶段指令传给 SkillExecutionEngine。 |
 | `stages[].default_agent_selector` | AgentResolver 的默认选择线索，StageRuntime 会据此选择 AgentProfile。 |
 | `stages[].model_route_key` | StageRuntime 实际解析到的 ModelRoute key。 |
 | `stages[].skill_policy_key` | Stage 级 Skill 策略 key；当前已接入 Skill 调用前权限校验和高风险 Governance 决策，精细化白名单仍可后续增强。 |
+
+### StageExecutionContext 运行时契约
+
+TASK-047 后，StageRuntime 会从 Catalog 构建 `advanced_context.stage_execution`。该对象包含当前 Project、Session、PipelineRun、Stage 的标识，阶段目标、必需输入类型、预期输出类型、完成标准、缺失输入类型和有界前序 Artifact。
+
+上下文只查询当前 `project_id + pipeline_run_id`，只接受真实 `stage_state_id` 对应的前序阶段，并按“阶段状态 + Artifact 类型”保留最新版本后应用预算：最多 6 项、单项最多 4000 字符、正文总计最多 12000 字符。总预算在入选项之间公平分配，避免首项耗尽上下文。
+
+阶段定义和完成标准进入 system prompt 的可信指令区；Artifact 正文只进入 user-level reference，并以 `trust_level="untrusted"` 标记和转义边界字符。`missing_input_artifact_types` 当前只提示，不阻断执行；硬门禁由 TASK-051 VerificationGate 实现。
 
 ---
 
@@ -1635,7 +1650,7 @@ Authorization: Bearer <token>
 
 `skill_authorizations` 只统计 `skill_authorization_required` 和 `skill_authorization_granted` EvalEvent。`by_permission` 从事件 metadata 的 `permissions` 数组聚合；空数据时 `required/granted/grant_rate` 为 0，明细列表为空。
 
-`llm`、`llm_by_model_route` 和 `llm_by_stage` 只统计 `llm_*` EvalEvent。TASK-046 后，StageRuntime 通过规范键 `evaluation_context` 将 Project、PipelineRun、Stage 和非敏感 Stage 名称传给 SkillExecutionEngine；`llm_tool_use_completed` metadata 只包含 `call_type`、轮次、可见工具数量、是否产生 tool call、tool 名称和 Stage 名称，不包含 prompt、用户消息、源码正文或凭据。`stream_complete` 的 token / cost usage 仍待 TASK-047 接入。
+`llm`、`llm_by_model_route` 和 `llm_by_stage` 只统计 `llm_*` EvalEvent。TASK-046 后，StageRuntime 通过规范键 `evaluation_context` 将 Project、PipelineRun、Stage 和非敏感 Stage 名称传给 SkillExecutionEngine；`llm_tool_use_completed` metadata 只包含 `call_type`、轮次、可见工具数量、是否产生 tool call、tool 名称和 Stage 名称，不包含 prompt、用户消息、源码正文或凭据。`stream_complete` 的 token / cost usage 仍未采集，作为后续增强。
 
 ---
 
