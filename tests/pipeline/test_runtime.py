@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 
 import pytest
 from sqlalchemy import select
@@ -22,6 +23,8 @@ from agent_forge.models import (
     User,
 )
 from agent_forge.models.session import Message, Session
+from agent_forge.pipeline import runtime as runtime_module
+from agent_forge.pipeline.catalog import get_stage_definition
 from agent_forge.pipeline.service import create_pipeline_run_for_session, get_pipeline_run_for_user_or_404
 from agent_forge.pipeline.runtime import StageRuntime
 from agent_forge.security.credentials import encrypt_secret
@@ -717,10 +720,13 @@ async def test_stage_runtime_records_resolved_model_route_and_passes_config(
 
 
 @pytest.mark.asyncio
-async def test_stage_runtime_creates_artifact_for_completed_stage(
+@pytest.mark.parametrize("expected_artifact_type", ["report", "architecture"])
+async def test_stage_runtime_creates_catalog_artifact_type_for_completed_stage(
     db_session: AsyncSession,
     test_session_factory,
     fake_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+    expected_artifact_type: str,
 ):
     user_id = fake_user.id
     project = Project(
@@ -749,6 +755,18 @@ async def test_stage_runtime_creates_artifact_for_completed_stage(
 
     run = await create_pipeline_run_for_session(db_session, session, "bug_fix")
     await db_session.commit()
+
+    original_definition = get_stage_definition("bug_fix", "locate")
+    assert original_definition is not None
+    if expected_artifact_type != original_definition.output_artifact_types[0]:
+        monkeypatch.setattr(
+            runtime_module,
+            "get_stage_definition",
+            lambda *_args: replace(
+                original_definition,
+                output_artifact_types=(expected_artifact_type,),
+            ),
+        )
 
     runtime = StageRuntime(engine=FakeSkillEngine(), session_factory=test_session_factory)
 
@@ -783,7 +801,7 @@ async def test_stage_runtime_creates_artifact_for_completed_stage(
     assert artifact.pipeline_run_id == run.id
     assert artifact.stage_state_id
     assert artifact.source_message_id == assistant_msg.id
-    assert artifact.artifact_type == "report"
+    assert artifact.artifact_type == expected_artifact_type
     assert artifact.file_type == "markdown"
     assert artifact.name == "问题定位.md"
     assert artifact.content == "stage output"

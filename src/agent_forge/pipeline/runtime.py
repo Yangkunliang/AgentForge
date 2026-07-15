@@ -302,6 +302,11 @@ class StageRuntime:
             stage = _find_stage(run, stage_id)
             if not stage or stage.status in {"completed", "skipped", "failed"}:
                 return
+            stage_definition = get_stage_definition(run.intent_type, stage_id)
+            if stage_definition is None or not stage_definition.output_artifact_types:
+                raise RuntimeError(
+                    f"Pipeline stage output type not found: {run.intent_type}/{stage_id}"
+                )
 
             complete_stage(run, stage_id)
             artifact = await create_stage_artifact(
@@ -310,6 +315,7 @@ class StageRuntime:
                 stage=stage,
                 task_id=task_id,
                 content=stage_output,
+                artifact_type=stage_definition.output_artifact_types[0],
                 source_message_id=source_message_id,
                 runtime_metadata=build_stage_runtime_metadata(
                     stage,

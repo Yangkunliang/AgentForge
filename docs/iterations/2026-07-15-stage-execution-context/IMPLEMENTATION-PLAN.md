@@ -200,7 +200,7 @@
 - Consumes: `StageDefinition.output_artifact_types[0]`。
 - Produces: 与 Catalog 一致的 `Artifact.artifact_type`。
 
-- [ ] **Step 1: 写非硬编码 Artifact 类型红灯测试**
+- [x] **Step 1: 写非硬编码 Artifact 类型红灯测试**
 
   ```python
   original = get_stage_definition("bug_fix", "locate")
@@ -214,13 +214,13 @@
 
   上述 monkeypatch 和断言加入现有 `test_stage_runtime_creates_artifact_for_completed_stage`，复用该测试已经完整构造的 Project、Session、PipelineRun 和 Runtime 执行过程。
 
-- [ ] **Step 2: 运行红灯测试**
+- [x] **Step 2: 运行红灯测试**
 
   Run: `uv run --extra dev pytest -q tests/pipeline/test_runtime.py -k catalog_artifact_type`
 
   Expected: FAIL，当前仍使用 `_STAGE_ARTIFACT_TYPE`。
 
-- [ ] **Step 3: 删除阶段类型映射并接入 Catalog**
+- [x] **Step 3: 删除阶段类型映射并接入 Catalog**
 
   ```python
   def infer_stage_artifact_type(stage_id: str, intent_type: str | None = None) -> str:
@@ -243,7 +243,7 @@
 
   `StageRuntime._complete_stage()` 重新读取当前 Run 的 StageDefinition，并把第一输出类型显式传给 `create_stage_artifact()`。
 
-- [ ] **Step 4: 运行 Artifact 与 Pipeline 回归并提交**
+- [x] **Step 4: 运行 Artifact 与 Pipeline 回归并提交**
 
   Run: `uv run --extra dev pytest -q tests/pipeline/test_runtime.py tests/api/test_projects.py tests/api/test_pipeline_catalog.py`
 
