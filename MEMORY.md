@@ -90,6 +90,7 @@
 - [2026-07-15-core-workflow-execution-chain/](docs/iterations/2026-07-15-core-workflow-execution-chain/) — TASK-047～TASK-053 核心工作流执行链路线图，覆盖 StageExecutionContext、TaskGraph、WorkspaceExecutor、VerificationGate、PipelineOrchestrator 和全链路 E2E
 - [2026-07-15-stage-execution-context/](docs/iterations/2026-07-15-stage-execution-context/) — TASK-047 阶段执行上下文已完成：Catalog 阶段契约、有界上游 Artifact、可信/不可信 Prompt 分层和完成异常失败收敛已接入真实运行时
 - [2026-07-15-dashboard-tenant-isolation/](docs/iterations/2026-07-15-dashboard-tenant-isolation/) — TASK-048 Dashboard 多租户隔离已完成：Task 统计、费用、最近任务和 Cost API 按用户过滤，停用 API Key 被拒绝
+- [2026-07-15-task-graph/](docs/iterations/2026-07-15-task-graph/) — TASK-049 结构化 TaskGraph，新增 PipelineRun 级 DAG、工程验收契约和用户隔离读取 API
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
