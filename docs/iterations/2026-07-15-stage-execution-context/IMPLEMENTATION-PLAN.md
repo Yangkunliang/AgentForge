@@ -283,7 +283,7 @@
 
   Expected: 到达 `Application startup complete`；恢复 `test_db.sqlite`。
 
-- [ ] **Step 4: 提交、推送、审查和合并**
+- [x] **Step 4: 提交、推送、审查和合并**
 
   Commit: `feat-完成阶段执行上下文迭代`
 
