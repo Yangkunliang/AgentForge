@@ -49,6 +49,6 @@ Commit: `fix-恢复并隔离用户费用接口`
 - [x] 验证 FastAPI 生命周期。
 - [x] 创建 `ITERATION-REVIEW.md` 并同步架构、API、README、MEMORY、CLAUDE。
 - [x] 独立代码评审无阻断问题。
-- [ ] 推送功能分支，合并并推送 `main`。
+- [x] 推送功能分支，合并并推送 `main`。
 
 Commit: `feat-完成Dashboard多租户隔离迭代`

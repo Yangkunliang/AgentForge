@@ -8,4 +8,4 @@
 - [x] 挂载 Cost API 并实现 Task / TaskExecution 用户过滤。
 - [x] 完成定向、全量、lint 和 FastAPI 生命周期验证。
 - [x] 同步架构、API、索引、根上下文和迭代复盘。
-- [ ] 中文提交并推送功能分支，合并并推送 `main`。
+- [x] 中文提交并推送功能分支，合并并推送 `main`。
