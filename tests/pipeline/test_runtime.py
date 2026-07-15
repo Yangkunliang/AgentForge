@@ -834,6 +834,71 @@ async def test_stage_runtime_creates_catalog_artifact_type_for_completed_stage(
 
 
 @pytest.mark.asyncio
+async def test_stage_runtime_marks_stage_failed_when_artifact_persistence_fails(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    user_id = fake_user.id
+    project = Project(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="artifact-failure-runtime-test",
+        tech_tags=["FastAPI"],
+        status="active",
+    )
+    session = Session(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        project_id=project.id,
+        title="产物持久化失败会话",
+        intent_type="bug_fix",
+    )
+    db_session.add_all([project, session])
+    await db_session.commit()
+    run = await create_pipeline_run_for_session(db_session, session, "bug_fix")
+    await db_session.commit()
+    run_id = run.id
+
+    async def _raise_persistence_error(*_args, **_kwargs):
+        raise ValueError("artifact persistence failed")
+
+    monkeypatch.setattr(
+        runtime_module,
+        "create_stage_artifact",
+        _raise_persistence_error,
+    )
+    runtime = StageRuntime(engine=FakeSkillEngine(), session_factory=test_session_factory)
+
+    with pytest.raises(ValueError, match="artifact persistence failed"):
+        async for _chunk in runtime.run_current_stage(
+            task_id="task-artifact-failure",
+            pipeline_run_id=run_id,
+            user_id=user_id,
+            user_message="修复登录报错",
+            conversation_history=[],
+            tools=[],
+            llm=object(),
+            config=object(),
+            sse_publish=lambda _event_type, _data: None,
+            agent_name="CodeSoul",
+            advanced_context={"intent": "bug_fix"},
+        ):
+            pass
+
+    db_session.expire_all()
+    refreshed = await get_pipeline_run_for_user_or_404(
+        db_session,
+        run_id,
+        user_id,
+    )
+    stage = next(item for item in refreshed.stages if item.stage_id == "locate")
+    assert stage.status == "failed"
+    assert refreshed.status == "failed"
+
+
+@pytest.mark.asyncio
 async def test_stage_runtime_blocks_waiting_confirmation_stage(
     db_session: AsyncSession,
     test_session_factory,

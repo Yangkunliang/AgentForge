@@ -7,9 +7,12 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.models import Artifact, PipelineRun, PipelineStageState
-from agent_forge.pipeline.catalog import get_stage_definition, list_pipeline_definitions
+from agent_forge.pipeline.catalog import (
+    ARTIFACT_TYPES,
+    get_stage_definition,
+    list_pipeline_definitions,
+)
 
-ARTIFACT_TYPES = {"prd", "architecture", "api_spec", "code", "test", "report", "diff"}
 
 def infer_stage_artifact_type(stage_id: str, intent_type: str | None = None) -> str:
     """Resolve a stage output type from the Pipeline Catalog."""

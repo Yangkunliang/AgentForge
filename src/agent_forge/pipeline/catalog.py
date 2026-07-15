@@ -6,11 +6,13 @@ This module is the backend source of truth for intent -> stage definitions.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
 from fastapi import HTTPException
 
 IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix"]
+ArtifactType = Literal["prd", "architecture", "api_spec", "code", "test", "report", "diff"]
+ARTIFACT_TYPES = frozenset(get_args(ArtifactType))
 
 
 @dataclass(frozen=True)

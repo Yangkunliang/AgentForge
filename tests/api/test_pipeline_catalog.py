@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from agent_forge.auth.jwt import create_access_token
 from agent_forge.models import User
+from agent_forge.pipeline.catalog import ARTIFACT_TYPES, list_pipeline_definitions
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -113,3 +114,17 @@ def test_pipeline_catalog_gets_single_intent_and_rejects_unknown_intent(
         headers=_auth_headers(fake_user),
     )
     assert missing.status_code == 404
+
+
+def test_pipeline_catalog_defines_every_stage_artifact_type():
+    catalog_types = {
+        artifact_type
+        for pipeline in list_pipeline_definitions()
+        for stage in pipeline.stages
+        for artifact_type in (
+            *stage.required_input_artifact_types,
+            *stage.output_artifact_types,
+        )
+    }
+
+    assert catalog_types == ARTIFACT_TYPES

@@ -42,16 +42,17 @@ from agent_forge.delivery import (
     preview_zip_delivery,
     zip_download_path,
 )
+from agent_forge.evaluation import EvaluationService
+from agent_forge.governance import GovernancePolicy
 from agent_forge.integrations.github import (
     GitHubOAuthError,
     build_github_authorization_url,
     exchange_github_oauth_code,
     fetch_github_repo,
 )
-from agent_forge.evaluation import EvaluationService
-from agent_forge.governance import GovernancePolicy
 from agent_forge.models import Artifact, AuditLog, OAuthCredential, OAuthState, Project, ProjectMount, User
 from agent_forge.models.session import Session
+from agent_forge.pipeline.catalog import ArtifactType
 from agent_forge.security.credentials import decrypt_secret, encrypt_secret
 from agent_forge.tracing import get_trace_id
 from middleware.auth import get_current_user
@@ -63,9 +64,6 @@ IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix"]
 MountType = Literal["local", "github", "upload"]
 MountRole = Literal["primary", "reference", "docs"]
 MountStatus = Literal["connected", "disconnected", "pending", "error"]
-ArtifactType = Literal["prd", "architecture", "api_spec", "code", "test", "report", "diff"]
-
-
 class ProjectCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=2000)

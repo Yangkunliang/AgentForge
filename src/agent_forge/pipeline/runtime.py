@@ -156,11 +156,7 @@ class StageRuntime:
                 if chunk:
                     stage_output_chunks.append(chunk)
                 yield chunk
-        except Exception:
-            if active_stage_id and pipeline_run_id and user_id:
-                await self._fail_stage(pipeline_run_id, user_id, active_stage_id)
-            raise
-        else:
+
             if active_stage_id and pipeline_run_id and user_id:
                 await self._complete_stage(
                     task_id=task_id,
@@ -171,6 +167,10 @@ class StageRuntime:
                     source_message_id=source_message_id,
                     skill_policy_key=skill_policy_key,
                 )
+        except Exception:
+            if active_stage_id and pipeline_run_id and user_id:
+                await self._fail_stage(pipeline_run_id, user_id, active_stage_id)
+            raise
 
     async def _start_current_stage(
         self,

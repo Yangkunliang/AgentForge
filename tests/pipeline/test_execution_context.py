@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,6 +58,7 @@ async def _add_artifact(
     content: str,
     project_id: str | None = None,
     pipeline_run_id: str | None = None,
+    created_at: datetime | None = None,
 ) -> Artifact:
     stage = _stage(run, stage_id)
     artifact = Artifact(
@@ -70,6 +73,8 @@ async def _add_artifact(
         file_type="markdown",
         metadata_json={"stage_id": stage_id},
     )
+    if created_at is not None:
+        artifact.created_at = created_at
     db.add(artifact)
     await db.flush()
     return artifact
@@ -124,7 +129,7 @@ async def test_stage_execution_context_loads_only_relevant_previous_run_artifact
         run=run,
         stage_id="backend_dev",
         artifact_id=f"artifact-current-{uuid.uuid4().hex[:8]}",
-        artifact_type="code",
+        artifact_type="prd",
         content="当前阶段不应读取",
     )
     future_artifact = await _add_artifact(
@@ -132,14 +137,25 @@ async def test_stage_execution_context_loads_only_relevant_previous_run_artifact
         run=run,
         stage_id="testing",
         artifact_id=f"artifact-future-{uuid.uuid4().hex[:8]}",
-        artifact_type="test",
+        artifact_type="prd",
         content="未来阶段不应读取",
     )
 
-    _other_project, _other_session, other_run = await _create_run(
-        db_session,
+    other_session = Session(
+        id=f"session-same-project-{uuid.uuid4().hex[:8]}",
         user_id=fake_user.id,
+        project_id=project.id,
+        title="同项目其他 Run",
+        intent_type="new_feature",
     )
+    db_session.add(other_session)
+    await db_session.commit()
+    other_run = await create_pipeline_run_for_session(
+        db_session,
+        other_session,
+        "new_feature",
+    )
+    await db_session.commit()
     other_run_artifact = await _add_artifact(
         db_session,
         run=other_run,
@@ -197,7 +213,7 @@ async def test_stage_execution_context_loads_only_relevant_previous_run_artifact
 
 
 @pytest.mark.asyncio
-async def test_stage_execution_context_enforces_artifact_count_and_content_budgets(
+async def test_stage_execution_context_keeps_latest_revision_per_stage_and_type(
     db_session: AsyncSession,
     fake_user: User,
 ):
@@ -205,14 +221,81 @@ async def test_stage_execution_context_enforces_artifact_count_and_content_budge
     current_stage = _stage(run, "design")
     definition = get_stage_definition("new_feature", "design")
     assert definition is not None
+    now = datetime.now(UTC)
 
-    for index in range(8):
+    old_artifact = await _add_artifact(
+        db_session,
+        run=run,
+        stage_id="analysis",
+        artifact_id=f"artifact-a-old-{uuid.uuid4().hex[:8]}",
+        artifact_type="prd",
+        content="旧版需求",
+        created_at=now - timedelta(minutes=5),
+    )
+    latest_artifact = await _add_artifact(
+        db_session,
+        run=run,
+        stage_id="analysis",
+        artifact_id=f"artifact-z-latest-{uuid.uuid4().hex[:8]}",
+        artifact_type="prd",
+        content="已确认的最新需求",
+        created_at=now,
+    )
+    await db_session.commit()
+
+    context = await build_stage_execution_context(
+        db_session,
+        run=run,
+        stage=current_stage,
+        stage_definition=definition,
+        max_artifacts=1,
+    )
+
+    assert [item.artifact_id for item in context.upstream_artifacts] == [
+        latest_artifact.id
+    ]
+    assert context.upstream_artifacts[0].content == "已确认的最新需求"
+    assert old_artifact.id not in {
+        item.artifact_id for item in context.upstream_artifacts
+    }
+
+
+@pytest.mark.asyncio
+async def test_stage_execution_context_enforces_artifact_count_and_content_budgets(
+    db_session: AsyncSession,
+    fake_user: User,
+):
+    _project, _session, run = await _create_run(db_session, user_id=fake_user.id)
+    current_stage = _stage(run, "testing")
+    definition = get_stage_definition("new_feature", "testing")
+    assert definition is not None
+    definition = replace(
+        definition,
+        required_input_artifact_types=(
+            "prd",
+            "architecture",
+            "api_spec",
+            "report",
+            "diff",
+            "code",
+        ),
+    )
+
+    source_artifacts = (
+        ("analysis", "prd"),
+        ("design", "architecture"),
+        ("db_api", "api_spec"),
+        ("task_split", "report"),
+        ("ui_prototype", "diff"),
+        ("backend_dev", "code"),
+    )
+    for index, (stage_id, artifact_type) in enumerate(source_artifacts):
         await _add_artifact(
             db_session,
             run=run,
-            stage_id="analysis",
+            stage_id=stage_id,
             artifact_id=f"artifact-budget-{index:02d}-{uuid.uuid4().hex[:8]}",
-            artifact_type="prd",
+            artifact_type=artifact_type,
             content=str(index) * 5000,
         )
     await db_session.commit()

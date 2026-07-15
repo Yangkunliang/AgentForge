@@ -88,16 +88,27 @@ async def build_stage_execution_context(
     stage_by_state_id = {item.id: item for item in run.stages}
     required_types = stage_definition.required_input_artifact_types
 
-    candidates: list[tuple[PipelineStageState, Artifact]] = []
+    latest_candidates: dict[
+        tuple[str, str],
+        tuple[PipelineStageState, Artifact],
+    ] = {}
     for artifact in artifacts:
         source_stage = stage_by_state_id.get(artifact.stage_state_id)
         if source_stage is None or source_stage.order_index >= stage.order_index:
             continue
         if required_types and artifact.artifact_type not in required_types:
             continue
-        candidates.append((source_stage, artifact))
+        revision_key = (source_stage.id, artifact.artifact_type)
+        existing = latest_candidates.get(revision_key)
+        if existing is None or _artifact_revision_key(artifact) > _artifact_revision_key(
+            existing[1]
+        ):
+            latest_candidates[revision_key] = (source_stage, artifact)
 
-    candidates.sort(key=lambda item: (item[0].order_index, item[1].id))
+    candidates = sorted(
+        latest_candidates.values(),
+        key=lambda item: (item[0].order_index, item[1].artifact_type, item[1].id),
+    )
     upstream_artifacts = _build_upstream_artifacts(
         candidates,
         max_artifacts=max_artifacts,
@@ -137,6 +148,10 @@ async def _load_run_artifacts(db: AsyncSession, run: PipelineRun) -> list[Artifa
         .order_by(Artifact.created_at.asc(), Artifact.id.asc())
     )
     return list(result.scalars().all())
+
+
+def _artifact_revision_key(artifact: Artifact) -> tuple:
+    return artifact.created_at, artifact.id
 
 
 def _build_upstream_artifacts(
