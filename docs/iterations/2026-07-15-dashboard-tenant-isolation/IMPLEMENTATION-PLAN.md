@@ -35,10 +35,10 @@ Files:
 
 步骤：
 
-- [ ] 用路由测试证明 `/api/v1/cost` 未注册。
-- [ ] 用双用户 Task / TaskExecution 证明费用跨租户聚合。
-- [ ] 挂载 Cost router，并用当前用户过滤三类查询。
-- [ ] 运行 Cost 与路由回归并提交。
+- [x] 用路由测试证明 `/api/v1/cost` 未注册。
+- [x] 用双用户 Task / TaskExecution 证明费用跨租户聚合。
+- [x] 挂载 Cost router，并用当前用户过滤三类查询。
+- [x] 运行 Cost 与路由回归并提交。
 
 Commit: `fix-恢复并隔离用户费用接口`
 

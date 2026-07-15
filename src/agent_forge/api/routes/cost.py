@@ -9,11 +9,11 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent_forge.auth.jwt import get_current_active_user
 from agent_forge.database import get_async_session
 from agent_forge.models.task import Task
 from agent_forge.models.task_execution import TaskExecution
 from agent_forge.models.user import User
+from middleware.auth import get_current_user
 
 router = APIRouter(prefix="/cost", tags=["cost"])
 
@@ -30,20 +30,24 @@ class DailyCostResponse(BaseModel):
 async def get_daily_cost(
     date: str | None = None,
     db: AsyncSession = Depends(get_async_session),
-    _: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ):
     if date is None:
         date = datetime.now(timezone.utc).date().isoformat()
 
     total_cost_result = await db.execute(
         select(func.coalesce(func.sum(Task.total_cost_usd), 0)).where(
+            Task.user_id == current_user.id,
             func.date(Task.created_at) == date
         )
     )
     total_cost_usd = float(total_cost_result.scalar_one() or 0)
 
     total_tasks_result = await db.execute(
-        select(func.count(Task.id)).where(func.date(Task.created_at) == date)
+        select(func.count(Task.id)).where(
+            Task.user_id == current_user.id,
+            func.date(Task.created_at) == date,
+        )
     )
     total_tasks = total_tasks_result.scalar_one()
 
@@ -53,7 +57,10 @@ async def get_daily_cost(
             func.coalesce(func.sum(TaskExecution.cost_usd), 0).label("total_cost"),
         )
         .join(Task, TaskExecution.task_id == Task.id)
-        .where(func.date(Task.created_at) == date)
+        .where(
+            Task.user_id == current_user.id,
+            func.date(Task.created_at) == date,
+        )
         .group_by(TaskExecution.model_used)
     )
     model_costs = {}
