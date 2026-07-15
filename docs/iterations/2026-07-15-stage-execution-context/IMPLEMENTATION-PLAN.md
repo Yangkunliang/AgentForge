@@ -27,7 +27,7 @@
 **Interfaces:**
 - Produces: `StageDefinition.required_input_artifact_types`、`StageDefinition.success_criteria` 和对应 Catalog API 字段。
 
-- [ ] **Step 1: 写 Catalog 红灯测试**
+- [x] **Step 1: 写 Catalog 红灯测试**
 
   ```python
   response = async_client.get("/api/v1/pipeline/catalog")
@@ -42,13 +42,13 @@
   ]
   ```
 
-- [ ] **Step 2: 运行红灯测试**
+- [x] **Step 2: 运行红灯测试**
 
   Run: `uv run --extra dev pytest -q tests/api/test_pipeline_catalog.py`
 
   Expected: FAIL，响应缺少新字段。
 
-- [ ] **Step 3: 实现 StageDefinition 字段和所有阶段契约**
+- [x] **Step 3: 实现 StageDefinition 字段和所有阶段契约**
 
   ```python
   @dataclass(frozen=True)
@@ -69,7 +69,7 @@
 
   `stage_definition_to_dict()` 增加两个 list 字段；阶段取值逐项使用 `TECHNICAL-DESIGN.md` 的阶段契约表，不自行扩展。
 
-- [ ] **Step 4: 运行 Catalog 测试并提交**
+- [x] **Step 4: 运行 Catalog 测试并提交**
 
   Run: `uv run --extra dev pytest -q tests/api/test_pipeline_catalog.py`
 

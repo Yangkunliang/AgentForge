@@ -58,9 +58,29 @@ def test_pipeline_catalog_lists_all_intent_stage_definitions(
         "gate": "prd_review",
     }
     assert analysis["output_artifact_types"] == ["prd"]
+    assert analysis["required_input_artifact_types"] == []
+    assert analysis["success_criteria"] == [
+        "明确用户目标与角色。",
+        "列出范围、非目标和验收标准。",
+    ]
     assert analysis["default_agent_selector"] == "planner"
     assert analysis["model_route_key"] == "default"
     assert analysis["skill_policy_key"] == "default"
+
+    stage_by_id = {stage["stage_id"]: stage for stage in new_feature["stages"]}
+    assert stage_by_id["design"]["required_input_artifact_types"] == ["prd"]
+    assert stage_by_id["backend_dev"]["required_input_artifact_types"] == [
+        "prd",
+        "architecture",
+        "api_spec",
+        "report",
+    ]
+    assert stage_by_id["backend_dev"]["success_criteria"] == [
+        "实现后端与自动化测试。",
+        "说明改动文件和回归结果。",
+    ]
+    assert stage_by_id["testing"]["required_input_artifact_types"] == ["prd", "code"]
+    assert all(stage["success_criteria"] for stage in new_feature["stages"])
 
 
 def test_pipeline_catalog_gets_single_intent_and_rejects_unknown_intent(
@@ -81,7 +101,12 @@ def test_pipeline_catalog_gets_single_intent_and_rejects_unknown_intent(
     assert stage_by_id["impact"]["can_skip"] is True
     assert stage_by_id["impact"]["can_restore"] is True
     assert stage_by_id["impact"]["confirmation_policy"]["gate"] == "impact_review"
+    assert stage_by_id["impact"]["required_input_artifact_types"] == ["diff"]
     assert stage_by_id["backend_dev"]["output_artifact_types"] == ["code"]
+    assert stage_by_id["regression"]["success_criteria"] == [
+        "执行变更点和相关回归。",
+        "记录失败与残余风险。",
+    ]
 
     missing = async_client.get(
         "/api/v1/pipeline/catalog/not_real",

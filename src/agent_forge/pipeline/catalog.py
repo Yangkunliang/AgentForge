@@ -29,7 +29,9 @@ class StageDefinition:
     required: bool = True
     confirmation_required: bool = False
     confirmation_gate: str | None = None
+    required_input_artifact_types: tuple[str, ...] = ()
     output_artifact_types: tuple[str, ...] = ("report",)
+    success_criteria: tuple[str, ...] = ()
     default_agent_selector: str = "planner"
     model_route_key: str = "default"
     skill_policy_key: str = "default"
@@ -67,6 +69,10 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 confirmation_required=True,
                 confirmation_gate="prd_review",
                 output_artifact_types=("prd",),
+                success_criteria=(
+                    "明确用户目标与角色。",
+                    "列出范围、非目标和验收标准。",
+                ),
                 default_agent_selector="planner",
             ),
             StageDefinition(
@@ -75,21 +81,36 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "明确模块边界、数据流、接口和关键技术取舍。",
                 confirmation_required=True,
                 confirmation_gate="architecture_review",
+                required_input_artifact_types=("prd",),
                 output_artifact_types=("architecture",),
+                success_criteria=(
+                    "定义模块边界和数据流。",
+                    "说明接口、技术取舍和风险。",
+                ),
                 default_agent_selector="planner",
             ),
             StageDefinition(
                 "db_api",
                 "DB & API",
                 "设计数据结构、迁移、服务接口和错误处理。",
+                required_input_artifact_types=("prd", "architecture"),
                 output_artifact_types=("api_spec",),
+                success_criteria=(
+                    "定义数据模型与迁移。",
+                    "定义 API 契约、错误和权限。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
                 "task_split",
                 "任务拆解",
                 "把需求拆成可执行、可验证、可提交的小任务。",
+                required_input_artifact_types=("prd", "architecture", "api_spec"),
                 output_artifact_types=("report",),
+                success_criteria=(
+                    "拆成可独立验证和提交的任务。",
+                    "声明依赖、文件范围和测试命令。",
+                ),
                 default_agent_selector="planner",
             ),
             StageDefinition(
@@ -97,14 +118,24 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "UI 原型",
                 "产出页面结构、交互状态和视觉验收点。",
                 required=False,
+                required_input_artifact_types=("prd",),
                 output_artifact_types=("prd",),
+                success_criteria=(
+                    "覆盖页面结构、关键状态和响应式。",
+                    "给出视觉验收点。",
+                ),
                 default_agent_selector="designer",
             ),
             StageDefinition(
                 "backend_dev",
                 "后端开发",
                 "实现后端模型、服务、路由、迁移和后端测试。",
+                required_input_artifact_types=("prd", "architecture", "api_spec", "report"),
                 output_artifact_types=("code",),
+                success_criteria=(
+                    "实现后端与自动化测试。",
+                    "说明改动文件和回归结果。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
@@ -112,14 +143,24 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "前端开发",
                 "实现前端状态、接口、页面交互和构建校验。",
                 required=False,
+                required_input_artifact_types=("prd", "api_spec", "report"),
                 output_artifact_types=("code",),
+                success_criteria=(
+                    "实现前端交互与错误状态。",
+                    "构建通过并说明视觉验收。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
                 "testing",
                 "测试交付",
                 "执行回归、整理验证结果和交付说明。",
+                required_input_artifact_types=("prd", "code"),
                 output_artifact_types=("test",),
+                success_criteria=(
+                    "执行目标与相关回归。",
+                    "记录命令、结果、失败和残余风险。",
+                ),
                 default_agent_selector="tester",
             ),
         ),
@@ -143,6 +184,10 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 confirmation_required=True,
                 confirmation_gate="diff_review",
                 output_artifact_types=("diff",),
+                success_criteria=(
+                    "描述旧行为、新行为和不变范围。",
+                    "给出验收差异。",
+                ),
                 default_agent_selector="planner",
             ),
             StageDefinition(
@@ -152,14 +197,24 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 required=False,
                 confirmation_required=True,
                 confirmation_gate="impact_review",
+                required_input_artifact_types=("diff",),
                 output_artifact_types=("report",),
+                success_criteria=(
+                    "列出受影响模块、文件和 API。",
+                    "定义回归范围和风险。",
+                ),
                 default_agent_selector="reviewer",
             ),
             StageDefinition(
                 "backend_dev",
                 "后端开发",
                 "实现后端局部改动和测试。",
+                required_input_artifact_types=("diff",),
                 output_artifact_types=("code",),
+                success_criteria=(
+                    "实现最小后端改动与测试。",
+                    "保持无关行为不变。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
@@ -167,14 +222,24 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "前端开发",
                 "实现必要前端改动和构建校验。",
                 required=False,
+                required_input_artifact_types=("diff",),
                 output_artifact_types=("code",),
+                success_criteria=(
+                    "实现必要前端改动与状态。",
+                    "构建结果可复核。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
                 "regression",
                 "回归测试",
                 "执行目标回归并整理验证结论。",
+                required_input_artifact_types=("diff", "code"),
                 output_artifact_types=("test",),
+                success_criteria=(
+                    "执行变更点和相关回归。",
+                    "记录失败与残余风险。",
+                ),
                 default_agent_selector="tester",
             ),
         ),
@@ -197,20 +262,34 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 confirmation_required=True,
                 confirmation_gate="prototype_review",
                 output_artifact_types=("diff",),
+                success_criteria=(
+                    "明确布局、视觉和交互差异。",
+                    "列出响应式和状态验收点。",
+                ),
                 default_agent_selector="designer",
             ),
             StageDefinition(
                 "frontend_dev",
                 "前端开发",
                 "实现前端组件、样式和交互。",
+                required_input_artifact_types=("diff",),
                 output_artifact_types=("code",),
+                success_criteria=(
+                    "实现组件、样式和交互。",
+                    "覆盖加载、空、错和禁用状态。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
                 "visual",
                 "视觉验收",
                 "检查响应式、溢出、状态和视觉一致性。",
+                required_input_artifact_types=("diff", "code"),
                 output_artifact_types=("report",),
+                success_criteria=(
+                    "检查响应式、溢出和一致性。",
+                    "记录视觉验收结论。",
+                ),
                 default_agent_selector="reviewer",
             ),
         ),
@@ -231,6 +310,10 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "问题定位",
                 "定位问题现象、复现条件和根因假设。",
                 output_artifact_types=("report",),
+                success_criteria=(
+                    "给出可复现现象和根因证据。",
+                    "区分事实与假设。",
+                ),
                 default_agent_selector="researcher",
             ),
             StageDefinition(
@@ -239,21 +322,36 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "评估修复影响面、风险和回归范围。",
                 confirmation_required=True,
                 confirmation_gate="impact_review",
+                required_input_artifact_types=("report",),
                 output_artifact_types=("report",),
+                success_criteria=(
+                    "列出受影响路径和风险。",
+                    "定义最小修复与回归范围。",
+                ),
                 default_agent_selector="reviewer",
             ),
             StageDefinition(
                 "fix",
                 "修复",
                 "实现最小修复并保留回归测试。",
+                required_input_artifact_types=("report",),
                 output_artifact_types=("code",),
+                success_criteria=(
+                    "实现最小修复和回归测试。",
+                    "不扩大无关改动。",
+                ),
                 default_agent_selector="coder",
             ),
             StageDefinition(
                 "regression",
                 "回归测试",
                 "执行复现用例和相关回归。",
+                required_input_artifact_types=("report", "code"),
                 output_artifact_types=("test",),
+                success_criteria=(
+                    "复现用例转绿。",
+                    "相关回归通过并记录残余风险。",
+                ),
                 default_agent_selector="tester",
             ),
         ),
@@ -315,7 +413,9 @@ def stage_definition_to_dict(stage: StageDefinition, order_index: int) -> dict:
             "type": "stage_output" if stage.confirmation_required else "none",
             "gate": stage.confirmation_gate,
         },
+        "required_input_artifact_types": list(stage.required_input_artifact_types),
         "output_artifact_types": list(stage.output_artifact_types),
+        "success_criteria": list(stage.success_criteria),
         "default_agent_selector": stage.default_agent_selector,
         "model_route_key": stage.model_route_key,
         "skill_policy_key": stage.skill_policy_key,
