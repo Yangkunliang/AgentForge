@@ -124,12 +124,12 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    task_stats = await _task_stats(db)
+    task_stats = await _task_stats(db, user_id=current_user.id)
     agent_stats = await _agent_stats(db)
     skill_stats = await _skill_stats(db)
-    cost_stats = await _cost_stats(db)
+    cost_stats = await _cost_stats(db, user_id=current_user.id)
     evaluation_stats = await _get_evaluation_stats(db, user_id=current_user.id)
-    recent = await _recent_tasks(db)
+    recent = await _recent_tasks(db, user_id=current_user.id)
 
     return DashboardResponse(
         tasks=task_stats,
@@ -143,20 +143,32 @@ async def get_dashboard(
 
 # ── 内部 helper ──────────────────────────────────────────────
 
-async def _count_by_status(db: AsyncSession, status: TaskStatus) -> int:
-    result = await db.execute(select(func.count(Task.id)).where(Task.status == status))
+async def _count_by_status(
+    db: AsyncSession,
+    status: TaskStatus,
+    *,
+    user_id: str,
+) -> int:
+    result = await db.execute(
+        select(func.count(Task.id)).where(
+            Task.user_id == user_id,
+            Task.status == status,
+        )
+    )
     return int(result.scalar_one() or 0)
 
 
-async def _task_stats(db: AsyncSession) -> TaskStats:
-    total_r = await db.execute(select(func.count(Task.id)))
+async def _task_stats(db: AsyncSession, *, user_id: str) -> TaskStats:
+    total_r = await db.execute(
+        select(func.count(Task.id)).where(Task.user_id == user_id)
+    )
     total = int(total_r.scalar_one() or 0)
     return TaskStats(
         total=total,
-        pending=await _count_by_status(db, TaskStatus.PENDING),
-        processing=await _count_by_status(db, TaskStatus.PROCESSING),
-        completed=await _count_by_status(db, TaskStatus.COMPLETED),
-        failed=await _count_by_status(db, TaskStatus.FAILED),
+        pending=await _count_by_status(db, TaskStatus.PENDING, user_id=user_id),
+        processing=await _count_by_status(db, TaskStatus.PROCESSING, user_id=user_id),
+        completed=await _count_by_status(db, TaskStatus.COMPLETED, user_id=user_id),
+        failed=await _count_by_status(db, TaskStatus.FAILED, user_id=user_id),
     )
 
 
@@ -174,21 +186,22 @@ async def _skill_stats(db: AsyncSession) -> SkillStats:
     return SkillStats(total=int(result.scalar_one() or 0))
 
 
-async def _sum_cost_on_date(db: AsyncSession, d) -> float:
+async def _sum_cost_on_date(db: AsyncSession, d, *, user_id: str) -> float:
     result = await db.execute(
         select(func.coalesce(func.sum(Task.total_cost_usd), 0)).where(
+            Task.user_id == user_id,
             func.date(Task.created_at) == d
         )
     )
     return float(result.scalar_one() or 0)
 
 
-async def _cost_stats(db: AsyncSession) -> CostStats:
+async def _cost_stats(db: AsyncSession, *, user_id: str) -> CostStats:
     today = datetime.now(timezone.utc).date()
     yesterday = today - timedelta(days=1)
 
-    today_usd = await _sum_cost_on_date(db, today)
-    yesterday_usd = await _sum_cost_on_date(db, yesterday)
+    today_usd = await _sum_cost_on_date(db, today, user_id=user_id)
+    yesterday_usd = await _sum_cost_on_date(db, yesterday, user_id=user_id)
 
     if yesterday_usd > 0:
         trend_pct = ((today_usd - yesterday_usd) / yesterday_usd) * 100
@@ -198,7 +211,12 @@ async def _cost_stats(db: AsyncSession) -> CostStats:
     daily_7d: list[DailyCost] = []
     for i in range(6, -1, -1):
         day = today - timedelta(days=i)
-        daily_7d.append(DailyCost(date=day.isoformat(), usd=await _sum_cost_on_date(db, day)))
+        daily_7d.append(
+            DailyCost(
+                date=day.isoformat(),
+                usd=await _sum_cost_on_date(db, day, user_id=user_id),
+            )
+        )
 
     return CostStats(
         today_usd=round(today_usd, 2),
@@ -228,9 +246,17 @@ async def _get_evaluation_stats(db: AsyncSession, user_id: str | None = None) ->
     )
 
 
-async def _recent_tasks(db: AsyncSession, limit: int = 5) -> list[RecentTask]:
+async def _recent_tasks(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    limit: int = 5,
+) -> list[RecentTask]:
     result = await db.execute(
-        select(Task).order_by(Task.created_at.desc()).limit(limit)
+        select(Task)
+        .where(Task.user_id == user_id)
+        .order_by(Task.created_at.desc())
+        .limit(limit)
     )
     tasks = result.scalars().all()
     out: list[RecentTask] = []

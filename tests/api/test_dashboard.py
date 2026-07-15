@@ -3,25 +3,71 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.routes import dashboard as runtime_dashboard
-from api.routes.dashboard import (
-    _agent_stats as _get_agent_stats,
-    _cost_stats as _get_cost_stats,
-    _get_evaluation_stats,
-    _recent_tasks as _get_recent_tasks,
-    _skill_stats as _get_skill_stats,
-    _task_stats as _get_task_stats,
-)
 from agent_forge.api.routes import dashboard as legacy_dashboard
 from agent_forge.models.agent import Agent
 from agent_forge.models.evaluation import EvalEvent
 from agent_forge.models.project import Project
 from agent_forge.models.skill import Skill
 from agent_forge.models.task import Task, TaskStatus
+from agent_forge.models.user import User
+from api.routes import dashboard as runtime_dashboard
+from api.routes.dashboard import (
+    _agent_stats as _get_agent_stats,
+)
+from api.routes.dashboard import (
+    _cost_stats as _get_cost_stats,
+)
+from api.routes.dashboard import (
+    _get_evaluation_stats,
+    get_dashboard,
+)
+from api.routes.dashboard import (
+    _recent_tasks as _get_recent_tasks,
+)
+from api.routes.dashboard import (
+    _skill_stats as _get_skill_stats,
+)
+from api.routes.dashboard import (
+    _task_stats as _get_task_stats,
+)
+
+
+def _dashboard_user(prefix: str) -> User:
+    suffix = uuid.uuid4().hex[:8]
+    return User(
+        id=f"{prefix}-user-{suffix}",
+        username=f"{prefix}-{suffix}",
+        email=f"{prefix}-{suffix}@example.com",
+        password_hash="not-used-in-dashboard-test",
+        permissions=["read"],
+    )
+
+
+def _dashboard_task(
+    *,
+    task_id: str,
+    user: User,
+    status: TaskStatus,
+    cost: float,
+    created_at: datetime,
+    user_id: str | None = None,
+) -> Task:
+    return Task(
+        id=task_id,
+        user_id=user.id if user_id is None else user_id,
+        created_by=user.id,
+        title=task_id,
+        description=f"description-{task_id}",
+        status=status,
+        priority=1,
+        total_cost_usd=cost,
+        created_at=created_at,
+    )
 
 
 def test_legacy_dashboard_module_reexports_runtime_dashboard():
@@ -32,12 +78,12 @@ def test_legacy_dashboard_module_reexports_runtime_dashboard():
 @pytest.mark.asyncio
 class TestDashboardStats:
     async def test_get_task_stats(self, db: AsyncSession):
-        stats = await _get_task_stats(db)
-        assert stats.total >= 0
-        assert stats.pending >= 0
-        assert stats.processing >= 0
-        assert stats.completed >= 0
-        assert stats.failed >= 0
+        stats = await _get_task_stats(db, user_id="dashboard-empty-user")
+        assert stats.total == 0
+        assert stats.pending == 0
+        assert stats.processing == 0
+        assert stats.completed == 0
+        assert stats.failed == 0
 
     async def test_get_agent_stats(self, db: AsyncSession):
         agent1 = Agent(id="agent-1", name="test-agent-1", capabilities=["test"], model="gpt-4", status="active")
@@ -67,13 +113,75 @@ class TestDashboardStats:
         assert stats.total >= 1
 
     async def test_get_cost_stats(self, db: AsyncSession):
-        stats = await _get_cost_stats(db)
-        assert stats.today_usd >= 0
+        stats = await _get_cost_stats(db, user_id="dashboard-empty-user")
+        assert stats.today_usd == 0
         assert len(stats.daily_7d) == 7
+        assert all(item.usd == 0 for item in stats.daily_7d)
 
     async def test_get_recent_tasks(self, db: AsyncSession):
-        tasks = await _get_recent_tasks(db)
-        assert isinstance(tasks, list)
+        tasks = await _get_recent_tasks(db, user_id="dashboard-empty-user")
+        assert tasks == []
+
+    async def test_dashboard_task_stats_cost_and_recent_tasks_are_user_isolated(
+        self,
+        db: AsyncSession,
+    ):
+        owner = _dashboard_user("dashboard-owner")
+        other = _dashboard_user("dashboard-other")
+        now = datetime.now(UTC)
+        own_today = _dashboard_task(
+            task_id=f"dashboard-own-today-{uuid.uuid4().hex[:8]}",
+            user=owner,
+            status=TaskStatus.PENDING,
+            cost=1.25,
+            created_at=now - timedelta(minutes=2),
+        )
+        own_yesterday = _dashboard_task(
+            task_id=f"dashboard-own-yesterday-{uuid.uuid4().hex[:8]}",
+            user=owner,
+            status=TaskStatus.COMPLETED,
+            cost=2.5,
+            created_at=now - timedelta(days=1),
+        )
+        other_task = _dashboard_task(
+            task_id=f"dashboard-other-{uuid.uuid4().hex[:8]}",
+            user=other,
+            status=TaskStatus.FAILED,
+            cost=99.0,
+            created_at=now - timedelta(minutes=1),
+        )
+        unowned_task = _dashboard_task(
+            task_id=f"dashboard-unowned-{uuid.uuid4().hex[:8]}",
+            user=owner,
+            user_id="",
+            status=TaskStatus.PROCESSING,
+            cost=77.0,
+            created_at=now,
+        )
+        unowned_task.user_id = None
+        db.add_all([owner, other, own_today, own_yesterday, other_task, unowned_task])
+        await db.commit()
+
+        body = await get_dashboard(db=db, current_user=owner)
+
+        assert body["tasks"] == {
+            "total": 2,
+            "pending": 1,
+            "processing": 0,
+            "completed": 1,
+            "failed": 0,
+        }
+        assert body["cost"]["today_usd"] == 1.25
+        assert body["cost"]["trend_pct"] == -50.0
+        daily_by_date = {
+            item["date"]: item["usd"] for item in body["cost"]["daily_7d"]
+        }
+        assert daily_by_date[now.date().isoformat()] == 1.25
+        assert daily_by_date[(now - timedelta(days=1)).date().isoformat()] == 2.5
+        assert [item["task_id"] for item in body["recent_tasks"]] == [
+            own_today.id,
+            own_yesterday.id,
+        ]
 
     async def test_get_evaluation_stats(self, db: AsyncSession):
         db.add(

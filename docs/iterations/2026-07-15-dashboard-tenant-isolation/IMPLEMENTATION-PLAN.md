@@ -17,11 +17,11 @@ Files:
 
 步骤：
 
-- [ ] 建立两个用户及各自 Task 数据。
-- [ ] 断言 tasks、cost、recent_tasks 只返回当前用户。
-- [ ] 观察现有 helper 不接收 `user_id` 或返回跨用户数据的红灯。
-- [ ] 在每条 Task SQL 中加入 `Task.user_id == user_id`。
-- [ ] 运行 Dashboard 定向测试并提交。
+- [x] 建立两个用户及各自 Task 数据。
+- [x] 断言 tasks、cost、recent_tasks 只返回当前用户。
+- [x] 观察现有 helper 不接收 `user_id` 或返回跨用户数据的红灯。
+- [x] 在每条 Task SQL 中加入 `Task.user_id == user_id`。
+- [x] 运行 Dashboard 定向测试并提交。
 
 Commit: `fix-隔离Dashboard用户任务数据`
 
