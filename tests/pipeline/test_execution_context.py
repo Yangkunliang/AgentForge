@@ -224,9 +224,9 @@ async def test_stage_execution_context_enforces_artifact_count_and_content_budge
         stage_definition=definition,
     )
 
-    assert len(context.upstream_artifacts) <= 6
-    assert all(len(item.content) <= 4000 for item in context.upstream_artifacts)
-    assert sum(len(item.content) for item in context.upstream_artifacts) <= 12000
+    assert len(context.upstream_artifacts) == 6
+    assert [len(item.content) for item in context.upstream_artifacts] == [2000] * 6
+    assert sum(len(item.content) for item in context.upstream_artifacts) == 12000
     assert all(item.content_truncated for item in context.upstream_artifacts)
 
 

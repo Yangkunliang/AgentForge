@@ -25,8 +25,11 @@ from agent_forge.models import (
 from agent_forge.models.session import Message, Session
 from agent_forge.pipeline import runtime as runtime_module
 from agent_forge.pipeline.catalog import get_stage_definition
-from agent_forge.pipeline.service import create_pipeline_run_for_session, get_pipeline_run_for_user_or_404
 from agent_forge.pipeline.runtime import StageRuntime
+from agent_forge.pipeline.service import (
+    create_pipeline_run_for_session,
+    get_pipeline_run_for_user_or_404,
+)
 from agent_forge.security.credentials import encrypt_secret
 from agent_forge.skills.registry import get_skill_registry
 

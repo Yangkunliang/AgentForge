@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from inspect import isawaitable
 from collections.abc import AsyncGenerator, Callable
+from inspect import isawaitable
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agent_forge.artifacts.service import build_stage_runtime_metadata, create_stage_artifact
+from agent_forge.agents.resolver import AgentProfile, resolve_agent_profile
 from agent_forge.api.sse import (
     emit_artifact_created,
     emit_confirm_required,
@@ -16,8 +16,8 @@ from agent_forge.api.sse import (
     emit_stage_completed,
     emit_stage_started,
 )
+from agent_forge.artifacts.service import build_stage_runtime_metadata, create_stage_artifact
 from agent_forge.database import async_session_factory
-from agent_forge.agents.resolver import AgentProfile, resolve_agent_profile
 from agent_forge.evaluation import EvaluationService
 from agent_forge.llm.router import ModelRouteResolution, resolve_model_route
 from agent_forge.models import PipelineRun, PipelineStageState

@@ -98,18 +98,17 @@ async def build_stage_execution_context(
         candidates.append((source_stage, artifact))
 
     candidates.sort(key=lambda item: (item[0].order_index, item[1].id))
-    available_types = {artifact.artifact_type for _source_stage, artifact in candidates}
-    missing_types = tuple(
-        artifact_type
-        for artifact_type in required_types
-        if artifact_type not in available_types
-    )
-
     upstream_artifacts = _build_upstream_artifacts(
         candidates,
         max_artifacts=max_artifacts,
         max_artifact_content_chars=max_artifact_content_chars,
         max_total_content_chars=max_total_content_chars,
+    )
+    available_types = {artifact.artifact_type for artifact in upstream_artifacts}
+    missing_types = tuple(
+        artifact_type
+        for artifact_type in required_types
+        if artifact_type not in available_types
     )
     return StageExecutionContext(
         project_id=run.project_id,
@@ -151,11 +150,16 @@ def _build_upstream_artifacts(
     content_limit = max(0, max_artifact_content_chars)
     remaining_chars = max(0, max_total_content_chars)
     result: list[UpstreamArtifactContext] = []
+    selected_candidates = candidates[:item_limit]
 
-    for source_stage, artifact in candidates[:item_limit]:
+    for index, (source_stage, artifact) in enumerate(selected_candidates):
         if remaining_chars <= 0:
             break
-        allowed_chars = min(content_limit, remaining_chars)
+        remaining_items = len(selected_candidates) - index
+        fair_share = remaining_chars // remaining_items
+        allowed_chars = min(content_limit, fair_share)
+        if allowed_chars <= 0:
+            break
         content = artifact.content[:allowed_chars]
         result.append(
             UpstreamArtifactContext(

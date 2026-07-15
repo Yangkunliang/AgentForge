@@ -35,18 +35,18 @@ yield 只携带正文文字 chunk，thinking 与 llm_response 严格互斥。
 from __future__ import annotations
 
 import html
+import inspect
 import json
 import logging
 import re
-import inspect
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-    from agent_forge.llm.provider import LLMResponse
+    from agent_forge.llm.provider import LiteLLMProvider, LLMConfig, LLMResponse
+    from agent_forge.skills.dispatcher import SkillDispatcher
 
 logger = logging.getLogger(__name__)
 
