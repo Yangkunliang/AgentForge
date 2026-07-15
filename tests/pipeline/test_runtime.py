@@ -112,6 +112,24 @@ async def test_stage_runtime_calls_skill_engine_and_advances_current_stage(
     assert fake_engine.kwargs is not None
     assert fake_engine.kwargs["advanced_context"]["intent"] == "bug_fix"
     assert fake_engine.kwargs["advanced_context"]["agent_profile"]["id"]
+    assert fake_engine.kwargs["advanced_context"]["stage_execution"] == {
+        "project_id": project.id,
+        "session_id": session.id,
+        "pipeline_run_id": run_id,
+        "intent_type": "bug_fix",
+        "stage_id": "locate",
+        "stage_name": "问题定位",
+        "stage_order": 0,
+        "description": "定位问题现象、复现条件和根因假设。",
+        "required_input_artifact_types": [],
+        "expected_output_artifact_types": ["report"],
+        "success_criteria": [
+            "给出可复现现象和根因证据。",
+            "区分事实与假设。",
+        ],
+        "missing_input_artifact_types": [],
+        "upstream_artifacts": [],
+    }
 
     db_session.expire_all()
     refreshed = await get_pipeline_run_for_user_or_404(db_session, run_id, user_id)

@@ -147,7 +147,7 @@
 - Consumes: `StageExecutionContext.to_context()`。
 - Produces: `advanced_context["stage_execution"]`、trusted system metadata、untrusted user-level Artifact reference prompt。
 
-- [ ] **Step 1: 写 Runtime 和 Engine 红灯测试**
+- [x] **Step 1: 写 Runtime 和 Engine 红灯测试**
 
   ```python
   stage_context = fake_engine.kwargs["advanced_context"]["stage_execution"]
@@ -161,13 +161,13 @@
   assert "&lt;/upstream_artifact&gt;" in _build_upstream_artifact_prompt(advanced_context)
   ```
 
-- [ ] **Step 2: 运行红灯测试**
+- [x] **Step 2: 运行红灯测试**
 
   Run: `uv run --extra dev pytest -q tests/pipeline/test_runtime.py tests/skills/test_engine_context.py -k 'stage_execution or upstream_artifact'`
 
   Expected: FAIL，当前无 `stage_execution`。
 
-- [ ] **Step 3: 接入 Runtime 和三条 Engine 回复路径**
+- [x] **Step 3: 接入 Runtime 和三条 Engine 回复路径**
 
   ```python
   reference_prompt = _build_upstream_artifact_prompt(advanced_context)
@@ -181,7 +181,7 @@
 
   无工具路径使用 `_build_direct_reply_prompt(user_message, reference_prompt)`；工具结果路径使用 `_build_final_prompt(messages, reference_prompt)`。Artifact 正文由 `html.escape(content)` 转义后放入 untrusted 标签。
 
-- [ ] **Step 4: 运行 Runtime、Engine 和安全回归并提交**
+- [x] **Step 4: 运行 Runtime、Engine 和安全回归并提交**
 
   Run: `uv run --extra dev pytest -q tests/pipeline/test_runtime.py tests/skills/test_engine_context.py tests/security/test_prompt_injection.py`
 

@@ -22,6 +22,7 @@ from agent_forge.evaluation import EvaluationService
 from agent_forge.llm.router import ModelRouteResolution, resolve_model_route
 from agent_forge.models import PipelineRun, PipelineStageState
 from agent_forge.pipeline.catalog import get_stage_definition, stage_definition_to_dict
+from agent_forge.pipeline.execution_context import build_stage_execution_context
 from agent_forge.pipeline.service import (
     complete_stage,
     fail_stage,
@@ -68,6 +69,7 @@ class StageRuntime:
         agent_profile: AgentProfile | None = None
         model_route: ModelRouteResolution | None = None
         eval_context: dict | None = None
+        stage_execution_context: dict | None = None
         skill_policy_key: str | None = None
         stage_output_chunks: list[str] = []
         if pipeline_run_id and user_id:
@@ -78,6 +80,7 @@ class StageRuntime:
                 agent_profile,
                 model_route,
                 eval_context,
+                stage_execution_context,
                 skill_policy_key,
             ) = await self._start_current_stage(
                 task_id=task_id,
@@ -144,6 +147,7 @@ class StageRuntime:
                     agent_profile,
                     model_route,
                     eval_context,
+                    stage_execution_context,
                     skill_filter_report,
                 ),
             )
@@ -183,6 +187,7 @@ class StageRuntime:
         AgentProfile | None,
         ModelRouteResolution | None,
         dict | None,
+        dict | None,
         str | None,
     ]:
         async with self.session_factory() as db:
@@ -197,18 +202,30 @@ class StageRuntime:
 
             stage_id = run.current_stage_id
             if not stage_id:
-                return None, None, None, None, None, None, None
+                return None, None, None, None, None, None, None, None
 
             stage = _find_stage(run, stage_id)
             if stage and stage.status == "waiting_confirmation":
-                return None, None, "waiting_confirmation", None, None, None, None
+                return None, None, "waiting_confirmation", None, None, None, None, None
+            if stage is None:
+                raise RuntimeError(f"Pipeline stage state not found: {stage_id}")
 
             stage_definition = get_stage_definition(run.intent_type, stage_id)
+            if stage_definition is None:
+                raise RuntimeError(
+                    f"Pipeline stage definition not found: {run.intent_type}/{stage_id}"
+                )
+            stage_execution_context = await build_stage_execution_context(
+                db,
+                run=run,
+                stage=stage,
+                stage_definition=stage_definition,
+            )
             eval_context = {
                 "project_id": run.project_id,
                 "pipeline_run_id": run.id,
                 "stage_id": stage_id,
-                "stage_name": stage.stage_name if stage else stage_definition.stage_name,
+                "stage_name": stage.stage_name,
             }
             agent_profile = await resolve_agent_profile(
                 db,
@@ -265,6 +282,7 @@ class StageRuntime:
                 agent_profile,
                 model_route,
                 eval_context,
+                stage_execution_context.to_context(),
                 stage_definition.skill_policy_key,
             )
 
@@ -431,10 +449,17 @@ def _merge_runtime_context(
     agent_profile: AgentProfile | None,
     model_route: ModelRouteResolution | None,
     eval_context: dict | None = None,
+    stage_execution_context: dict | None = None,
     skill_filter_report: SkillToolFilterReport | None = None,
 ) -> dict | None:
     merged = _merge_confirmation_context(base, confirmation)
-    if not agent_profile and not model_route and not eval_context and not skill_filter_report:
+    if (
+        not agent_profile
+        and not model_route
+        and not eval_context
+        and not stage_execution_context
+        and not skill_filter_report
+    ):
         return merged
     runtime_context = dict(merged or {})
     if agent_profile:
@@ -443,6 +468,8 @@ def _merge_runtime_context(
         runtime_context["model_route"] = model_route.to_context()
     if eval_context:
         runtime_context["evaluation_context"] = eval_context
+    if stage_execution_context:
+        runtime_context["stage_execution"] = stage_execution_context
     if skill_filter_report:
         runtime_context["skill_policy"] = skill_filter_report.to_context()
     return runtime_context
