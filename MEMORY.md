@@ -91,6 +91,7 @@
 - [2026-07-15-stage-execution-context/](docs/iterations/2026-07-15-stage-execution-context/) — TASK-047 阶段执行上下文已完成：Catalog 阶段契约、有界上游 Artifact、可信/不可信 Prompt 分层和完成异常失败收敛已接入真实运行时
 - [2026-07-15-dashboard-tenant-isolation/](docs/iterations/2026-07-15-dashboard-tenant-isolation/) — TASK-048 Dashboard 多租户隔离已完成：Task 统计、费用、最近任务和 Cost API 按用户过滤，停用 API Key 被拒绝
 - [2026-07-15-task-graph/](docs/iterations/2026-07-15-task-graph/) — TASK-049 结构化 TaskGraph 已完成：PipelineRun 级 DAG、工程验收契约、Runtime 原子持久化和用户隔离读取 API
+- [2026-07-15-workspace-executor/](docs/iterations/2026-07-15-workspace-executor/) — TASK-050 授权 WorkspaceExecutor，设计 WorkspaceChangeSet/FilePatch、多文件预览、确认、基线校验和失败回滚
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -133,6 +134,7 @@
 - TASK-047 已完成：`StageDefinition` 新增必需输入和完成标准，`StageExecutionContext` 按 Project/Run/阶段隔离并按阶段类型选最新 Artifact，执行上下文受 6 项/单项 4000/总计 12000 字符预算约束，Artifact 正文以不可信 user-level reference 注入；完成归档异常会将阶段置为 failed。
 - TASK-048 已完成：Dashboard Task/Cost/RecentTask 和 `/api/v1/cost` 均按 `Task.user_id` 在 SQL 层隔离；Cost router 已恢复挂载；真实 JWT 双用户、无 Token 401、active/inactive API Key 已覆盖。
 - TASK-049 已完成：新增 `TaskGraph`、`TaskNode`、`TaskNodeDependency` 和 `020_task_graph` 迁移；`task_split` 通过 `task_graph_v1` 生成结构化 DAG 与可读 Artifact，非法输出原子回滚；`GET /api/v1/pipeline-runs/{run_id}/task-graph` 按当前用户隔离。下一步 TASK-050 实现受 ProjectMount 授权边界约束的 WorkspaceExecutor。
+- TASK-050 正在实施：采用持久化 WorkspaceChangeSet/FilePatch，不复用单文件 Artifact Delivery，也不向 LLM 开放任意 filesystem/shell；第一版只写 connected local primary Mount，路径受 TaskNode.target_files 和 Bridge 双重约束。
 
 ---
 

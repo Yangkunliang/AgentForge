@@ -118,6 +118,7 @@ docs/
 | TASK-047 | 2026-07-15 | StageExecutionContext 阶段执行上下文 | ✅ 已完成 |
 | TASK-048 | 2026-07-15 | Dashboard 多租户隔离 | ✅ 已完成 |
 | TASK-049 | 2026-07-15 | 结构化 TaskGraph | ✅ 已完成 |
+| TASK-050 | 2026-07-15 | 授权 WorkspaceExecutor | 🚧 进行中 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -373,6 +374,14 @@ docs/
   - [ITERATION-REVIEW.md](iterations/2026-07-15-task-graph/ITERATION-REVIEW.md)
 - **TASK-049 核心功能**：`task_split` 使用严格 `task_graph_v1` 输出合同，原子生成 PipelineRun 级 TaskGraph、TaskNode 依赖边和可读 Artifact；非法输出无半成品，读取 API 按当前用户隔离。
 - **下一步**：TASK-050 WorkspaceExecutor 消费 TaskGraph，并在用户授权的 ProjectMount 边界内执行节点。
+- **TASK-050 目录**：`docs/iterations/2026-07-15-workspace-executor/`
+- **TASK-050 产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-15-workspace-executor/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-15-workspace-executor/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-15-workspace-executor/TECHNICAL-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-15-workspace-executor/TEST-PLAN.md)
+  - [IMPLEMENTATION-PLAN.md](iterations/2026-07-15-workspace-executor/IMPLEMENTATION-PLAN.md)
+- **目标能力**：TaskNode 生成持久化多文件 Patch，写入前可预览、确认和全量基线校验，正常失败可回滚且全程按用户与 ProjectMount 隔离。
 
 ## 版本号规范
 
