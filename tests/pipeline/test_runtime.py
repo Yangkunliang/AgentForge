@@ -1009,7 +1009,9 @@ async def test_stage_runtime_persists_task_graph_for_task_split(
     ):
         chunks.append(chunk)
 
-    assert chunks == [output]
+    assert len(chunks) == 1
+    assert chunks[0].startswith("# 任务图：实现通知设置")
+    assert output not in chunks[0]
     db_session.expire_all()
     graph = await load_task_graph_for_run(db_session, run_id=run_id)
     assert graph is not None
@@ -1054,8 +1056,9 @@ async def test_stage_runtime_rejects_invalid_task_graph_without_partial_output(
         session_factory=test_session_factory,
     )
 
+    chunks = []
     with pytest.raises(TaskGraphOutputError, match="must be valid JSON"):
-        async for _chunk in runtime.run_current_stage(
+        async for chunk in runtime.run_current_stage(
             task_id="task-graph-invalid-runtime",
             pipeline_run_id=run_id,
             user_id=user_id,
@@ -1068,8 +1071,9 @@ async def test_stage_runtime_rejects_invalid_task_graph_without_partial_output(
             agent_name="CodeSoul",
             advanced_context={"intent": "new_feature"},
         ):
-            pass
+            chunks.append(chunk)
 
+    assert chunks == []
     db_session.expire_all()
     refreshed = await get_pipeline_run_for_user_or_404(
         db_session,

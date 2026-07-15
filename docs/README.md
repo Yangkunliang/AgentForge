@@ -117,7 +117,7 @@ docs/
 | TASK-046 | 2026-07-14 | Dashboard LLM 成本与用量 | ✅ 已完成（浏览器 E2E 环境豁免） |
 | TASK-047 | 2026-07-15 | StageExecutionContext 阶段执行上下文 | ✅ 已完成 |
 | TASK-048 | 2026-07-15 | Dashboard 多租户隔离 | ✅ 已完成 |
-| TASK-049 | 2026-07-15 | 结构化 TaskGraph | 🚧 进行中 |
+| TASK-049 | 2026-07-15 | 结构化 TaskGraph | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -370,7 +370,9 @@ docs/
   - [TECHNICAL-DESIGN.md](iterations/2026-07-15-task-graph/TECHNICAL-DESIGN.md)
   - [TEST-PLAN.md](iterations/2026-07-15-task-graph/TEST-PLAN.md)
   - [IMPLEMENTATION-PLAN.md](iterations/2026-07-15-task-graph/IMPLEMENTATION-PLAN.md)
-- **目标链路**：StageExecutionContext → TaskGraph → WorkspaceExecutor → VerificationGate → PipelineOrchestrator → 全链路 E2E；Dashboard 多租户隔离作为 TASK-048 P0 风险修复插入执行序列。
+  - [ITERATION-REVIEW.md](iterations/2026-07-15-task-graph/ITERATION-REVIEW.md)
+- **TASK-049 核心功能**：`task_split` 使用严格 `task_graph_v1` 输出合同，原子生成 PipelineRun 级 TaskGraph、TaskNode 依赖边和可读 Artifact；非法输出无半成品，读取 API 按当前用户隔离。
+- **下一步**：TASK-050 WorkspaceExecutor 消费 TaskGraph，并在用户授权的 ProjectMount 边界内执行节点。
 
 ## 版本号规范
 

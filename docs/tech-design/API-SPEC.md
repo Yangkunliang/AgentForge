@@ -757,6 +757,7 @@ Authorization: Bearer <token>
 | `stages[].confirmation_policy` | 当前阶段确认策略；StageState 初始化时由 GovernancePolicy 生成确认类型、原因和影响范围。 |
 | `stages[].required_input_artifact_types` | 阶段需要消费的前序 Artifact 类型；运行时会据此筛选上下文并报告缺失类型。 |
 | `stages[].output_artifact_types` | 阶段预期产物类型，用于 Artifact 归档和后续展示。 |
+| `stages[].output_contract_key` | 可选结构化输出合同；`task_split` 当前为 `task_graph_v1`。 |
 | `stages[].success_criteria` | 阶段完成标准；StageRuntime 会把它作为可信阶段指令传给 SkillExecutionEngine。 |
 | `stages[].default_agent_selector` | AgentResolver 的默认选择线索，StageRuntime 会据此选择 AgentProfile。 |
 | `stages[].model_route_key` | StageRuntime 实际解析到的 ModelRoute key。 |
@@ -764,7 +765,7 @@ Authorization: Bearer <token>
 
 ### StageExecutionContext 运行时契约
 
-TASK-047 后，StageRuntime 会从 Catalog 构建 `advanced_context.stage_execution`。该对象包含当前 Project、Session、PipelineRun、Stage 的标识，阶段目标、必需输入类型、预期输出类型、完成标准、缺失输入类型和有界前序 Artifact。
+TASK-047 后，StageRuntime 会从 Catalog 构建 `advanced_context.stage_execution`。该对象包含当前 Project、Session、PipelineRun、Stage 的标识，阶段目标、必需输入类型、预期输出类型、结构化输出合同、完成标准、缺失输入类型和有界前序 Artifact。
 
 上下文只查询当前 `project_id + pipeline_run_id`，只接受真实 `stage_state_id` 对应的前序阶段，并按“阶段状态 + Artifact 类型”保留最新版本后应用预算：最多 6 项、单项最多 4000 字符、正文总计最多 12000 字符。总预算在入选项之间公平分配，避免首项耗尽上下文。
 
@@ -857,6 +858,50 @@ Authorization: Bearer <token>
 
 响应结构同创建接口。
 
+### 查询 TaskGraph
+
+TASK-049 后，`task_split` 阶段的 `task_graph_v1` 输出会在同一事务内生成 TaskGraph 和可读 Artifact。TaskGraph 是后续 WorkspaceExecutor 与 VerificationGate 的结构化事实源。
+
+```http
+GET /api/v1/pipeline-runs/{run_id}/task-graph
+Authorization: Bearer <token>
+```
+
+**响应 200**:
+
+```json
+{
+  "id": "graph-001",
+  "project_id": "project-001",
+  "pipeline_run_id": "run-001",
+  "source_stage_state_id": "stage-task-split",
+  "source_artifact_id": "artifact-task-split",
+  "schema_version": 1,
+  "status": "ready",
+  "summary": "实现用户通知设置",
+  "created_at": "2026-07-15T10:00:00Z",
+  "updated_at": "2026-07-15T10:00:00Z",
+  "nodes": [
+    {
+      "id": "node-backend",
+      "key": "backend-api",
+      "title": "新增通知设置 API",
+      "description": "实现模型、服务和路由",
+      "order_index": 0,
+      "status": "pending",
+      "depends_on": [],
+      "acceptance_criteria": ["API 权限和错误响应符合契约"],
+      "target_files": ["src/api/routes/notifications.py"],
+      "verification_commands": ["pytest -q tests/api/test_notifications.py"],
+      "created_at": "2026-07-15T10:00:00Z",
+      "updated_at": "2026-07-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+接口先按当前用户校验 PipelineRun 所有权，再加载图。其他用户、Run 不存在或图尚未生成均返回 404，不暴露资源是否属于其他账号。节点按 `order_index` 返回，`depends_on` 使用同图 node key。
+
 ### 阶段状态操作
 
 ```http
@@ -886,7 +931,7 @@ POST /api/v1/pipeline-runs/{run_id}/stages/{stage_id}/fail
 
 `action=approve` 会把当前阶段置为 `completed` 并推进到下一阶段；`action=revise` 会把当前阶段回到 `pending`，`feedback` 注入下一次同阶段执行上下文；`action=cancel` 会把阶段置为 `failed`、run 置为 `cancelled`。每次确认会写入 `AuditLog.action=pipeline.confirm.{action}`，并在 `details.governance_decision` 中记录确认类型、原因、风险等级和影响范围。
 
-StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。确认原因和影响范围由服务端 `GovernancePolicy` 生成，前端只负责渲染。
+StageRuntime 会在调用现有 `SkillExecutionEngine` 前后自动执行当前阶段的 start/complete；阶段完成后创建 Artifact 并发出 `artifact_created` SSE。`task_split` 会缓冲并严格解析 `task_graph_v1`，再原子创建 Artifact、TaskGraph、TaskNode 和依赖边；成功后聊天只接收可读 Markdown，不展示原始 JSON，非法输出使 Stage/Run failed 且不留下半成品或用户可见的部分输出。需要人工确认的阶段完成后会发出 `confirm_required`，并在确认前停止自动推进。确认原因和影响范围由服务端 `GovernancePolicy` 生成，前端只负责渲染。
 
 StageRuntime 启动阶段时会通过 AgentResolver 选择 AgentProfile，并写入当前 `PipelineStageState.agent_profile_id/name/source`。解析优先级为：用户本次阶段覆盖 → Project 默认 Agent policy → `StageDefinition.default_agent_selector` → 系统默认 Agent。第一版 Project 默认值通过运行时上下文预留，持久化项目策略后续继续扩展。
 

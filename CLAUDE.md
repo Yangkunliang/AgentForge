@@ -10,7 +10,7 @@
 
 > 当前落地场景：全栈开发自动化（代码审查、生成、研究）。框架本身领域无关，Skill 和 Agent 可按需替换以支持其他场景。
 
-**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现；PipelineRun / StageState 阶段状态机已实现；Artifact 归档、查看和上下文复用已实现；人工确认与阶段继续机制已实现；Agent Bridge 授权文件上下文已实现；Delivery diff 预览与确认写回已实现；GitHub OAuth Mount 授权底座已实现；GitHub PR Delivery 已实现；zip Delivery Package 已实现；Upload Mount 上下文兜底已实现；AI Runtime 收敛架构基线已完成；Pipeline Stage Catalog 后端事实源已实现；AgentProfile 运行时绑定已实现；ModelRoute 运行时绑定与 LLM 结构化配置已实现；第三方 Skill 导入、权限、运行时注册和审计闭环已实现；Governance 人工确认策略引擎已实现；Eval Feedback 结构化反馈闭环已实现；AI Runtime 架构文档收敛已完成；Stage 级 SkillPolicy 编排已实现；MCP RuntimeSpec 权限归一已实现；内置 Skill RuntimeSpec 补齐已实现；高风险 Skill 阶段级临时授权已实现；高风险 Skill 授权确认入口已实现；高风险 Skill 授权 Eval 可观测性已实现；高风险 Skill 授权聚合指标已实现；Dashboard 高风险 Skill 授权指标已实现；Dashboard 路由单一事实源已实现；Artifact 运行时来源固化已实现；LLM 成本评估事件和 Dashboard LLM 用量已实现；TASK-047 StageExecutionContext 和 TASK-048 Dashboard 多租户隔离已完成；TASK-049 结构化 TaskGraph 正在实施。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`，AI Runtime 收敛主线详见 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`。
+**当前状态：Phase 1 — 记忆系统已实现；Project / Mount / Artifact 数据底座已实现；PipelineRun / StageState 阶段状态机已实现；Artifact 归档、查看和上下文复用已实现；人工确认与阶段继续机制已实现；Agent Bridge 授权文件上下文已实现；Delivery diff 预览与确认写回已实现；GitHub OAuth Mount 授权底座已实现；GitHub PR Delivery 已实现；zip Delivery Package 已实现；Upload Mount 上下文兜底已实现；AI Runtime 收敛架构基线已完成；Pipeline Stage Catalog 后端事实源已实现；AgentProfile 运行时绑定已实现；ModelRoute 运行时绑定与 LLM 结构化配置已实现；第三方 Skill 导入、权限、运行时注册和审计闭环已实现；Governance 人工确认策略引擎已实现；Eval Feedback 结构化反馈闭环已实现；AI Runtime 架构文档收敛已完成；Stage 级 SkillPolicy 编排已实现；MCP RuntimeSpec 权限归一已实现；内置 Skill RuntimeSpec 补齐已实现；高风险 Skill 阶段级临时授权已实现；高风险 Skill 授权确认入口已实现；高风险 Skill 授权 Eval 可观测性已实现；高风险 Skill 授权聚合指标已实现；Dashboard 高风险 Skill 授权指标已实现；Dashboard 路由单一事实源已实现；Artifact 运行时来源固化已实现；LLM 成本评估事件和 Dashboard LLM 用量已实现；TASK-047 StageExecutionContext、TASK-048 Dashboard 多租户隔离和 TASK-049 结构化 TaskGraph 已完成。** 核心实现位于 `src/agent_forge/`，数据库迁移见 `migrations/alembic/`。记忆系统详见 `docs/tech-design/DATABASE.md` 第 5 节，核心闭环详见 `docs/architecture/CORE-DEV-WORKFLOW.md`，AI Runtime 收敛主线详见 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`。
 
 ---
 
@@ -70,7 +70,7 @@
 |------|-----------|
 | `docs/tech-design/ARCHITECTURE.md` | 整体架构、Harness 六层、消息总线、执行流程、沙箱池 |
 | `docs/tech-design/API-SPEC.md` | 完整 API 规范（Project、Mount、Pipeline Catalog、PipelineRun、StageState、Artifact、Delivery、Evaluation、认证、任务、Agent、Skill、Dashboard、Cost、SSE、Webhook、导出） |
-| `docs/tech-design/DATABASE.md` | 数据库实体、Project/Mount/PipelineRun/StageState/Artifact/Delivery/EvalEvent 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
+| `docs/tech-design/DATABASE.md` | 数据库实体、Project/Mount/PipelineRun/StageState/TaskGraph/Artifact/Delivery/EvalEvent 核心闭环表 + 记忆系统表（semantic_entries、user_memories、pgvector 全文索引） |
 | `docs/tech-design/SECURITY.md` | 认证体系、限流、Prompt 注入防护（三类注入 + 语义检测）、Skill 沙箱分级、审计日志 |
 | `docs/tech-design/LLM-CONFIG.md` | LLM Provider 接口、配置管理、两级 Prompt、Thinking 拆分、ReAct tool_use 循环、Cost 追踪和 LLM usage EvalEvent |
 | `docs/tech-design/FRONTEND-ARCHITECTURE.md` | Vue 3 前端架构（SSE 方案、Token 策略、权限模型、Store 同步） |
@@ -111,8 +111,8 @@
 | `src/agent_forge/agents/coder.py` | CoderAgent |
 | `src/agent_forge/agents/resolver.py` | StageRuntime 使用的 AgentProfile 解析器，支持用户覆盖、项目默认、阶段默认和系统默认 |
 | `src/agent_forge/memory/` | 4 层记忆实现 |
-| `src/agent_forge/models/` | SQLAlchemy 数据模型（含 Project、ProjectMount、OAuthCredential、OAuthState、PipelineRun、PipelineStageState、Artifact、LLM Provider/Model/Credential/Route、EvalEvent 核心闭环表） |
-| `src/agent_forge/pipeline/` | Pipeline Catalog、intent 阶段定义、状态机服务与 StageRuntime |
+| `src/agent_forge/models/` | SQLAlchemy 数据模型（含 Project、ProjectMount、OAuthCredential、OAuthState、PipelineRun、PipelineStageState、TaskGraph、TaskNode、Artifact、LLM Provider/Model/Credential/Route、EvalEvent 核心闭环表） |
+| `src/agent_forge/pipeline/` | Pipeline Catalog、intent 阶段定义、状态机服务、StageRuntime 与 task_graph_v1 合同 |
 | `src/agent_forge/bridge/` | Agent Bridge 授权本地 Mount、Upload Mount 文件列表和只读读取安全边界 |
 | `src/agent_forge/delivery/` | Artifact diff preview、确认写回授权 Mount、GitHub PR Delivery、zip Delivery Package、Delivery report |
 | `src/agent_forge/evaluation/` | EvalEvent 记录与摘要聚合服务，供 Runtime、Dashboard 和 Export 使用 |
@@ -138,7 +138,7 @@
 
 **支撑子系统**：消息总线（RabbitMQ，Pub/Sub 广播 + 点对点 + SSE 流式输出）、LLM Provider 抽象层（LiteLLM，支持模型路由/降级/Cost 追踪）、Eval Feedback（结构化执行事件 + LLM usage 聚合 + Dashboard 聚合 + JSONL 导出）、数据导出器（JSONL 训练数据 + PII 脱敏）。
 
-**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> StageExecutionContext -> Artifact -> Delivery -> Eval Feedback`。TASK-013～TASK-048 已完成数据底座、状态机、Artifact、确认、授权上下文、Delivery、AI Runtime 治理、Eval Feedback、成本观测、阶段执行语义和私有统计多租户隔离。后续按 `TaskGraph -> WorkspaceExecutor -> VerificationGate -> PipelineOrchestrator -> Full-chain E2E` 推进执行闭环。详细任务边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
+**核心开发闭环**：面向全栈开发工程师的产品主线是 `Project -> Mount -> Session -> PipelineRun -> StageState -> StageExecutionContext -> TaskGraph -> Artifact -> Delivery -> Eval Feedback`。TASK-013～TASK-049 已完成数据底座、状态机、Artifact、确认、授权上下文、Delivery、AI Runtime 治理、Eval Feedback、成本观测、阶段执行语义、私有统计多租户隔离和结构化任务图。后续按 `WorkspaceExecutor -> VerificationGate -> PipelineOrchestrator -> Full-chain E2E` 推进执行闭环。详细任务边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
 
 ### 计划技术栈
 

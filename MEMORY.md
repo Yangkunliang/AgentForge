@@ -23,7 +23,7 @@
 ## 架构蓝图 (docs/architecture/)
 - [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
 - [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery；增强阶段按 TASK-020 服务端可信交付、TASK-021 交互复盘、TASK-022 交付扩展设计、TASK-023～TASK-026 实现推进
-- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → StageExecutionContext → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-048 的实现基线和 TASK-049～TASK-053 的工作流增强入口
+- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → StageExecutionContext → Agent/Profile → Skill Runtime → TaskGraph/Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-049 的实现基线和 TASK-050～TASK-053 的工作流增强入口
 
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-026 路线图
@@ -90,7 +90,7 @@
 - [2026-07-15-core-workflow-execution-chain/](docs/iterations/2026-07-15-core-workflow-execution-chain/) — TASK-047～TASK-053 核心工作流执行链路线图，覆盖 StageExecutionContext、TaskGraph、WorkspaceExecutor、VerificationGate、PipelineOrchestrator 和全链路 E2E
 - [2026-07-15-stage-execution-context/](docs/iterations/2026-07-15-stage-execution-context/) — TASK-047 阶段执行上下文已完成：Catalog 阶段契约、有界上游 Artifact、可信/不可信 Prompt 分层和完成异常失败收敛已接入真实运行时
 - [2026-07-15-dashboard-tenant-isolation/](docs/iterations/2026-07-15-dashboard-tenant-isolation/) — TASK-048 Dashboard 多租户隔离已完成：Task 统计、费用、最近任务和 Cost API 按用户过滤，停用 API Key 被拒绝
-- [2026-07-15-task-graph/](docs/iterations/2026-07-15-task-graph/) — TASK-049 结构化 TaskGraph，新增 PipelineRun 级 DAG、工程验收契约和用户隔离读取 API
+- [2026-07-15-task-graph/](docs/iterations/2026-07-15-task-graph/) — TASK-049 结构化 TaskGraph 已完成：PipelineRun 级 DAG、工程验收契约、Runtime 原子持久化和用户隔离读取 API
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -131,7 +131,8 @@
 - TASK-045 已完成：SkillExecutionEngine 将 `tool_use_complete` 的 token、cost 和 latency 写入 `llm_tool_use_completed` EvalEvent；Evaluation summary 新增 `llm` 聚合块，Agent / ModelRoute 维度补充 `tokens_used`；`stream_complete` usage 仍作为后续增强。
 - TASK-046 已完成：修复 StageRuntime `evaluation_context` 与 SkillExecutionEngine `eval` 键名错位；Evaluation summary 新增仅统计 `llm_*` 的 ModelRoute / Stage 聚合；Dashboard 展示当前用户 LLM 调用、成本、Token、延迟和前 3 成本排行。浏览器 E2E 因 sandbox 禁止本地端口绑定未执行，已作为环境豁免记录，不视为测试通过。
 - TASK-047 已完成：`StageDefinition` 新增必需输入和完成标准，`StageExecutionContext` 按 Project/Run/阶段隔离并按阶段类型选最新 Artifact，执行上下文受 6 项/单项 4000/总计 12000 字符预算约束，Artifact 正文以不可信 user-level reference 注入；完成归档异常会将阶段置为 failed。
-- TASK-048 已完成：Dashboard Task/Cost/RecentTask 和 `/api/v1/cost` 均按 `Task.user_id` 在 SQL 层隔离；Cost router 已恢复挂载；真实 JWT 双用户、无 Token 401、active/inactive API Key 已覆盖。下一步 TASK-049 实现结构化 TaskGraph。
+- TASK-048 已完成：Dashboard Task/Cost/RecentTask 和 `/api/v1/cost` 均按 `Task.user_id` 在 SQL 层隔离；Cost router 已恢复挂载；真实 JWT 双用户、无 Token 401、active/inactive API Key 已覆盖。
+- TASK-049 已完成：新增 `TaskGraph`、`TaskNode`、`TaskNodeDependency` 和 `020_task_graph` 迁移；`task_split` 通过 `task_graph_v1` 生成结构化 DAG 与可读 Artifact，非法输出原子回滚；`GET /api/v1/pipeline-runs/{run_id}/task-graph` 按当前用户隔离。下一步 TASK-050 实现受 ProjectMount 授权边界约束的 WorkspaceExecutor。
 
 ---
 

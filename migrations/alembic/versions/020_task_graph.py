@@ -11,11 +11,14 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0020"
 down_revision: Union[str, Sequence[str], None] = "0019"
 branch_labels = None
 depends_on = None
+
+JSON_VARIANT = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 
 
 def upgrade() -> None:
@@ -72,9 +75,9 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=False),
         sa.Column("order_index", sa.Integer(), nullable=False),
         sa.Column("status", sa.String(30), nullable=False, server_default="pending"),
-        sa.Column("acceptance_criteria", sa.JSON(), nullable=False, server_default="[]"),
-        sa.Column("target_files", sa.JSON(), nullable=False, server_default="[]"),
-        sa.Column("verification_commands", sa.JSON(), nullable=False, server_default="[]"),
+        sa.Column("acceptance_criteria", JSON_VARIANT, nullable=False, server_default="[]"),
+        sa.Column("target_files", JSON_VARIANT, nullable=False, server_default="[]"),
+        sa.Column("verification_commands", JSON_VARIANT, nullable=False, server_default="[]"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(

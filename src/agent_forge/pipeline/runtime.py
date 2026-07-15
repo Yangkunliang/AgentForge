@@ -96,6 +96,12 @@ class StageRuntime:
                 advanced_context=advanced_context,
             )
 
+        buffers_structured_output = bool(
+            stage_execution_context
+            and stage_execution_context.get("output_contract_key")
+            == TASK_GRAPH_OUTPUT_CONTRACT_KEY
+        )
+
         if blocked_reason == "waiting_confirmation":
             yield "当前阶段正在等待确认，请先确认或提出修改意见。"
             return
@@ -161,10 +167,11 @@ class StageRuntime:
             async for chunk in async_gen:
                 if chunk:
                     stage_output_chunks.append(chunk)
-                yield chunk
+                if not buffers_structured_output:
+                    yield chunk
 
             if active_stage_id and pipeline_run_id and user_id:
-                await self._complete_stage(
+                display_output = await self._complete_stage(
                     task_id=task_id,
                     pipeline_run_id=pipeline_run_id,
                     user_id=user_id,
@@ -173,6 +180,8 @@ class StageRuntime:
                     source_message_id=source_message_id,
                     skill_policy_key=skill_policy_key,
                 )
+                if buffers_structured_output and display_output:
+                    yield display_output
         except Exception:
             if active_stage_id and pipeline_run_id and user_id:
                 await self._fail_stage(pipeline_run_id, user_id, active_stage_id)
@@ -302,12 +311,12 @@ class StageRuntime:
         stage_output: str,
         source_message_id: str | None,
         skill_policy_key: str | None,
-    ) -> None:
+    ) -> str | None:
         async with self.session_factory() as db:
             run = await get_pipeline_run_for_user_or_404(db, pipeline_run_id, user_id)
             stage = _find_stage(run, stage_id)
             if not stage or stage.status in {"completed", "skipped", "failed"}:
-                return
+                return None
             stage_definition = get_stage_definition(run.intent_type, stage_id)
             if stage_definition is None or not stage_definition.output_artifact_types:
                 raise RuntimeError(
@@ -411,6 +420,7 @@ class StageRuntime:
                     pipeline_run_id=run.id,
                     stage_id=stage_id,
                 )
+            return artifact.content
 
     async def _fail_stage(self, pipeline_run_id: str, user_id: str, stage_id: str) -> None:
         async with self.session_factory() as db:

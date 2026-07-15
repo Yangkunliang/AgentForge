@@ -1,20 +1,20 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-048 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测、StageExecutionContext 和私有统计多租户隔离已进入真实运行时。TASK-049～TASK-053 在此基线上继续补齐结构化任务、授权工作区执行、真实测试门禁、统一编排和全链路验收。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-049 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测、StageExecutionContext、私有统计多租户隔离和结构化 TaskGraph 已进入真实运行时。TASK-050～TASK-053 在此基线上继续补齐授权工作区执行、真实测试门禁、统一编排和全链路验收。
 
 ## 1. 定位
 
 AgentForge 的长期形态不是“多 Agent 聊天页”，而是面向全栈开发工程师的项目级 AI 开发操作系统：
 
 ```text
-Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Artifact -> Delivery -> Eval Feedback
+Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> TaskGraph/Artifact -> Delivery -> Eval Feedback
 ```
 
 这条链路的核心价值是：用稳定的软件工程对象包住不稳定的 AI 行为，让每次执行都能被规划、观察、确认、交付和复盘。
 
 ## 2. 当前真实链路
 
-截至 TASK-048，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；Dashboard Task/Cost/RecentTask 与独立 Cost API 已按当前用户隔离，高风险授权和 LLM 成本可按当前账号观察。
+截至 TASK-049，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、TaskGraph、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；Dashboard Task/Cost/RecentTask 与独立 Cost API 已按当前用户隔离，高风险授权和 LLM 成本可按当前账号观察。
 
 ### 2.1 请求到执行
 
@@ -59,7 +59,9 @@ src/agent_forge/pipeline/runtime.py
 - `PipelineStageState` 记录阶段状态、是否 required、是否 confirmation_required，以及确认类型、原因、影响范围和审计 payload。
 - `StageRuntime` 从 Catalog 读取 StageDefinition，负责 stage started / completed / failed 与 SSE。
 - `StageDefinition` 已定义必需输入类型、预期输出类型和完成标准；`StageRuntime` 会构建有界 StageExecutionContext 并注入 SkillExecutionEngine。
+- `StageDefinition.output_contract_key` 可声明结构化输出合同；`task_split` 当前使用 `task_graph_v1`，只接受经过 schema、DAG 和安全路径校验的原始 JSON。
 - 上游 Artifact 只读取当前 Project / PipelineRun 的前序阶段，按阶段和类型取最新版本，并受数量与字符预算约束。
+- 合法 `task_split` 输出会在同一事务内生成一个 PipelineRun 级 TaskGraph、TaskNode 依赖边和可读 Markdown Artifact；非法输出使阶段与 Run 失败，不留下半成品。
 - confirmation_required 阶段完成后进入 `waiting_confirmation`。
 - 前端通过 `/api/v1/pipeline/catalog` 读取阶段定义、默认动作和 placeholder。
 
@@ -142,6 +144,7 @@ Artifact Viewer
 - 阶段输出会归档为 Artifact。
 - Artifact 可被 Chat、Project、Viewer 使用。
 - TASK-044 后，StageRuntime 创建 Artifact 时会把 AgentProfile、ModelRoute、model name 和 SkillPolicy key 写入 `metadata.runtime`。
+- TASK-049 后，`task_split` Artifact 是 TaskGraph 的人类可读投影，`metadata.task_graph_id` 和 `output_contract_key` 可追溯结构化事实源；后续执行器应消费 TaskGraph，不反向解析 Markdown。
 - Delivery 已支持本地写回、GitHub PR、zip 包。
 - Delivery preview/apply 有一致性校验和失败报告。
 
@@ -681,7 +684,7 @@ StageExecutionContext
   -> Full-chain E2E
 ```
 
-当前状态：TASK-047 和 TASK-048 已完成。阶段执行语义已进入真实运行时；Dashboard Task、任务费用、最近任务和 `/api/v1/cost` 均按当前用户隔离，停用 API Key 不再通过认证。下一步 TASK-049 实现结构化 TaskGraph。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
+当前状态：TASK-047～TASK-049 已完成。阶段执行语义已进入真实运行时；Dashboard 私有统计已隔离；`task_split` 已生成可验证、可追溯、可由后续执行器消费的 PipelineRun 级 TaskGraph。下一步 TASK-050 实现受 ProjectMount 授权边界约束的 WorkspaceExecutor。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
 
 架构约束：
 
@@ -695,7 +698,7 @@ StageExecutionContext
 | 风险 | 表现 | 对应任务 |
 |------|------|----------|
 | 阶段输入只提示不阻断 | StageExecutionContext 已报告缺失输入，但当前仍允许模型继续执行 | TASK-051 |
-| 任务拆解不可执行 | task_split 当前只生成 Markdown Artifact，没有结构化依赖和验收节点 | TASK-049 |
+| 任务拆解不可执行 | 已通过 `task_graph_v1`、TaskGraph/TaskNode/Dependency 和用户隔离 API 收敛 | TASK-049 已完成 |
 | 开发阶段没有真实工作区执行 | 通用 SkillExecutionEngine 可回答文本，但没有受 Mount 约束的文件级 Patch 执行闭环 | TASK-050 |
 | 测试结论不可作为门禁 | 测试阶段尚未用真实命令结果阻断失败交付 | TASK-051 |
 | 阶段推进生命周期分散 | 确认后推进、下一阶段启动、Run 完成和新需求创建尚未统一编排 | TASK-052 |

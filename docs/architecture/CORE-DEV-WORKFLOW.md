@@ -7,7 +7,7 @@
 AgentForge 的核心功能不是单纯聊天，也不是单纯多 Agent 编排，而是围绕用户自己的项目完成开发交付，并把执行事实沉淀为可复盘数据：
 
 ```text
-Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery -> Eval Feedback
+Project -> Mount -> Session -> PipelineRun -> StageState -> TaskGraph -> Artifact -> Delivery -> Eval Feedback
 ```
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
@@ -17,6 +17,7 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> Artifact -> Delivery
 | Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片和授权文件上下文 | 可继续增强多阶段自动推进 |
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | 可继续增强 Delivery 自动编排 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
+| TaskGraph | `task_split` 产出的 PipelineRun 级结构化执行计划 | 已支持 task_graph_v1、DAG/路径校验、节点依赖、工程验收契约、原子持久化和用户隔离读取 | TASK-050 起由 WorkspaceExecutor 消费 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
 | Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | 可继续增强发布/回滚编排 |
 | Eval Feedback | 结构化记录阶段、Agent、模型、Skill、高风险授权、确认、Artifact 和 Delivery 执行事实 | 已支持 EvalEvent、EvaluationService、Dashboard 授权指标、Evaluation summary API、Skill 授权聚合和 Eval JSONL 导出 | 可继续增强 LLM token/cost 明细和质量评分 |
@@ -31,7 +32,7 @@ MVP 用户路径按以下顺序落地：
 4. 用户选择需求类型，或由规则分类得到 intent。
 5. 系统创建 PipelineRun，并根据 intent 初始化 StageState。
 6. 用户可从 connected local 或 upload Mount 选择文件作为上下文；后端在执行前读取授权范围或上传 manifest 内的真实文件内容并注入 Agent。
-7. Agent 执行当前阶段，阶段完成后保存 Artifact。
+7. Agent 执行当前阶段，阶段完成后保存 Artifact；`task_split` 额外原子生成 TaskGraph，Artifact 仅作为其人类可读投影。
 8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
 9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
 10. 用户在 Artifact Viewer 中选择本地写回、GitHub PR Delivery 或 zip 包交付：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR；zip 模式生成包含 manifest、delivery report 和文件树的可下载包。
@@ -43,6 +44,7 @@ MVP 用户路径按以下顺序落地：
 - Mount 是用户主动授权，不自动扫描用户目录。
 - Intent 不只是 prompt 文案，必须生成可检查的 PipelineRun。
 - StageState 是状态机，不是纯 UI pill。
+- TaskGraph 是后续工作区执行和验证的结构化事实源，不得从 Markdown Artifact 反向解析任务依赖。
 - Artifact 是平台产物，不应该只散落在聊天消息里。
 - 人工确认是流程节点，不是普通按钮。
 - Bridge 读取必须始终受 Mount 授权范围约束；Delivery 仍需复用 Mount 边界。
@@ -72,6 +74,10 @@ TASK-012 路线图和状态纠偏
                     -> TASK-025 zip Delivery Package
                     -> TASK-026 Upload Mount
                       -> TASK-027～TASK-034 AI Runtime 收敛
+                        -> TASK-047 StageExecutionContext
+                          -> TASK-048 Dashboard 多租户隔离
+                            -> TASK-049 TaskGraph
+                              -> TASK-050 WorkspaceExecutor
 ```
 
 ## 5. MVP 非目标
@@ -90,7 +96,7 @@ TASK-012 路线图和状态纠偏
 ```text
 创建项目 -> 创建会话 -> 选择需求类型 -> 生成阶段计划
 -> 选择 AgentProfile / ModelRoute / StageSkillPolicy / SkillRuntime
--> 完成一个阶段 -> 保存产物 -> 人工确认 -> 进入下一阶段
+-> 完成一个阶段 -> 生成 TaskGraph / 保存产物 -> 人工确认 -> 进入下一阶段
 -> 查看产物 -> 将结果交付到本地、GitHub PR 或 zip 包
 -> 通过 Eval Feedback 复盘成功率、耗时和失败原因
 ```
