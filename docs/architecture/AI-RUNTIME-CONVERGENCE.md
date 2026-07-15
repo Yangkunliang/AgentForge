@@ -1,6 +1,6 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-047 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测和 StageExecutionContext 已进入真实运行时。TASK-048～TASK-053 在此基线上继续补齐多租户隔离、结构化任务、授权工作区执行、真实测试门禁、统一编排和全链路验收。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-048 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测、StageExecutionContext 和私有统计多租户隔离已进入真实运行时。TASK-049～TASK-053 在此基线上继续补齐结构化任务、授权工作区执行、真实测试门禁、统一编排和全链路验收。
 
 ## 1. 定位
 
@@ -14,7 +14,7 @@ Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> Arti
 
 ## 2. 当前真实链路
 
-截至 TASK-047，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；高风险授权已具备确认入口、结构化事件、聚合 API 和 Dashboard 指标，LLM `tool_use_complete` 的 token、成本和延迟已进入 Evaluation summary，并可按 ModelRoute / Stage 在 Dashboard 观察。
+截至 TASK-048，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；Dashboard Task/Cost/RecentTask 与独立 Cost API 已按当前用户隔离，高风险授权和 LLM 成本可按当前账号观察。
 
 ### 2.1 请求到执行
 
@@ -681,7 +681,7 @@ StageExecutionContext
   -> Full-chain E2E
 ```
 
-当前状态：TASK-047 已完成。StageDefinition 的输入、输出和完成标准已进入真实执行提示；上游 Artifact 按 Project、Run、阶段、类型、版本和字符预算构建上下文；Artifact 类型收敛到 Catalog；完成归档异常会落入 failed 状态。下一步 TASK-048 先修复 Dashboard 多租户隔离，再推进 TaskGraph 等执行链。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
+当前状态：TASK-047 和 TASK-048 已完成。阶段执行语义已进入真实运行时；Dashboard Task、任务费用、最近任务和 `/api/v1/cost` 均按当前用户隔离，停用 API Key 不再通过认证。下一步 TASK-049 实现结构化 TaskGraph。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
 
 架构约束：
 
@@ -699,7 +699,7 @@ StageExecutionContext
 | 开发阶段没有真实工作区执行 | 通用 SkillExecutionEngine 可回答文本，但没有受 Mount 约束的文件级 Patch 执行闭环 | TASK-050 |
 | 测试结论不可作为门禁 | 测试阶段尚未用真实命令结果阻断失败交付 | TASK-051 |
 | 阶段推进生命周期分散 | 确认后推进、下一阶段启动、Run 完成和新需求创建尚未统一编排 | TASK-052 |
-| Dashboard 用户隔离不足 | Task 数量、费用和最近任务 helper 未按当前用户过滤 | TASK-048 |
+| API Key 使用审计不完整 | 认证会尝试更新 `last_used_at`，但 APIKey 模型尚无持久化字段 | 后续增强 |
 | Agent 配置空转 | AgentProfile 已进入 StageRuntime，AgentSkill allowlist 已参与 Stage 级 SkillPolicy 编排 | 后续增强 |
 | 模型配置不可治理 | Provider / Model / Credential / Route 已落地，LLM tool-use 成本指标已进入 EvalEvent 和 Dashboard；后续接入预算和重试治理 | 后续增强 |
 | Skill 安全边界不足 | 内置/外部/MCP RuntimeSpec、Manifest、权限、风险、Stage 级工具过滤、临时授权上下文、授权确认入口、授权 Eval、调用审计和高风险 Governance 决策已落地 | 后续增强 |

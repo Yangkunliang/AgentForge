@@ -44,11 +44,11 @@ Commit: `fix-恢复并隔离用户费用接口`
 
 ## Task 4：验证、文档和集成
 
-- [ ] 执行 Dashboard、Cost、路由定向测试。
-- [ ] 执行后端全量测试和生产代码 lint。
-- [ ] 验证 FastAPI 生命周期。
-- [ ] 创建 `ITERATION-REVIEW.md` 并同步架构、API、README、MEMORY、CLAUDE。
-- [ ] 独立代码评审无阻断问题。
+- [x] 执行 Dashboard、Cost、路由定向测试。
+- [x] 执行后端全量测试和生产代码 lint。
+- [x] 验证 FastAPI 生命周期。
+- [x] 创建 `ITERATION-REVIEW.md` 并同步架构、API、README、MEMORY、CLAUDE。
+- [x] 独立代码评审无阻断问题。
 - [ ] 推送功能分支，合并并推送 `main`。
 
 Commit: `feat-完成Dashboard多租户隔离迭代`

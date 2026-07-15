@@ -116,7 +116,7 @@ docs/
 | TASK-045 | 2026-07-14 | LLM 成本评估事件 | ✅ 已完成 |
 | TASK-046 | 2026-07-14 | Dashboard LLM 成本与用量 | ✅ 已完成（浏览器 E2E 环境豁免） |
 | TASK-047 | 2026-07-15 | StageExecutionContext 阶段执行上下文 | ✅ 已完成 |
-| TASK-048 | 2026-07-15 | Dashboard 多租户隔离 | 🚧 进行中 |
+| TASK-048 | 2026-07-15 | Dashboard 多租户隔离 | ✅ 已完成 |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -360,6 +360,8 @@ docs/
   - [TECHNICAL-DESIGN.md](iterations/2026-07-15-dashboard-tenant-isolation/TECHNICAL-DESIGN.md)
   - [TEST-PLAN.md](iterations/2026-07-15-dashboard-tenant-isolation/TEST-PLAN.md)
   - [IMPLEMENTATION-PLAN.md](iterations/2026-07-15-dashboard-tenant-isolation/IMPLEMENTATION-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-15-dashboard-tenant-isolation/ITERATION-REVIEW.md)
+- **TASK-048 核心功能**：Dashboard Task/Cost/RecentTask 和 `/api/v1/cost` 在 SQL 层按 `Task.user_id` 隔离；Cost API 恢复主路由挂载；真实 JWT 双用户、无 Token 和 active/inactive API Key 回归覆盖认证链。
 - **目标链路**：StageExecutionContext → TaskGraph → WorkspaceExecutor → VerificationGate → PipelineOrchestrator → 全链路 E2E；Dashboard 多租户隔离作为 TASK-048 P0 风险修复插入执行序列。
 
 ## 版本号规范

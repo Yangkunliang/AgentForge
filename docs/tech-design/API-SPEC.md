@@ -1496,7 +1496,7 @@ Authorization: Bearer <token>
 }
 ```
 
-**说明：** `trend_pct` 为正表示任务费用较昨日增加，为负表示减少。`evaluation` 基于当前用户的 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。TASK-046 后，Dashboard evaluation 同步返回高风险 Skill 授权指标和非流式 LLM 用量指标；`llm.by_model_route` / `llm.by_stage` 只返回成本最高的前 3 项。
+**说明：** `trend_pct` 为正表示任务费用较昨日增加，为负表示减少。TASK-048 后，`tasks`、`cost` 和 `recent_tasks` 均在 SQL 查询阶段按当前用户的 `Task.user_id` 隔离，无归属 Task 不对普通用户展示；Agent 和 Skill 数量仍表示平台级可用资源。`evaluation` 基于当前用户的 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。TASK-046 后，Dashboard evaluation 同步返回高风险 Skill 授权指标和非流式 LLM 用量指标；`llm.by_model_route` / `llm.by_stage` 只返回成本最高的前 3 项。
 
 ---
 
@@ -1675,6 +1675,8 @@ Authorization: Bearer <token>
   "avg_cost_per_task": 0.31
 }
 ```
+
+TASK-048 后，该路由已挂载到主 FastAPI 应用。任务总成本、任务数和 `TaskExecution` 模型费用均通过 `Task.user_id` 按当前认证用户隔离，无归属 Task 不参与统计。Bearer Token 和有效 API Key 均可认证；停用 API Key 返回 401。
 
 ---
 

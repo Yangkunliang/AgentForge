@@ -13,8 +13,13 @@
 3. Cost API 双用户隔离
    - 断言 `/api/v1/cost` 已注册并可通过 Bearer Token 访问。
    - Task 总成本、总数和 TaskExecution model_costs 只统计当前用户。
+   - owner/other 两个真实 Token 分别得到各自统计；无 Token 返回 401。
 
-4. 既有回归
+4. API Key 状态
+   - active Key 可访问 Dashboard。
+   - inactive Key 返回 401。
+
+5. 既有回归
    - Agent/Skill 全局统计不变。
    - Evaluation、Skill authorization 和 LLM usage 指标继续按用户隔离。
 

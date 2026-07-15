@@ -27,6 +27,12 @@ ALGORITHM = "HS256"
 
 > **注意**：Cookie Path 为 `/api/v1/auth`（而非精确的 `/api/v1/auth/refresh`），确保浏览器在请求 `/api/v1/auth/refresh` 时能正确携带。SameSite 设为 `Lax`（而非 `Strict`），兼容本地开发环境下的跨域场景。
 
+### 1.4 API Key 状态校验
+
+- `X-API-Key` 只匹配 `active = true` 的 APIKey；已停用 Key 返回 401。
+- API Key 解析出的用户与 JWT 用户走同一租户查询边界，Dashboard、Cost 等私有统计必须继续按 `user_id` 过滤。
+- 当前 `APIKey` 模型尚未持久化 `last_used_at`，认证代码中的使用时间更新不构成可靠审计事实；该字段和迁移作为后续审计增强处理。
+
 ---
 
 ## 2. 限流策略
