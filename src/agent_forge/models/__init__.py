@@ -26,6 +26,7 @@ from .user import User
 from .user_agent_settings import UserAgentSettings
 from .user_memory import UserMemory
 from .webhook import Webhook
+from .workspace import FilePatch, WorkspaceChangeSet
 
 __all__ = [
     "APIKey",
@@ -35,6 +36,7 @@ __all__ = [
     "Conversation",
     "EvalEvent",
     "ExportTask",
+    "FilePatch",
     "Artifact",
     "LLMCredential",
     "LLMModelSetting",
@@ -64,4 +66,5 @@ __all__ = [
     "UserAgentSettings",
     "UserMemory",
     "Webhook",
+    "WorkspaceChangeSet",
 ]

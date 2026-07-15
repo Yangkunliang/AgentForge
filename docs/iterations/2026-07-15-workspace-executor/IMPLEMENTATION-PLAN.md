@@ -10,11 +10,11 @@ Commit: `feat-设计授权工作区执行器迭代`
 
 ## Task 2：模型、迁移与 Preview
 
-- [ ] 红灯覆盖模型持久化、多文件 diff、target_files 和 Mount 边界。
-- [ ] 新增 WorkspaceChangeSet/FilePatch 与 021 migration。
-- [ ] 实现 preview service、序列化和 `POST .../workspace/preview`。
-- [ ] 实现 `GET /workspace-change-sets/{id}` 用户隔离读取。
-- [ ] 定向测试并提交。
+- [x] 红灯覆盖模型持久化、多文件 diff、target_files 和 Mount 边界。
+- [x] 新增 WorkspaceChangeSet/FilePatch 与 021 migration。
+- [x] 实现 preview service、序列化和 `POST .../workspace/preview`。
+- [x] 实现 `GET /workspace-change-sets/{id}` 用户隔离读取。
+- [x] 定向测试并提交。
 
 Commit: `feat-实现工作区Patch预览`
 
@@ -36,4 +36,3 @@ Commit: `feat-实现工作区Patch确认应用`
 - [ ] 推送功能分支，合并并推送 `main`。
 
 Commit: `feat-完成授权工作区执行器迭代`
-

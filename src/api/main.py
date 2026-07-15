@@ -190,7 +190,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # ── 路由挂载 ──────────────────────────────────────────────────
 
-from api.routes import agents, auth, dashboard, evaluation, health, llm, memory, pipeline_catalog, pipeline_runs, projects, sandboxes, sessions, skills, tasks, tools, uploads  # noqa: E402
+from api.routes import (  # noqa: E402
+    agents,
+    auth,
+    dashboard,
+    evaluation,
+    health,
+    llm,
+    memory,
+    pipeline_catalog,
+    pipeline_runs,
+    projects,
+    sandboxes,
+    sessions,
+    skills,
+    tasks,
+    tools,
+    uploads,
+    workspace,
+)
 from agent_forge.api.routes import cost, exports  # noqa: E402
 from agent_forge.api.sse import sse_router  # noqa: E402
 
@@ -207,6 +225,8 @@ app.include_router(sessions.router,    prefix="/api/v1/sessions",  tags=["sessio
 app.include_router(pipeline_runs.session_router, prefix="/api/v1/sessions", tags=["pipeline-runs"])
 app.include_router(pipeline_runs.router, prefix="/api/v1/pipeline-runs", tags=["pipeline-runs"])
 app.include_router(pipeline_catalog.router, prefix="/api/v1/pipeline", tags=["pipeline-catalog"])
+app.include_router(workspace.task_graph_router, prefix="/api/v1/task-graphs", tags=["workspace"])
+app.include_router(workspace.router, prefix="/api/v1/workspace-change-sets", tags=["workspace"])
 app.include_router(projects.router,    prefix="/api/v1/projects",  tags=["projects"])
 app.include_router(projects.artifact_router, prefix="/api/v1/artifacts", tags=["artifacts"])
 app.include_router(llm.router,         prefix="/api/v1",           tags=["llm"])
