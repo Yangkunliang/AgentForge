@@ -51,12 +51,13 @@ class StageExecutionContext:
     description: str
     required_input_artifact_types: tuple[str, ...]
     expected_output_artifact_types: tuple[str, ...]
+    output_contract_key: str | None
     success_criteria: tuple[str, ...]
     missing_input_artifact_types: tuple[str, ...]
     upstream_artifacts: tuple[UpstreamArtifactContext, ...]
 
     def to_context(self) -> dict:
-        return {
+        payload = {
             "project_id": self.project_id,
             "session_id": self.session_id,
             "pipeline_run_id": self.pipeline_run_id,
@@ -71,6 +72,9 @@ class StageExecutionContext:
             "missing_input_artifact_types": list(self.missing_input_artifact_types),
             "upstream_artifacts": [item.to_context() for item in self.upstream_artifacts],
         }
+        if self.output_contract_key:
+            payload["output_contract_key"] = self.output_contract_key
+        return payload
 
 
 async def build_stage_execution_context(
@@ -132,6 +136,7 @@ async def build_stage_execution_context(
         description=stage_definition.description,
         required_input_artifact_types=required_types,
         expected_output_artifact_types=stage_definition.output_artifact_types,
+        output_contract_key=stage_definition.output_contract_key,
         success_criteria=stage_definition.success_criteria,
         missing_input_artifact_types=missing_types,
         upstream_artifacts=upstream_artifacts,

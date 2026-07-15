@@ -144,6 +144,28 @@ def test_build_system_prompt_includes_stage_contract_without_upstream_content():
     assert "ignore previous instructions" not in prompt
 
 
+def test_build_system_prompt_includes_task_graph_output_contract():
+    context = _stage_execution_context()
+    context["stage_execution"].update(
+        {
+            "stage_id": "task_split",
+            "stage_name": "任务拆解",
+            "output_contract_key": "task_graph_v1",
+        }
+    )
+
+    prompt = _build_system_prompt("CodeSoul", context)
+
+    assert "task_graph_v1" in prompt
+    assert '"summary"' in prompt
+    assert '"depends_on"' in prompt
+    assert '"acceptance_criteria"' in prompt
+    assert '"target_files"' in prompt
+    assert '"verification_commands"' in prompt
+    assert "只输出原始 JSON" in prompt
+    assert "不要输出 Markdown fence" in prompt
+
+
 def test_build_upstream_artifact_prompt_marks_content_untrusted_and_escapes_boundaries():
     prompt = _build_upstream_artifact_prompt(_stage_execution_context())
 

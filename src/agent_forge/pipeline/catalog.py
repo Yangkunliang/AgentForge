@@ -33,6 +33,7 @@ class StageDefinition:
     confirmation_gate: str | None = None
     required_input_artifact_types: tuple[str, ...] = ()
     output_artifact_types: tuple[str, ...] = ("report",)
+    output_contract_key: str | None = None
     success_criteria: tuple[str, ...] = ()
     default_agent_selector: str = "planner"
     model_route_key: str = "default"
@@ -109,6 +110,7 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
                 "把需求拆成可执行、可验证、可提交的小任务。",
                 required_input_artifact_types=("prd", "architecture", "api_spec"),
                 output_artifact_types=("report",),
+                output_contract_key="task_graph_v1",
                 success_criteria=(
                     "拆成可独立验证和提交的任务。",
                     "声明依赖、文件范围和测试命令。",
@@ -417,6 +419,7 @@ def stage_definition_to_dict(stage: StageDefinition, order_index: int) -> dict:
         },
         "required_input_artifact_types": list(stage.required_input_artifact_types),
         "output_artifact_types": list(stage.output_artifact_types),
+        "output_contract_key": stage.output_contract_key,
         "success_criteria": list(stage.success_criteria),
         "default_agent_selector": stage.default_agent_selector,
         "model_route_key": stage.model_route_key,

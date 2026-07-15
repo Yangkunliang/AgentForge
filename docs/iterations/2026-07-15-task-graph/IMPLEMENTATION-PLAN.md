@@ -10,10 +10,10 @@ Commit: `feat-设计结构化TaskGraph迭代`
 
 ## Task 2：输出契约与解析器
 
-- [ ] Catalog/StageExecutionContext 暴露 output_contract_key。
-- [ ] Engine 渲染 task_graph_v1 可信输出约束。
-- [ ] 实现 Pydantic spec、JSON parser、DAG/path 校验和 Markdown renderer。
-- [ ] 定向测试并提交。
+- [x] Catalog/StageExecutionContext 暴露 output_contract_key。
+- [x] Engine 渲染 task_graph_v1 可信输出约束。
+- [x] 实现 Pydantic spec、JSON parser、DAG/path 校验和 Markdown renderer。
+- [x] 定向测试并提交。
 
 Commit: `feat-实现TaskGraph输出契约`
 

@@ -48,6 +48,8 @@ if TYPE_CHECKING:
     from agent_forge.llm.provider import LiteLLMProvider, LLMConfig, LLMResponse
     from agent_forge.skills.dispatcher import SkillDispatcher
 
+from agent_forge.pipeline.task_graph import get_output_contract_prompt
+
 logger = logging.getLogger(__name__)
 
 MAX_ROUNDS = 5
@@ -158,6 +160,13 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
             stage_execution.get("expected_output_artifact_types")
         )
         lines.append(f"- 预期输出产物：{', '.join(expected_outputs) if expected_outputs else '未声明'}")
+        output_contract_key = _as_non_empty_str(
+            stage_execution.get("output_contract_key")
+        )
+        if output_contract_key:
+            output_contract_prompt = get_output_contract_prompt(output_contract_key)
+            if output_contract_prompt:
+                lines.append(output_contract_prompt)
         success_criteria = _context_string_list(stage_execution.get("success_criteria"))
         if success_criteria:
             lines.append("- 阶段完成标准：")

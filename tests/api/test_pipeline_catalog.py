@@ -80,6 +80,8 @@ def test_pipeline_catalog_lists_all_intent_stage_definitions(
         "实现后端与自动化测试。",
         "说明改动文件和回归结果。",
     ]
+    assert stage_by_id["task_split"]["output_contract_key"] == "task_graph_v1"
+    assert stage_by_id["analysis"]["output_contract_key"] is None
     assert stage_by_id["testing"]["required_input_artifact_types"] == ["prd", "code"]
     assert all(stage["success_criteria"] for stage in new_feature["stages"])
 
