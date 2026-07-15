@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import json
+import uuid
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.artifacts.service import create_stage_artifact
 from agent_forge.auth.jwt import create_access_token
-from agent_forge.models import AuditLog, User
+from agent_forge.models import AuditLog, Project, User
+from agent_forge.models.session import Session
+from agent_forge.pipeline.service import (
+    create_pipeline_run_for_session,
+    get_pipeline_run_for_user_or_404,
+)
+from agent_forge.pipeline.task_graph import create_task_graph, parse_task_graph_output
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -86,6 +96,131 @@ def test_create_pipeline_run_from_intent_generates_persisted_stage_plan(
     )
     assert get_resp.status_code == 200
     assert get_resp.json()["id"] == run["id"]
+
+
+async def test_get_task_graph_is_user_isolated(
+    async_client: TestClient,
+    fake_user: User,
+    db_session: AsyncSession,
+):
+    project = _create_project(async_client, fake_user)
+    session = _create_project_session(async_client, fake_user, project["id"], "new_feature")
+    run = async_client.post(
+        f"/api/v1/sessions/{session['id']}/pipeline-runs",
+        json={"intent_type": "new_feature"},
+        headers=_auth_headers(fake_user),
+    ).json()
+    owned_run = await get_pipeline_run_for_user_or_404(
+        db_session,
+        run["id"],
+        fake_user.id,
+    )
+    owned_stage = next(
+        stage for stage in owned_run.stages if stage.stage_id == "task_split"
+    )
+    owned_artifact = await create_stage_artifact(
+        db_session,
+        run=owned_run,
+        stage=owned_stage,
+        task_id="task-graph-api",
+        content="# 任务图",
+        artifact_type="report",
+    )
+    owned_graph = await create_task_graph(
+        db_session,
+        run=owned_run,
+        stage=owned_stage,
+        source_artifact=owned_artifact,
+        spec=parse_task_graph_output(
+            json.dumps(
+                {
+                    "summary": "实现支付渠道",
+                    "nodes": [
+                        {
+                            "key": "backend",
+                            "title": "实现后端",
+                            "description": "新增支付接口",
+                            "depends_on": [],
+                            "acceptance_criteria": ["接口测试通过"],
+                            "target_files": ["src/api/routes/payments.py"],
+                            "verification_commands": [
+                                "pytest -q tests/api/test_payments.py"
+                            ],
+                        },
+                        {
+                            "key": "frontend",
+                            "title": "实现前端",
+                            "description": "新增支付页面",
+                            "depends_on": ["backend"],
+                            "acceptance_criteria": ["构建通过"],
+                            "target_files": ["web/src/views/Payments.vue"],
+                            "verification_commands": ["npm run build"],
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+            )
+        ),
+    )
+
+    suffix = uuid.uuid4().hex[:8]
+    foreign_user = User(
+        id=f"foreign-task-graph-user-{suffix}",
+        username=f"foreign-task-graph-{suffix}",
+        email=f"foreign-task-graph-{suffix}@example.com",
+        password_hash="not-used",
+        permissions=["read"],
+    )
+    foreign_project = Project(
+        id=f"foreign-task-graph-project-{suffix}",
+        user_id=foreign_user.id,
+        name="foreign-task-graph",
+        tech_tags=["FastAPI"],
+        status="active",
+    )
+    foreign_session = Session(
+        id=f"foreign-task-graph-session-{suffix}",
+        user_id=foreign_user.id,
+        project_id=foreign_project.id,
+        title="Foreign TaskGraph",
+        intent_type="new_feature",
+    )
+    db_session.add_all([foreign_user, foreign_project, foreign_session])
+    await db_session.flush()
+    foreign_run = await create_pipeline_run_for_session(
+        db_session,
+        foreign_session,
+        "new_feature",
+    )
+    await db_session.commit()
+    no_graph_run = async_client.post(
+        f"/api/v1/sessions/{session['id']}/pipeline-runs",
+        json={"intent_type": "new_feature"},
+        headers=_auth_headers(fake_user),
+    ).json()
+
+    owned_response = async_client.get(
+        f"/api/v1/pipeline-runs/{owned_run.id}/task-graph",
+        headers=_auth_headers(fake_user),
+    )
+    assert owned_response.status_code == 200
+    payload = owned_response.json()
+    assert payload["id"] == owned_graph.id
+    assert payload["pipeline_run_id"] == owned_run.id
+    assert [node["key"] for node in payload["nodes"]] == ["backend", "frontend"]
+    assert payload["nodes"][1]["depends_on"] == ["backend"]
+
+    foreign_response = async_client.get(
+        f"/api/v1/pipeline-runs/{foreign_run.id}/task-graph",
+        headers=_auth_headers(fake_user),
+    )
+    assert foreign_response.status_code == 404
+
+    no_graph_response = async_client.get(
+        f"/api/v1/pipeline-runs/{no_graph_run['id']}/task-graph",
+        headers=_auth_headers(fake_user),
+    )
+    assert no_graph_response.status_code == 404
 
 
 def test_create_pipeline_run_respects_intent_and_stage_overrides(

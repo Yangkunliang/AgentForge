@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import replace
 
@@ -30,6 +31,7 @@ from agent_forge.pipeline.service import (
     create_pipeline_run_for_session,
     get_pipeline_run_for_user_or_404,
 )
+from agent_forge.pipeline.task_graph import TaskGraphOutputError, load_task_graph_for_run
 from agent_forge.security.credentials import encrypt_secret
 from agent_forge.skills.registry import get_skill_registry
 
@@ -47,6 +49,83 @@ class FakeSkillEngine:
             yield "stage output"
 
         return _chunks()
+
+
+class StaticOutputSkillEngine(FakeSkillEngine):
+    def __init__(self, output: str):
+        super().__init__()
+        self.output = output
+
+    async def run(self, **kwargs):
+        self.called = True
+        self.kwargs = kwargs
+
+        async def _chunks():
+            yield self.output
+
+        return _chunks()
+
+
+def _task_graph_output() -> str:
+    return json.dumps(
+        {
+            "summary": "实现通知设置",
+            "nodes": [
+                {
+                    "key": "backend-api",
+                    "title": "新增通知设置 API",
+                    "description": "实现模型、服务和路由",
+                    "depends_on": [],
+                    "acceptance_criteria": ["API 权限和错误响应符合契约"],
+                    "target_files": ["src/api/routes/notifications.py"],
+                    "verification_commands": [
+                        "pytest -q tests/api/test_notifications.py"
+                    ],
+                },
+                {
+                    "key": "frontend-page",
+                    "title": "新增通知设置页面",
+                    "description": "实现表单和错误状态",
+                    "depends_on": ["backend-api"],
+                    "acceptance_criteria": ["保存成功和失败状态可见"],
+                    "target_files": [
+                        "web/src/views/settings/Notifications.vue"
+                    ],
+                    "verification_commands": ["npm run build"],
+                },
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+
+async def _create_task_split_run(db_session: AsyncSession, user_id: str):
+    suffix = uuid.uuid4().hex[:8]
+    project = Project(
+        id=f"task-graph-runtime-project-{suffix}",
+        user_id=user_id,
+        name="task-graph-runtime",
+        tech_tags=["FastAPI", "Vue"],
+        status="active",
+    )
+    session = Session(
+        id=f"task-graph-runtime-session-{suffix}",
+        user_id=user_id,
+        project_id=project.id,
+        title="TaskGraph Runtime",
+        intent_type="new_feature",
+    )
+    db_session.add_all([project, session])
+    await db_session.commit()
+    run = await create_pipeline_run_for_session(db_session, session, "new_feature")
+    task_split = next(stage for stage in run.stages if stage.stage_id == "task_split")
+    for stage in run.stages:
+        if stage.order_index < task_split.order_index:
+            stage.status = "completed"
+    run.status = "planned"
+    run.current_stage_id = task_split.stage_id
+    await db_session.commit()
+    return project, session, run
 
 
 def _tool_def(name: str) -> dict:
@@ -896,6 +975,119 @@ async def test_stage_runtime_marks_stage_failed_when_artifact_persistence_fails(
     stage = next(item for item in refreshed.stages if item.stage_id == "locate")
     assert stage.status == "failed"
     assert refreshed.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_stage_runtime_persists_task_graph_for_task_split(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+):
+    user_id = fake_user.id
+    project, _session, run = await _create_task_split_run(db_session, user_id)
+    project_id = project.id
+    run_id = run.id
+    output = _task_graph_output()
+    runtime = StageRuntime(
+        engine=StaticOutputSkillEngine(output),
+        session_factory=test_session_factory,
+    )
+
+    chunks = []
+    async for chunk in runtime.run_current_stage(
+        task_id="task-graph-runtime",
+        pipeline_run_id=run_id,
+        user_id=user_id,
+        user_message="实现通知设置",
+        conversation_history=[],
+        tools=[],
+        llm=object(),
+        config=object(),
+        sse_publish=lambda _event_type, _data: None,
+        agent_name="CodeSoul",
+        advanced_context={"intent": "new_feature"},
+    ):
+        chunks.append(chunk)
+
+    assert chunks == [output]
+    db_session.expire_all()
+    graph = await load_task_graph_for_run(db_session, run_id=run_id)
+    assert graph is not None
+    assert graph.project_id == project_id
+    assert [node.node_key for node in graph.nodes] == ["backend-api", "frontend-page"]
+    assert [
+        dependency.dependency_node.node_key
+        for dependency in graph.nodes[1].dependencies
+    ] == ["backend-api"]
+
+    artifact = await db_session.scalar(
+        select(Artifact).where(Artifact.pipeline_run_id == run_id)
+    )
+    assert artifact is not None
+    assert artifact.content.startswith("# 任务图：实现通知设置")
+    assert artifact.metadata_json["task_graph_id"] == graph.id
+    assert artifact.metadata_json["output_contract_key"] == "task_graph_v1"
+
+    refreshed = await get_pipeline_run_for_user_or_404(
+        db_session,
+        run_id,
+        user_id,
+    )
+    task_split = next(
+        stage for stage in refreshed.stages if stage.stage_id == "task_split"
+    )
+    assert task_split.status == "completed"
+    assert refreshed.current_stage_id == "ui_prototype"
+
+
+@pytest.mark.asyncio
+async def test_stage_runtime_rejects_invalid_task_graph_without_partial_output(
+    db_session: AsyncSession,
+    test_session_factory,
+    fake_user: User,
+):
+    user_id = fake_user.id
+    _project, _session, run = await _create_task_split_run(db_session, user_id)
+    run_id = run.id
+    runtime = StageRuntime(
+        engine=StaticOutputSkillEngine("not-json"),
+        session_factory=test_session_factory,
+    )
+
+    with pytest.raises(TaskGraphOutputError, match="must be valid JSON"):
+        async for _chunk in runtime.run_current_stage(
+            task_id="task-graph-invalid-runtime",
+            pipeline_run_id=run_id,
+            user_id=user_id,
+            user_message="实现通知设置",
+            conversation_history=[],
+            tools=[],
+            llm=object(),
+            config=object(),
+            sse_publish=lambda _event_type, _data: None,
+            agent_name="CodeSoul",
+            advanced_context={"intent": "new_feature"},
+        ):
+            pass
+
+    db_session.expire_all()
+    refreshed = await get_pipeline_run_for_user_or_404(
+        db_session,
+        run_id,
+        user_id,
+    )
+    task_split = next(
+        stage for stage in refreshed.stages if stage.stage_id == "task_split"
+    )
+    assert task_split.status == "failed"
+    assert refreshed.status == "failed"
+    assert await load_task_graph_for_run(db_session, run_id=run_id) is None
+    assert (
+        await db_session.scalar(
+            select(Artifact).where(Artifact.pipeline_run_id == run_id)
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio

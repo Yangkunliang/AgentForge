@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,11 +22,12 @@ from agent_forge.pipeline.service import (
     get_pipeline_run_for_user_or_404,
     get_session_for_pipeline_or_404,
     pipeline_run_to_dict,
-    restore_stage,
     resolve_stage_confirmation,
+    restore_stage,
     skip_stage,
     start_stage,
 )
+from agent_forge.pipeline.task_graph import load_task_graph_for_run, task_graph_to_dict
 from agent_forge.tracing import get_trace_id
 from middleware.auth import get_current_user
 
@@ -83,6 +84,35 @@ class PipelineRunResponse(BaseModel):
     stages: list[PipelineStageStateResponse]
 
 
+class TaskNodeResponse(BaseModel):
+    id: str
+    key: str
+    title: str
+    description: str
+    order_index: int
+    status: str
+    depends_on: list[str]
+    acceptance_criteria: list[str]
+    target_files: list[str]
+    verification_commands: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class TaskGraphResponse(BaseModel):
+    id: str
+    project_id: str
+    pipeline_run_id: str
+    source_stage_state_id: str | None
+    source_artifact_id: str | None
+    schema_version: int
+    status: str
+    summary: str
+    created_at: datetime
+    updated_at: datetime
+    nodes: list[TaskNodeResponse]
+
+
 class StageConfirmationRequest(BaseModel):
     action: Literal["approve", "revise", "cancel"]
     feedback: str | None = Field(default=None, max_length=2000)
@@ -119,6 +149,19 @@ async def get_pipeline_run(
 ) -> dict:
     run = await get_pipeline_run_for_user_or_404(db, run_id, current_user.id)
     return pipeline_run_to_dict(run)
+
+
+@router.get("/{run_id}/task-graph", response_model=TaskGraphResponse)
+async def get_pipeline_run_task_graph(
+    run_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    await get_pipeline_run_for_user_or_404(db, run_id, current_user.id)
+    task_graph = await load_task_graph_for_run(db, run_id=run_id)
+    if task_graph is None:
+        raise HTTPException(status_code=404, detail="TaskGraph not found")
+    return task_graph_to_dict(task_graph)
 
 
 @router.post("/{run_id}/stages/{stage_id}/skip", response_model=PipelineRunResponse)

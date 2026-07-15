@@ -29,6 +29,12 @@ from agent_forge.pipeline.service import (
     get_pipeline_run_for_user_or_404,
     start_stage,
 )
+from agent_forge.pipeline.task_graph import (
+    TASK_GRAPH_OUTPUT_CONTRACT_KEY,
+    create_task_graph,
+    parse_task_graph_output,
+    render_task_graph_markdown,
+)
 from agent_forge.skills.dispatcher import SkillDispatcher
 from agent_forge.skills.engine import SkillExecutionEngine
 from agent_forge.skills.policy import SkillToolFilterReport, filter_tool_defs_for_runtime
@@ -308,13 +314,19 @@ class StageRuntime:
                     f"Pipeline stage output type not found: {run.intent_type}/{stage_id}"
                 )
 
+            task_graph_spec = None
+            artifact_content = stage_output
+            if stage_definition.output_contract_key == TASK_GRAPH_OUTPUT_CONTRACT_KEY:
+                task_graph_spec = parse_task_graph_output(stage_output)
+                artifact_content = render_task_graph_markdown(task_graph_spec)
+
             complete_stage(run, stage_id)
             artifact = await create_stage_artifact(
                 db,
                 run=run,
                 stage=stage,
                 task_id=task_id,
-                content=stage_output,
+                content=artifact_content,
                 artifact_type=stage_definition.output_artifact_types[0],
                 source_message_id=source_message_id,
                 runtime_metadata=build_stage_runtime_metadata(
@@ -322,6 +334,19 @@ class StageRuntime:
                     skill_policy_key=skill_policy_key,
                 ),
             )
+            if task_graph_spec is not None:
+                task_graph = await create_task_graph(
+                    db,
+                    run=run,
+                    stage=stage,
+                    source_artifact=artifact,
+                    spec=task_graph_spec,
+                )
+                artifact.metadata_json = {
+                    **(artifact.metadata_json or {}),
+                    "task_graph_id": task_graph.id,
+                    "output_contract_key": TASK_GRAPH_OUTPUT_CONTRACT_KEY,
+                }
             artifact_payload = {
                 "project_id": artifact.project_id,
                 "session_id": artifact.session_id,

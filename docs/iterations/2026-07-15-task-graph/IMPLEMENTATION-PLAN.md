@@ -28,10 +28,10 @@ Commit: `feat-持久化结构化TaskGraph`
 
 ## Task 4：Runtime 与 API
 
-- [ ] task_split 完成时先解析再创建 Artifact 和 TaskGraph。
-- [ ] 非法输出进入 failed 且无半成品。
-- [ ] 新增 `/pipeline-runs/{run_id}/task-graph` 用户隔离 API。
-- [ ] 定向测试并提交。
+- [x] task_split 完成时先解析再创建 Artifact 和 TaskGraph。
+- [x] 非法输出进入 failed 且无半成品。
+- [x] 新增 `/pipeline-runs/{run_id}/task-graph` 用户隔离 API。
+- [x] 定向测试并提交。
 
 Commit: `feat-将TaskGraph接入流水线运行时`
 
