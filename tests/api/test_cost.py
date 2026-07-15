@@ -35,6 +35,7 @@ def _cost_task(
         description=f"description-{task_id}",
         status=TaskStatus.COMPLETED,
         priority=1,
+        trace_id=f"trace-{task_id}",
         total_cost_usd=cost,
         created_at=created_at,
     )
@@ -60,9 +61,18 @@ def _task_execution(
 async def test_daily_cost_route_is_registered_and_user_isolated(
     async_client: TestClient,
     db: AsyncSession,
-    fake_user: User,
 ):
+    from api.main import app
+    from middleware.auth import get_current_user
+
     suffix = uuid.uuid4().hex[:8]
+    owner_user = User(
+        id=f"cost-owner-user-{suffix}",
+        username=f"cost-owner-{suffix}",
+        email=f"cost-owner-{suffix}@example.com",
+        password_hash="not-used-in-cost-test",
+        permissions=["read"],
+    )
     other_user = User(
         id=f"cost-other-user-{suffix}",
         username=f"cost-other-{suffix}",
@@ -73,15 +83,15 @@ async def test_daily_cost_route_is_registered_and_user_isolated(
     target_time = datetime(2031, 1, 15, 9, 0, tzinfo=UTC)
     own_first = _cost_task(
         task_id=f"cost-own-first-{suffix}",
-        user_id=fake_user.id,
-        created_by=fake_user.id,
+        user_id=owner_user.id,
+        created_by=owner_user.id,
         cost=1.25,
         created_at=target_time,
     )
     own_second = _cost_task(
         task_id=f"cost-own-second-{suffix}",
-        user_id=fake_user.id,
-        created_by=fake_user.id,
+        user_id=owner_user.id,
+        created_by=owner_user.id,
         cost=0.75,
         created_at=target_time,
     )
@@ -95,13 +105,14 @@ async def test_daily_cost_route_is_registered_and_user_isolated(
     unowned_task = _cost_task(
         task_id=f"cost-unowned-{suffix}",
         user_id=None,
-        created_by=fake_user.id,
+        created_by=owner_user.id,
         cost=77.0,
         created_at=target_time,
     )
     db.add_all(
         [
             other_user,
+            owner_user,
             own_first,
             own_second,
             other_task,
@@ -134,10 +145,15 @@ async def test_daily_cost_route_is_registered_and_user_isolated(
     )
     await db.commit()
 
+    async def _override_current_user() -> User:
+        return owner_user
+
+    app.dependency_overrides[get_current_user] = _override_current_user
+
     response = async_client.get(
         "/api/v1/cost",
         params={"date": "2031-01-15"},
-        headers=_auth_headers(fake_user),
+        headers=_auth_headers(owner_user),
     )
 
     assert response.status_code == 200
