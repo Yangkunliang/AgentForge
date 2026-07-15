@@ -9,4 +9,4 @@
 - [x] 实现 Apply service、GovernancePolicy 和 AuditLog 闭环。
 - [x] 完成定向、全量、lint、migration heads 和 FastAPI 生命周期验证。
 - [x] 同步架构、数据库、API、安全、索引、MEMORY、CLAUDE 和迭代复盘。
-- [ ] 中文提交并推送功能分支，合并并推送 `main`。
+- [x] 中文提交并推送功能分支，合并并推送 `main`。

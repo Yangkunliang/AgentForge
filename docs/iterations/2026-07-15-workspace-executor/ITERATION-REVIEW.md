@@ -37,4 +37,4 @@
 
 - 功能分支：`feature/task-050-workspace-executor`。
 - 完成功能分支验证后推送，并以 fast-forward 方式合并到 `main`。
-- `main` 集成提交和远端一致性在合并后补录。
+- 功能分支最终提交 `6860c40` 已 fast-forward 合并到 `main`；`main` 使用独立中文集成提交补录路线图状态。
