@@ -30,3 +30,9 @@
 - `verification_commands` 当前只保存，不执行；命令白名单、超时、退出码和报告由 TASK-051 VerificationGate 负责。
 - 当前不支持同一 PipelineRun 修订或版本化多个 TaskGraph；若后续允许重新拆解，应新增显式 revision，而不是覆盖历史事实。
 - 现有全量测试 warning 主要来自 Pydantic V2 兼容、pytest 未注册 mark 和异步 mock 基线，本任务未扩大这些告警。
+
+## 集成记录
+
+- 功能分支：`feature/task-049-task-graph`。
+- 功能分支完成后已推送，并以 fast-forward 方式合并到 `main`。
+- TASK-049 在 `main` 上的最终集成记录使用独立中文提交，便于后续路线图追溯。

@@ -41,6 +41,6 @@ Commit: `feat-将TaskGraph接入流水线运行时`
 - [x] 执行生产代码 lint、迁移 heads 和 FastAPI 生命周期验证。
 - [x] 代码评审无阻断问题，并修复用户可见原始 JSON 与 PostgreSQL JSONB 漂移风险。
 - [x] 同步架构、数据库、API、README、MEMORY、CLAUDE 和复盘。
-- [ ] 推送功能分支，合并并推送 `main`。
+- [x] 推送功能分支，合并并推送 `main`。
 
 Commit: `feat-完成结构化TaskGraph迭代`
