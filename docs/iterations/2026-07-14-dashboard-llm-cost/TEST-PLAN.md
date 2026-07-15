@@ -35,3 +35,7 @@ PYTHONPATH=src JWT_SECRET_KEY=test-secret .venv/bin/python -m uvicorn api.main:a
 ```
 
 测试结束后恢复 `test_db.sqlite`，确保提交不包含测试数据。
+
+## 环境豁免
+
+本轮 Playwright 能正确发现 `web/e2e/dashboard.spec.ts` 的两个场景，但 sandbox 禁止 Vite 绑定本地端口，测试未进入浏览器断言。该项按用户批准记录为环境豁免，不视为 E2E 通过；后端全量测试、前端构建和 FastAPI 生命周期验证不受此豁免影响。

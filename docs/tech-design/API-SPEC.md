@@ -1441,6 +1441,32 @@ Authorization: Bearer <token>
           "grant_rate": 0.875
         }
       ]
+    },
+    "llm": {
+      "total_calls": 6,
+      "tokens_used": 4820,
+      "cost_usd": 0.034,
+      "average_latency_ms": 820,
+      "by_model_route": [
+        {
+          "model_route_key": "default",
+          "name": "Default Route",
+          "total_calls": 6,
+          "tokens_used": 4820,
+          "cost_usd": 0.034,
+          "average_latency_ms": 820
+        }
+      ],
+      "by_stage": [
+        {
+          "stage_id": "backend_dev",
+          "name": "后端开发",
+          "total_calls": 3,
+          "tokens_used": 2500,
+          "cost_usd": 0.019,
+          "average_latency_ms": 760
+        }
+      ]
     }
   },
   "recent_tasks": [
@@ -1455,7 +1481,7 @@ Authorization: Bearer <token>
 }
 ```
 
-**说明：** `trend_pct` 为正表示费用较昨日增加，为负表示减少。`evaluation` 基于 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。TASK-042 后，Dashboard evaluation 同步返回高风险 Skill 授权聚合指标，前端用于展示授权请求、授权通过率以及 Skill / permission 排行。
+**说明：** `trend_pct` 为正表示任务费用较昨日增加，为负表示减少。`evaluation` 基于当前用户的 `EvalEvent` 聚合，空数据时返回 0 值，不影响 Dashboard 渲染。TASK-046 后，Dashboard evaluation 同步返回高风险 Skill 授权指标和非流式 LLM 用量指标；`llm.by_model_route` / `llm.by_stage` 只返回成本最高的前 3 项。
 
 ---
 
@@ -1505,6 +1531,26 @@ Authorization: Bearer <token>
     "cost_usd": 0.034,
     "tokens_used": 4820
   },
+  "llm_by_model_route": [
+    {
+      "model_route_key": "default",
+      "name": "Default Route",
+      "total_calls": 6,
+      "tokens_used": 4820,
+      "cost_usd": 0.034,
+      "average_latency_ms": 820
+    }
+  ],
+  "llm_by_stage": [
+    {
+      "stage_id": "backend_dev",
+      "name": "后端开发",
+      "total_calls": 3,
+      "tokens_used": 2500,
+      "cost_usd": 0.019,
+      "average_latency_ms": 760
+    }
+  ],
   "skills": {
     "total": 9,
     "succeeded": 8,
@@ -1589,7 +1635,7 @@ Authorization: Bearer <token>
 
 `skill_authorizations` 只统计 `skill_authorization_required` 和 `skill_authorization_granted` EvalEvent。`by_permission` 从事件 metadata 的 `permissions` 数组聚合；空数据时 `required/granted/grant_rate` 为 0，明细列表为空。
 
-`llm` 统计 `llm_*` EvalEvent。TASK-045 后，SkillExecutionEngine 会在 `tool_use_complete` 成功返回时写入 `llm_tool_use_completed`，metadata 只包含 `call_type`、轮次、可见工具数量、是否产生 tool call 和 tool 名称，不包含 prompt、用户消息、源码正文或凭据。`stream_complete` 的 token / cost usage 仍待后续接入。
+`llm`、`llm_by_model_route` 和 `llm_by_stage` 只统计 `llm_*` EvalEvent。TASK-046 后，StageRuntime 通过规范键 `evaluation_context` 将 Project、PipelineRun、Stage 和非敏感 Stage 名称传给 SkillExecutionEngine；`llm_tool_use_completed` metadata 只包含 `call_type`、轮次、可见工具数量、是否产生 tool call、tool 名称和 Stage 名称，不包含 prompt、用户消息、源码正文或凭据。`stream_complete` 的 token / cost usage 仍待 TASK-047 接入。
 
 ---
 

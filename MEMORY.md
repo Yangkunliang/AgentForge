@@ -23,7 +23,7 @@
 ## 架构蓝图 (docs/architecture/)
 - [AGENT-MODEL.md](docs/architecture/AGENT-MODEL.md) — AgentForge 产品内部的 Agent 定义、类型、能力模型、协作机制
 - [CORE-DEV-WORKFLOW.md](docs/architecture/CORE-DEV-WORKFLOW.md) — 核心开发闭环：Project → Mount → Session → PipelineRun → StageState → Artifact → Delivery；增强阶段按 TASK-020 服务端可信交付、TASK-021 交互复盘、TASK-022 交付扩展设计、TASK-023～TASK-026 实现推进
-- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-045 的架构基线
+- [AI-RUNTIME-CONVERGENCE.md](docs/architecture/AI-RUNTIME-CONVERGENCE.md) — AI Runtime 收敛主线：Project → Intent → Pipeline → Stage → Agent/Profile → Skill Runtime → Artifact → Delivery → Eval Feedback，作为 TASK-028～TASK-046 的架构基线
 
 ## 任务清单 (docs/tasks/)
 - [CHECKLIST.md](docs/tasks/CHECKLIST.md) — 实现任务清单、核心开发闭环覆盖矩阵、TASK-012～TASK-026 路线图
@@ -86,6 +86,7 @@
 - [2026-07-13-dashboard-route-convergence/](docs/iterations/2026-07-13-dashboard-route-convergence/) — TASK-043 Dashboard 路由单一事实源，旧 `agent_forge.api.routes.dashboard` 仅 re-export 真实 `api.routes.dashboard`
 - [2026-07-13-artifact-runtime-provenance/](docs/iterations/2026-07-13-artifact-runtime-provenance/) — TASK-044 Artifact 运行时来源固化，将 StageRuntime 解析的 Agent / ModelRoute / SkillPolicy 写入 `metadata.runtime`
 - [2026-07-14-llm-cost-eval/](docs/iterations/2026-07-14-llm-cost-eval/) — TASK-045 LLM 成本评估事件，将 `tool_use_complete` token / cost / latency 写入 EvalEvent 和 Evaluation summary
+- [2026-07-14-dashboard-llm-cost/](docs/iterations/2026-07-14-dashboard-llm-cost/) — TASK-046 Dashboard LLM 成本与用量，将真实运行时 usage 聚合接入 Dashboard API 和页面
 
 ## 文档体系
 - [docs/README.md](docs/README.md) — 文档目录结构、迭代链条、版本号规范
@@ -124,6 +125,7 @@
 - TASK-043 已完成：Dashboard 运行时逻辑收敛到 `src/api/routes/dashboard.py`，旧 `src/agent_forge/api/routes/dashboard.py` 改为兼容 re-export；测试改为覆盖真实模块，并修正真实 Dashboard inactive Agent 统计。
 - TASK-044 已完成：StageRuntime 创建 Artifact 时会把 AgentProfile、ModelRoute、model name 和 SkillPolicy 写入 `metadata.runtime`，Artifact 详情页展示生成 Agent、模型和路由来源。
 - TASK-045 已完成：SkillExecutionEngine 将 `tool_use_complete` 的 token、cost 和 latency 写入 `llm_tool_use_completed` EvalEvent；Evaluation summary 新增 `llm` 聚合块，Agent / ModelRoute 维度补充 `tokens_used`；`stream_complete` usage 仍作为后续增强。
+- TASK-046 已完成：修复 StageRuntime `evaluation_context` 与 SkillExecutionEngine `eval` 键名错位；Evaluation summary 新增仅统计 `llm_*` 的 ModelRoute / Stage 聚合；Dashboard 展示当前用户 LLM 调用、成本、Token、延迟和前 3 成本排行。浏览器 E2E 因 sandbox 禁止本地端口绑定未执行，已作为环境豁免记录，不视为测试通过。
 
 ---
 

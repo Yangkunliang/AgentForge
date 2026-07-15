@@ -32,25 +32,25 @@
 - Consumes: `EvaluationService.get_summary(db, user_id=...) -> dict[str, Any]`、`advanced_context["evaluation_context"]`。
 - Produces: `summary["llm_by_model_route"]`、`summary["llm_by_stage"]`，以及 `llm_tool_use_completed.metadata.stage_name`。
 
-- [ ] **Step 1: 写 Evaluation 聚合红灯测试**
+- [x] **Step 1: 写 Evaluation 聚合红灯测试**
 
   新增测试数据，包含两个 route、两个 stage、一个非 LLM 事件；断言 `llm_by_model_route` 和 `llm_by_stage` 只统计 LLM 事件，并按成本降序。
 
-- [ ] **Step 2: 运行红灯测试**
+- [x] **Step 2: 运行红灯测试**
 
   Run: `uv run --extra dev pytest -q tests/api/test_evaluation.py -k llm_usage_dimensions`
 
   Expected: FAIL，原因是 summary 尚无 `llm_by_model_route` 或 `llm_by_stage`。
 
-- [ ] **Step 3: 实现最小聚合**
+- [x] **Step 3: 实现最小聚合**
 
   在 `EvaluationService.get_summary()` 中先提取 `llm_events`，复用 `_metric_block(llm_events)`，新增 `_group_llm_by_model_route()` 和 `_group_llm_by_stage()`；每行输出 `total_calls/tokens_used/cost_usd/average_latency_ms`。
 
-- [ ] **Step 4: 补充 stage name 事件测试和实现**
+- [x] **Step 4: 补充 stage name 事件测试和实现**
 
   扩展 SkillExecutionEngine 测试，给 evaluation context 注入 `stage_name` 并断言 metadata；StageRuntime 构造 context 时加入 `stage_name`，Engine 只复制非空字符串。
 
-- [ ] **Step 5: 运行聚合和运行时相关测试**
+- [x] **Step 5: 运行聚合和运行时相关测试**
 
   Run: `uv run --extra dev pytest -q tests/api/test_evaluation.py tests/skills/test_engine_context.py tests/pipeline/test_runtime.py`
 
@@ -66,21 +66,21 @@
 - Consumes: `summary["llm"]`、`summary["llm_by_model_route"]`、`summary["llm_by_stage"]`。
 - Produces: `DashboardResponse.evaluation.llm: LLMUsageStats`。
 
-- [ ] **Step 1: 写 Dashboard API 红灯测试**
+- [x] **Step 1: 写 Dashboard API 红灯测试**
 
   在当前用户项目下写入四个以上 LLM 事件，断言 `_get_evaluation_stats(db, user_id=...)` 返回总览和成本最高的前 3 route/stage。
 
-- [ ] **Step 2: 运行红灯测试**
+- [x] **Step 2: 运行红灯测试**
 
   Run: `uv run --extra dev pytest -q tests/api/test_dashboard.py -k llm_usage`
 
   Expected: FAIL，原因是 `EvaluationStats` 尚无 `llm`。
 
-- [ ] **Step 3: 实现 Pydantic schema 与映射**
+- [x] **Step 3: 实现 Pydantic schema 与映射**
 
   新增 `LLMUsageDimension`、`LLMModelRouteUsage`、`LLMStageUsage`、`LLMUsageStats`，在 `_get_evaluation_stats()` 中映射 summary，并对排行切片 `[:3]`。
 
-- [ ] **Step 4: 运行 Dashboard 回归**
+- [x] **Step 4: 运行 Dashboard 回归**
 
   Run: `uv run --extra dev pytest -q tests/api/test_dashboard.py tests/api/test_evaluation.py`
 
@@ -97,29 +97,33 @@
 - Consumes: `DashboardStats.evaluation.llm`。
 - Produces: “LLM 实际用量”总览、ModelRoute 排行、Stage 排行和零数据状态。
 
-- [ ] **Step 1: 写浏览器红灯测试**
+- [x] **Step 1: 写浏览器红灯测试**
 
   Mock `/api/v1/dashboard`，分别返回完整 LLM 指标和空指标；断言页面标题、四项数值、排行、两个空状态及“任务费用（今日）”。
 
-- [ ] **Step 2: 运行浏览器红灯测试**
+- [ ] **Step 2: 运行浏览器红灯测试（环境阻塞）**
 
   Run: `cd web && npx playwright test e2e/dashboard.spec.ts`
 
   Expected: FAIL，原因是页面尚无“LLM 实际用量”。
 
-- [ ] **Step 3: 实现类型和页面**
+  实际：Playwright 能发现测试，但 sandbox 禁止 Vite 绑定本地端口，测试未进入页面断言。
+
+- [x] **Step 3: 实现类型和页面**
 
   在 `web/src/types/index.ts` 增加 LLM usage 类型；在 Dashboard 使用 0 值 fallback、数字格式化函数、四列稳定指标网格和两列排行，窄屏分别降为两列和单列。
 
-- [ ] **Step 4: 运行 E2E 和构建**
-
-  Run: `cd web && npx playwright test e2e/dashboard.spec.ts`
-
-  Expected: PASS。
+- [x] **Step 4: 运行前端构建**
 
   Run: `cd web && npm run build`
 
   Expected: `vue-tsc` 和 `vite build` 均成功。
+
+- [ ] **Step 5: 运行浏览器 E2E（环境阻塞）**
+
+  Run: `cd web && npx playwright test e2e/dashboard.spec.ts`
+
+  Expected: PASS。当前 sandbox 禁止 Vite 绑定本地端口，已在迭代复盘中记录环境豁免，不视为测试通过。
 
 ### Task 4: 文档、完整验证与集成
 
@@ -134,13 +138,13 @@
 
 **Interfaces:**
 - Consumes: 已验证的 API 与页面行为。
-- Produces: TASK-046 当前事实、验证证据和 TASK-047/048 后续边界。
+- Produces: TASK-046 当前事实、验证证据和后续任务边界。
 
-- [ ] **Step 1: 同步文档和 checklist**
+- [x] **Step 1: 同步文档和 checklist**
 
   更新 API 示例、AI Runtime 当前状态、索引、根上下文和迭代复盘；所有完成项改为 `[x]`。
 
-- [ ] **Step 2: 执行完整验证**
+- [x] **Step 2: 执行后端全量测试和前端构建**
 
   Run: `uv run --extra dev pytest -q`
 
@@ -150,11 +154,7 @@
 
   Expected: 构建成功，允许仓库既有 Sass 和 chunk size 警告。
 
-  Run: `cd web && npx playwright test e2e/dashboard.spec.ts`
-
-  Expected: Dashboard E2E 全部通过。
-
-- [ ] **Step 3: 验证 FastAPI 启动并恢复测试数据库**
+- [x] **Step 3: 验证 FastAPI 生命周期并恢复测试数据库**
 
   Run: `PYTHONPATH=src JWT_SECRET_KEY=test-secret .venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 18147`
 

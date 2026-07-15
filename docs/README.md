@@ -114,6 +114,7 @@ docs/
 | TASK-043 | 2026-07-13 | Dashboard 路由单一事实源 | ✅ 已完成 |
 | TASK-044 | 2026-07-13 | Artifact 运行时来源固化 | ✅ 已完成 |
 | TASK-045 | 2026-07-14 | LLM 成本评估事件 | ✅ 已完成 |
+| TASK-046 | 2026-07-14 | Dashboard LLM 成本与用量 | ✅ 已完成（浏览器 E2E 环境豁免） |
 
 ### TASK-002 详细信息
 - **目录**：`docs/iterations/2026-06-17-architecture-design/`
@@ -322,6 +323,18 @@ docs/
   - [TEST-PLAN.md](iterations/2026-07-14-llm-cost-eval/TEST-PLAN.md)
   - [ITERATION-REVIEW.md](iterations/2026-07-14-llm-cost-eval/ITERATION-REVIEW.md)
 - **核心功能**：SkillExecutionEngine 将 `tool_use_complete` 的 `tokens_used`、`cost_usd`、`latency_ms` 写入 `llm_tool_use_completed` EvalEvent；Evaluation summary 新增 `llm` 聚合块，并在 Agent / ModelRoute 维度累计 `tokens_used`。
+
+### TASK-046 详细信息
+- **目录**：`docs/iterations/2026-07-14-dashboard-llm-cost/`
+- **产物**：
+  - [PRODUCT-REQUIREMENTS.md](iterations/2026-07-14-dashboard-llm-cost/PRODUCT-REQUIREMENTS.md)
+  - [TASK-CHECKLIST.md](iterations/2026-07-14-dashboard-llm-cost/TASK-CHECKLIST.md)
+  - [TECHNICAL-DESIGN.md](iterations/2026-07-14-dashboard-llm-cost/TECHNICAL-DESIGN.md)
+  - [UI-DESIGN.md](iterations/2026-07-14-dashboard-llm-cost/UI-DESIGN.md)
+  - [TEST-PLAN.md](iterations/2026-07-14-dashboard-llm-cost/TEST-PLAN.md)
+  - [IMPLEMENTATION-PLAN.md](iterations/2026-07-14-dashboard-llm-cost/IMPLEMENTATION-PLAN.md)
+  - [ITERATION-REVIEW.md](iterations/2026-07-14-dashboard-llm-cost/ITERATION-REVIEW.md)
+- **核心功能**：Evaluation summary 增加 LLM ModelRoute / Stage 专属聚合；Dashboard 展示当前用户的调用数、累计成本、Token、平均延迟和成本排行；真实 StageRuntime 的 evaluation context 已与 SkillExecutionEngine 契约对齐。
 
 ## 版本号规范
 

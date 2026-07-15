@@ -36,4 +36,4 @@ TASK-045 已将非流式 `tool_use_complete` 的调用次数、token、成本和
 - Dashboard 数据继续按当前登录用户隔离。
 - 页面展示 LLM 调用、累计成本、Token、平均延迟和两类排行。
 - 空数据时数值为 0，排行显示“暂无 LLM 调用记录”，页面不报错。
-- 后端相关测试、后端全量测试、前端构建、Dashboard E2E 和 FastAPI 启动验证通过。
+- 后端相关测试、后端全量测试、前端构建、Dashboard E2E 和 FastAPI 启动验证通过；若执行环境禁止本地端口绑定，必须记录 Dashboard E2E 环境豁免，且不得标记为通过。
