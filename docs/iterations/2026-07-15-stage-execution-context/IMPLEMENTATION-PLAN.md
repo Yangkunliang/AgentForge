@@ -87,7 +87,7 @@
 - Consumes: `PipelineRun`、`PipelineStageState`、`StageDefinition`、`Artifact`。
 - Produces: `build_stage_execution_context(...) -> StageExecutionContext` 和 `.to_context() -> dict`。
 
-- [ ] **Step 1: 写隔离、顺序、缺失和截断红灯测试**
+- [x] **Step 1: 写隔离、顺序、缺失和截断红灯测试**
 
   ```python
   context = await build_stage_execution_context(
@@ -103,13 +103,13 @@
   ]
   ```
 
-- [ ] **Step 2: 运行红灯测试**
+- [x] **Step 2: 运行红灯测试**
 
   Run: `uv run --extra dev pytest -q tests/pipeline/test_execution_context.py`
 
   Expected: ERROR，模块尚不存在。
 
-- [ ] **Step 3: 实现 dataclass、查询、过滤和截断**
+- [x] **Step 3: 实现 dataclass、查询、过滤和截断**
 
   ```python
   stage_by_state_id = {item.id: item for item in run.stages}
@@ -127,7 +127,7 @@
 
   按 `(stage_order, created_at, artifact_id)` 排序后应用 6/4000/12000 预算；`.to_context()` 将 tuple 序列化为 list。
 
-- [ ] **Step 4: 运行加载器测试并提交**
+- [x] **Step 4: 运行加载器测试并提交**
 
   Run: `uv run --extra dev pytest -q tests/pipeline/test_execution_context.py`
 
