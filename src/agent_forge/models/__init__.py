@@ -7,8 +7,8 @@ from .agent_skill import AgentSkill
 from .api_key import APIKey
 from .audit_log import AuditLog
 from .conversation import Conversation
-from .export_task import ExportTask
 from .evaluation import EvalEvent
+from .export_task import ExportTask
 from .llm import LLMCredential, LLMModelSetting, LLMProviderSetting, LLMRoute
 from .memory_entry import MemoryEntry
 from .oauth import OAuthCredential, OAuthState
@@ -21,6 +21,7 @@ from .skill_install import SkillInstall
 from .subtask import SubTask
 from .task import Task, TaskPriority, TaskStatus
 from .task_execution import TaskExecution
+from .task_graph import TaskGraph, TaskNode, TaskNodeDependency
 from .user import User
 from .user_agent_settings import UserAgentSettings
 from .user_memory import UserMemory
@@ -54,6 +55,9 @@ __all__ = [
     "SubTask",
     "Task",
     "TaskExecution",
+    "TaskGraph",
+    "TaskNode",
+    "TaskNodeDependency",
     "TaskPriority",
     "TaskStatus",
     "User",

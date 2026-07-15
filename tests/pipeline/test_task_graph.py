@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.models import Artifact, Project, Session, TaskGraph, User
+from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.pipeline.task_graph import (
+    TaskGraphAlreadyExistsError,
     TaskGraphOutputError,
+    create_task_graph,
+    load_task_graph_for_run,
     parse_task_graph_output,
     render_task_graph_markdown,
+    task_graph_to_dict,
 )
 
 
@@ -116,3 +124,80 @@ def test_parse_task_graph_output_rejects_invalid_graph(payload, message):
 
     with pytest.raises(TaskGraphOutputError, match=message):
         parse_task_graph_output(raw)
+
+
+@pytest.mark.asyncio
+async def test_create_task_graph_persists_nodes_dependencies_and_serializes_keys(
+    db: AsyncSession,
+    fake_user: User,
+):
+    suffix = uuid.uuid4().hex[:8]
+    project = Project(
+        id=f"task-graph-project-{suffix}",
+        user_id=fake_user.id,
+        name="TaskGraph project",
+        tech_tags=["FastAPI", "Vue"],
+        status="active",
+    )
+    session = Session(
+        id=f"task-graph-session-{suffix}",
+        user_id=fake_user.id,
+        project_id=project.id,
+        title="TaskGraph session",
+        intent_type="new_feature",
+    )
+    db.add_all([project, session])
+    await db.commit()
+    run = await create_pipeline_run_for_session(db, session, "new_feature")
+    await db.commit()
+    task_split_stage = next(stage for stage in run.stages if stage.stage_id == "task_split")
+    artifact = Artifact(
+        id=f"task-graph-artifact-{suffix}",
+        project_id=project.id,
+        session_id=session.id,
+        pipeline_run_id=run.id,
+        stage_state_id=task_split_stage.id,
+        artifact_type="report",
+        name="任务拆解.md",
+        content="task graph",
+        file_type="markdown",
+        metadata_json={"stage_id": "task_split"},
+    )
+    db.add(artifact)
+    await db.flush()
+    spec = parse_task_graph_output(json.dumps(_valid_payload()))
+
+    graph = await create_task_graph(
+        db,
+        run=run,
+        stage=task_split_stage,
+        source_artifact=artifact,
+        spec=spec,
+    )
+    await db.commit()
+
+    loaded = await load_task_graph_for_run(db, run_id=run.id)
+    assert isinstance(loaded, TaskGraph)
+    assert loaded.id == graph.id
+    payload = task_graph_to_dict(loaded)
+    assert payload["project_id"] == project.id
+    assert payload["pipeline_run_id"] == run.id
+    assert payload["source_artifact_id"] == artifact.id
+    assert payload["status"] == "ready"
+    assert [node["key"] for node in payload["nodes"]] == [
+        "backend-api",
+        "frontend-page",
+    ]
+    assert payload["nodes"][1]["depends_on"] == ["backend-api"]
+    assert payload["nodes"][1]["acceptance_criteria"] == [
+        "保存成功和失败状态可见"
+    ]
+
+    with pytest.raises(TaskGraphAlreadyExistsError):
+        await create_task_graph(
+            db,
+            run=run,
+            stage=task_split_stage,
+            source_artifact=artifact,
+            spec=spec,
+        )

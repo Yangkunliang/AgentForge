@@ -3,15 +3,32 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from agent_forge.models import (
+    Artifact,
+    PipelineRun,
+    PipelineStageState,
+    TaskGraph,
+    TaskNode,
+    TaskNodeDependency,
+)
 
 TASK_GRAPH_OUTPUT_CONTRACT_KEY = "task_graph_v1"
 
 
 class TaskGraphOutputError(ValueError):
     """Raised when task_split output cannot form a safe TaskGraph."""
+
+
+class TaskGraphAlreadyExistsError(ValueError):
+    """Raised when a PipelineRun already owns a TaskGraph."""
 
 
 class TaskNodeSpec(BaseModel):
@@ -100,6 +117,118 @@ def parse_task_graph_output(raw_output: str) -> TaskGraphSpec:
         return TaskGraphSpec.model_validate(payload)
     except ValidationError as exc:
         raise TaskGraphOutputError(str(exc)) from exc
+
+
+async def create_task_graph(
+    db: AsyncSession,
+    *,
+    run: PipelineRun,
+    stage: PipelineStageState,
+    source_artifact: Artifact,
+    spec: TaskGraphSpec,
+) -> TaskGraph:
+    """Persist a validated graph and its dependency edges in the caller transaction."""
+    existing = await db.scalar(
+        select(TaskGraph.id).where(TaskGraph.pipeline_run_id == run.id)
+    )
+    if existing is not None:
+        raise TaskGraphAlreadyExistsError(
+            f"PipelineRun already has a TaskGraph: {run.id}"
+        )
+
+    graph = TaskGraph(
+        id=str(uuid.uuid4()),
+        project_id=run.project_id,
+        pipeline_run_id=run.id,
+        source_stage_state_id=stage.id,
+        source_artifact_id=source_artifact.id,
+        schema_version=1,
+        status="ready",
+        summary=spec.summary,
+    )
+    db.add(graph)
+
+    node_by_key: dict[str, TaskNode] = {}
+    for order_index, node_spec in enumerate(spec.nodes):
+        node = TaskNode(
+            id=str(uuid.uuid4()),
+            task_graph=graph,
+            node_key=node_spec.key,
+            title=node_spec.title,
+            description=node_spec.description,
+            order_index=order_index,
+            status="pending",
+            acceptance_criteria=list(node_spec.acceptance_criteria),
+            target_files=list(node_spec.target_files),
+            verification_commands=list(node_spec.verification_commands),
+        )
+        db.add(node)
+        node_by_key[node_spec.key] = node
+
+    for node_spec in spec.nodes:
+        node = node_by_key[node_spec.key]
+        for dependency_key in node_spec.depends_on:
+            db.add(
+                TaskNodeDependency(
+                    task_node=node,
+                    dependency_node=node_by_key[dependency_key],
+                )
+            )
+
+    await db.flush()
+    return graph
+
+
+async def load_task_graph_for_run(
+    db: AsyncSession,
+    *,
+    run_id: str,
+) -> TaskGraph | None:
+    result = await db.execute(
+        select(TaskGraph)
+        .where(TaskGraph.pipeline_run_id == run_id)
+        .options(
+            selectinload(TaskGraph.nodes)
+            .selectinload(TaskNode.dependencies)
+            .selectinload(TaskNodeDependency.dependency_node)
+        )
+    )
+    return result.unique().scalar_one_or_none()
+
+
+def task_graph_to_dict(graph: TaskGraph) -> dict:
+    return {
+        "id": graph.id,
+        "project_id": graph.project_id,
+        "pipeline_run_id": graph.pipeline_run_id,
+        "source_stage_state_id": graph.source_stage_state_id,
+        "source_artifact_id": graph.source_artifact_id,
+        "schema_version": graph.schema_version,
+        "status": graph.status,
+        "summary": graph.summary,
+        "created_at": graph.created_at,
+        "updated_at": graph.updated_at,
+        "nodes": [
+            {
+                "id": node.id,
+                "key": node.node_key,
+                "title": node.title,
+                "description": node.description,
+                "order_index": node.order_index,
+                "status": node.status,
+                "depends_on": sorted(
+                    dependency.dependency_node.node_key
+                    for dependency in node.dependencies
+                ),
+                "acceptance_criteria": list(node.acceptance_criteria or []),
+                "target_files": list(node.target_files or []),
+                "verification_commands": list(node.verification_commands or []),
+                "created_at": node.created_at,
+                "updated_at": node.updated_at,
+            }
+            for node in graph.nodes
+        ],
+    }
 
 
 def render_task_graph_markdown(spec: TaskGraphSpec) -> str:

@@ -19,10 +19,10 @@ Commit: `feat-实现TaskGraph输出契约`
 
 ## Task 3：模型、迁移与 Service
 
-- [ ] 新增 TaskGraph、TaskNode、TaskNodeDependency 模型。
-- [ ] 新增 020 migration 和模型导出。
-- [ ] 实现原子 create/load/serialize service。
-- [ ] 定向测试并提交。
+- [x] 新增 TaskGraph、TaskNode、TaskNodeDependency 模型。
+- [x] 新增 020 migration 和模型导出。
+- [x] 实现原子 create/load/serialize service。
+- [x] 定向测试并提交。
 
 Commit: `feat-持久化结构化TaskGraph`
 

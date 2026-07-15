@@ -13,6 +13,7 @@ from .base import Base, TimestampMixin
 if TYPE_CHECKING:
     from .project import Project
     from .session import Session
+    from .task_graph import TaskGraph
 
 
 class PipelineRun(Base, TimestampMixin):
@@ -41,6 +42,12 @@ class PipelineRun(Base, TimestampMixin):
         back_populates="pipeline_run",
         cascade="all, delete-orphan",
         order_by="PipelineStageState.order_index",
+    )
+    task_graph: Mapped[TaskGraph | None] = relationship(
+        "TaskGraph",
+        back_populates="pipeline_run",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
 
     def __repr__(self) -> str:
