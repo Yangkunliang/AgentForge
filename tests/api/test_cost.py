@@ -59,11 +59,11 @@ def _task_execution(
 
 @pytest.mark.asyncio
 async def test_daily_cost_route_is_registered_and_user_isolated(
-    async_client: TestClient,
     db: AsyncSession,
+    test_session_factory,
 ):
+    from agent_forge.database import get_async_session
     from api.main import app
-    from middleware.auth import get_current_user
 
     suffix = uuid.uuid4().hex[:8]
     owner_user = User(
@@ -145,16 +145,27 @@ async def test_daily_cost_route_is_registered_and_user_isolated(
     )
     await db.commit()
 
-    async def _override_current_user() -> User:
-        return owner_user
+    async def _override_get_session():
+        async with test_session_factory() as session:
+            yield session
 
-    app.dependency_overrides[get_current_user] = _override_current_user
-
-    response = async_client.get(
-        "/api/v1/cost",
-        params={"date": "2031-01-15"},
-        headers=_auth_headers(owner_user),
-    )
+    app.dependency_overrides.clear()
+    app.dependency_overrides[get_async_session] = _override_get_session
+    client = TestClient(app, raise_server_exceptions=True)
+    try:
+        assert client.get("/api/v1/cost").status_code == 401
+        response = client.get(
+            "/api/v1/cost",
+            params={"date": "2031-01-15"},
+            headers=_auth_headers(owner_user),
+        )
+        other_response = client.get(
+            "/api/v1/cost",
+            params={"date": "2031-01-15"},
+            headers=_auth_headers(other_user),
+        )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == {
@@ -163,4 +174,12 @@ async def test_daily_cost_route_is_registered_and_user_isolated(
         "model_costs": {"owner-model": 1.0},
         "total_tasks": 2,
         "avg_cost_per_task": 1.0,
+    }
+    assert other_response.status_code == 200
+    assert other_response.json() == {
+        "date": "2031-01-15",
+        "total_cost_usd": 99.0,
+        "model_costs": {"foreign-model": 55.0},
+        "total_tasks": 1,
+        "avg_cost_per_task": 99.0,
     }

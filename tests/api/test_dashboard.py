@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.api.routes import dashboard as legacy_dashboard
+from agent_forge.auth.jwt import create_access_token
 from agent_forge.models.agent import Agent
+from agent_forge.models.api_key import APIKey
 from agent_forge.models.evaluation import EvalEvent
 from agent_forge.models.project import Project
 from agent_forge.models.skill import Skill
@@ -24,7 +28,6 @@ from api.routes.dashboard import (
 )
 from api.routes.dashboard import (
     _get_evaluation_stats,
-    get_dashboard,
 )
 from api.routes.dashboard import (
     _recent_tasks as _get_recent_tasks,
@@ -48,6 +51,10 @@ def _dashboard_user(prefix: str) -> User:
     )
 
 
+def _auth_headers(user: User) -> dict[str, str]:
+    return {"Authorization": f"Bearer {create_access_token({'sub': user.id})}"}
+
+
 def _dashboard_task(
     *,
     task_id: str,
@@ -65,6 +72,7 @@ def _dashboard_task(
         description=f"description-{task_id}",
         status=status,
         priority=1,
+        trace_id=f"trace-{task_id}",
         total_cost_usd=cost,
         created_at=created_at,
     )
@@ -125,7 +133,11 @@ class TestDashboardStats:
     async def test_dashboard_task_stats_cost_and_recent_tasks_are_user_isolated(
         self,
         db: AsyncSession,
+        test_session_factory,
     ):
+        from agent_forge.database import get_async_session
+        from api.main import app
+
         owner = _dashboard_user("dashboard-owner")
         other = _dashboard_user("dashboard-other")
         now = datetime.now(UTC)
@@ -162,7 +174,30 @@ class TestDashboardStats:
         db.add_all([owner, other, own_today, own_yesterday, other_task, unowned_task])
         await db.commit()
 
-        body = await get_dashboard(db=db, current_user=owner)
+        async def _override_get_session():
+            async with test_session_factory() as session:
+                yield session
+
+        app.dependency_overrides.clear()
+        app.dependency_overrides[get_async_session] = _override_get_session
+        client = TestClient(app, raise_server_exceptions=True)
+        try:
+            assert client.get("/api/v1/dashboard").status_code == 401
+            assert client.get("/api/v1/cost").status_code == 401
+            owner_response = client.get(
+                "/api/v1/dashboard",
+                headers=_auth_headers(owner),
+            )
+            other_response = client.get(
+                "/api/v1/dashboard",
+                headers=_auth_headers(other),
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert owner_response.status_code == 200
+        assert other_response.status_code == 200
+        body = owner_response.json()
 
         assert body["tasks"] == {
             "total": 2,
@@ -182,6 +217,74 @@ class TestDashboardStats:
             own_today.id,
             own_yesterday.id,
         ]
+        other_body = other_response.json()
+        assert other_body["tasks"] == {
+            "total": 1,
+            "pending": 0,
+            "processing": 0,
+            "completed": 0,
+            "failed": 1,
+        }
+        assert other_body["cost"]["today_usd"] == 99.0
+        assert [item["task_id"] for item in other_body["recent_tasks"]] == [
+            other_task.id
+        ]
+
+    async def test_inactive_api_key_cannot_read_dashboard(
+        self,
+        db: AsyncSession,
+        test_session_factory,
+    ):
+        from agent_forge.database import get_async_session
+        from api.main import app
+
+        owner = _dashboard_user("dashboard-api-key-owner")
+        active_secret = f"active-dashboard-key-{uuid.uuid4().hex}"
+        inactive_secret = f"inactive-dashboard-key-{uuid.uuid4().hex}"
+        db.add_all(
+            [
+                owner,
+                APIKey(
+                    id=f"active-dashboard-key-{uuid.uuid4().hex[:8]}",
+                    user_id=owner.id,
+                    key_hash=hashlib.sha256(active_secret.encode()).hexdigest(),
+                    name="active dashboard key",
+                    permissions=["read"],
+                    active=True,
+                ),
+                APIKey(
+                    id=f"inactive-dashboard-key-{uuid.uuid4().hex[:8]}",
+                    user_id=owner.id,
+                    key_hash=hashlib.sha256(inactive_secret.encode()).hexdigest(),
+                    name="inactive dashboard key",
+                    permissions=["read"],
+                    active=False,
+                ),
+            ]
+        )
+        await db.commit()
+
+        async def _override_get_session():
+            async with test_session_factory() as session:
+                yield session
+
+        app.dependency_overrides.clear()
+        app.dependency_overrides[get_async_session] = _override_get_session
+        client = TestClient(app, raise_server_exceptions=True)
+        try:
+            active_response = client.get(
+                "/api/v1/dashboard",
+                headers={"X-API-Key": active_secret},
+            )
+            inactive_response = client.get(
+                "/api/v1/dashboard",
+                headers={"X-API-Key": inactive_secret},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert active_response.status_code == 200
+        assert inactive_response.status_code == 401
 
     async def test_get_evaluation_stats(self, db: AsyncSession):
         db.add(

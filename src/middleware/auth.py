@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
@@ -11,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.auth.jwt import decode_token
-from agent_forge.config import settings
 from agent_forge.database import get_async_session
 from agent_forge.models import APIKey, User
 
@@ -49,7 +46,12 @@ async def get_current_user(
         # 简单 hash 比对（生产建议用 hmac）
         import hashlib
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        result = await db.execute(select(APIKey).where(APIKey.key_hash == key_hash))
+        result = await db.execute(
+            select(APIKey).where(
+                APIKey.key_hash == key_hash,
+                APIKey.active.is_(True),
+            )
+        )
         key_obj = result.scalar_one_or_none()
         if key_obj:
             # 更新 last_used_at
