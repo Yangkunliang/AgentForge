@@ -20,10 +20,10 @@ Commit: `feat-实现工作区Patch预览`
 
 ## Task 3：Apply、回滚与治理
 
-- [ ] 红灯覆盖未确认、冲突、成功、幂等、failed 重试和写入异常回滚。
-- [ ] 实现全量基线预检、applying journal、文件写入和正常失败回滚。
-- [ ] 新增 workspace_write GovernanceDecision 和 AuditLog 事件。
-- [ ] 定向测试并提交。
+- [x] 红灯覆盖未确认、冲突、成功、幂等、failed 重试和写入异常回滚。
+- [x] 实现全量基线预检、applying journal、文件写入和正常失败回滚。
+- [x] 新增 workspace_write GovernanceDecision 和 AuditLog 事件。
+- [x] 定向测试并提交。
 
 Commit: `feat-实现工作区Patch确认应用`
 

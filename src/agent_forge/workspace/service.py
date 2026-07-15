@@ -17,6 +17,8 @@ from agent_forge.bridge.files import (
     BridgeAccessError,
     normalize_mount_relative_path,
     read_mount_file,
+    restore_mount_file,
+    write_mount_file,
 )
 from agent_forge.models import (
     Artifact,
@@ -143,16 +145,24 @@ async def load_workspace_change_set_for_user(
     *,
     change_set_id: str,
     user_id: str,
+    for_update: bool = False,
 ) -> WorkspaceChangeSet:
-    result = await db.execute(
+    statement = (
         select(WorkspaceChangeSet)
         .join(Project, WorkspaceChangeSet.project_id == Project.id)
         .where(
             WorkspaceChangeSet.id == change_set_id,
             Project.user_id == user_id,
         )
-        .options(selectinload(WorkspaceChangeSet.patches))
+        .options(
+            selectinload(WorkspaceChangeSet.patches),
+            selectinload(WorkspaceChangeSet.mount),
+            selectinload(WorkspaceChangeSet.task_node),
+        )
     )
+    if for_update:
+        statement = statement.with_for_update(of=WorkspaceChangeSet)
+    result = await db.execute(statement)
     change_set = result.unique().scalar_one_or_none()
     if change_set is None:
         raise WorkspaceExecutionError(
@@ -160,6 +170,172 @@ async def load_workspace_change_set_for_user(
             "WorkspaceChangeSet not found",
             "change_set_not_found",
         )
+    return change_set
+
+
+async def apply_workspace_change_set(
+    db: AsyncSession,
+    *,
+    change_set: WorkspaceChangeSet,
+) -> WorkspaceChangeSet:
+    """Apply a confirmed preview with full preflight and normal-failure rollback."""
+    if change_set.status == "applied":
+        return change_set
+    if change_set.status == "failed":
+        raise WorkspaceExecutionError(
+            409,
+            "Failed WorkspaceChangeSet must be previewed again",
+            "change_set_failed",
+            change_set.apply_report_json,
+        )
+    if change_set.status != "previewed":
+        raise WorkspaceExecutionError(
+            409,
+            f"WorkspaceChangeSet cannot be applied from status {change_set.status}",
+            "change_set_not_ready",
+            change_set.apply_report_json,
+        )
+
+    patches = sorted(change_set.patches, key=lambda patch: patch.target_path)
+    mount = change_set.mount
+    originals: dict[str, str | None] = {}
+    conflicts: list[dict] = []
+    for patch in patches:
+        content, fingerprint = _read_baseline(mount, patch.target_path)
+        originals[patch.target_path] = content if fingerprint["exists"] else None
+        if not _baseline_matches(patch, fingerprint):
+            conflicts.append(
+                {
+                    "path": patch.target_path,
+                    "expected": _patch_fingerprint(patch),
+                    "actual": fingerprint,
+                }
+            )
+
+    started_at = datetime.now(UTC)
+    if conflicts:
+        conflict_paths = {item["path"] for item in conflicts}
+        for patch in patches:
+            patch.status = "conflict" if patch.target_path in conflict_paths else "not_applied"
+        report = {
+            "status": "failed",
+            "phase": "consistency_check",
+            "error_code": "baseline_changed",
+            "error_message": "Workspace target changed since preview",
+            "conflicts": conflicts,
+            "rollback": {
+                "attempted": False,
+                "succeeded": True,
+                "paths": [],
+                "errors": [],
+            },
+            "started_at": started_at.isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
+        }
+        change_set.status = "failed"
+        change_set.apply_report_json = report
+        await db.flush()
+        raise WorkspaceExecutionError(
+            409,
+            "Workspace target changed since preview",
+            "baseline_changed",
+            report,
+        )
+
+    change_set.status = "applying"
+    change_set.apply_report_json = {
+        "status": "applying",
+        "phase": "apply",
+        "started_at": started_at.isoformat(),
+    }
+    await db.commit()
+
+    attempted: list[tuple[FilePatch, str | None]] = []
+    file_reports: list[dict] = []
+    try:
+        for patch in patches:
+            if not patch.has_changes:
+                patch.status = "unchanged"
+                file_reports.append(
+                    {
+                        "path": patch.target_path,
+                        "status": "unchanged",
+                        "created": False,
+                        "backup_path": None,
+                        "bytes_written": 0,
+                    }
+                )
+                continue
+
+            _ensure_baseline_unchanged(mount, patch)
+            attempted.append((patch, originals[patch.target_path]))
+            write_report = write_mount_file(
+                mount,
+                patch.target_path,
+                patch.proposed_content,
+            )
+            patch.status = "applied"
+            file_reports.append(
+                {
+                    "path": patch.target_path,
+                    "status": "applied",
+                    "created": write_report["created"],
+                    "backup_path": write_report["backup_path"],
+                    "bytes_written": write_report["bytes_written"],
+                }
+            )
+    except Exception as exc:
+        error = _normalize_apply_error(exc)
+        rollback = _rollback_attempted_files(mount, attempted)
+        rolled_back_paths = set(rollback["paths"])
+        for patch in patches:
+            if patch.target_path in rolled_back_paths:
+                patch.status = "rolled_back" if rollback["succeeded"] else "rollback_failed"
+            elif patch.status not in {"unchanged"}:
+                patch.status = "not_applied"
+        report = {
+            "status": "failed",
+            "phase": "apply",
+            "error_code": error.error_code,
+            "error_message": error.detail,
+            "file_count": len(patches),
+            "changed_count": sum(patch.has_changes for patch in patches),
+            "files": file_reports,
+            "rollback": rollback,
+            "started_at": started_at.isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
+        }
+        change_set.status = "failed"
+        change_set.apply_report_json = report
+        await db.flush()
+        raise WorkspaceExecutionError(
+            error.status_code,
+            error.detail,
+            error.error_code,
+            report,
+        ) from exc
+
+    completed_at = datetime.now(UTC)
+    report = {
+        "status": "applied",
+        "phase": "apply",
+        "file_count": len(patches),
+        "changed_count": sum(patch.has_changes for patch in patches),
+        "total_bytes_written": sum(item["bytes_written"] for item in file_reports),
+        "files": file_reports,
+        "rollback": {
+            "attempted": False,
+            "succeeded": True,
+            "paths": [],
+            "errors": [],
+        },
+        "started_at": started_at.isoformat(),
+        "completed_at": completed_at.isoformat(),
+    }
+    change_set.status = "applied"
+    change_set.applied_at = completed_at
+    change_set.apply_report_json = report
+    await db.flush()
     return change_set
 
 
@@ -363,6 +539,68 @@ def _unified_diff(
 
 def _sha256(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _patch_fingerprint(patch: FilePatch) -> dict:
+    return {
+        "exists": patch.base_exists,
+        "size": patch.base_size,
+        "sha256": patch.base_sha256,
+    }
+
+
+def _baseline_matches(patch: FilePatch, fingerprint: dict) -> bool:
+    return (
+        patch.base_exists == fingerprint["exists"]
+        and patch.base_sha256 == fingerprint["sha256"]
+    )
+
+
+def _ensure_baseline_unchanged(mount: ProjectMount, patch: FilePatch) -> None:
+    _content, fingerprint = _read_baseline(mount, patch.target_path)
+    if not _baseline_matches(patch, fingerprint):
+        raise WorkspaceExecutionError(
+            409,
+            f"Workspace target changed during apply: {patch.target_path}",
+            "baseline_changed",
+            {
+                "path": patch.target_path,
+                "expected": _patch_fingerprint(patch),
+                "actual": fingerprint,
+            },
+        )
+
+
+def _rollback_attempted_files(
+    mount: ProjectMount,
+    attempted: list[tuple[FilePatch, str | None]],
+) -> dict:
+    paths: list[str] = []
+    errors: list[dict] = []
+    for patch, original_content in reversed(attempted):
+        paths.append(patch.target_path)
+        try:
+            restore_mount_file(mount, patch.target_path, original_content)
+        except Exception as exc:
+            errors.append({"path": patch.target_path, "error": str(exc)[:500]})
+    return {
+        "attempted": bool(attempted),
+        "succeeded": not errors,
+        "paths": paths,
+        "errors": errors,
+    }
+
+
+def _normalize_apply_error(exc: Exception) -> WorkspaceExecutionError:
+    if isinstance(exc, WorkspaceExecutionError):
+        return exc
+    if isinstance(exc, BridgeAccessError):
+        return _workspace_error_from_bridge(exc)
+    return WorkspaceExecutionError(
+        500,
+        "Workspace apply failed unexpectedly",
+        "write_failed",
+    )
 
 
 def _as_utc(value: datetime | None) -> datetime | None:

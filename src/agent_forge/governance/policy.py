@@ -112,6 +112,38 @@ class GovernancePolicy:
             metadata={"channel": channel},
         )
 
+    def evaluate_workspace_confirmation(
+        self,
+        *,
+        change_set_id: str,
+        mount_id: str,
+        target_paths: list[str],
+        confirmed: bool,
+    ) -> GovernanceDecision:
+        impact_scope = [
+            _scope("workspace_change_set", change_set_id, change_set_id),
+            _scope("mount", mount_id, mount_id),
+            *(_scope("path", path, path) for path in target_paths),
+        ]
+        if confirmed:
+            return GovernanceDecision(
+                decision="allow",
+                reason="用户已确认工作区文件变更。",
+                risk_level="high",
+                confirmation_type="workspace_write",
+                impact_scope=impact_scope,
+                metadata={"channel": "workspace"},
+            )
+        return GovernanceDecision(
+            decision="require_confirmation",
+            reason="应用工作区文件变更前需要用户确认影响范围。",
+            risk_level="high",
+            confirmation_type="workspace_write",
+            reason_code="missing_confirmation",
+            impact_scope=impact_scope,
+            metadata={"channel": "workspace"},
+        )
+
     def evaluate_skill_call(
         self,
         *,

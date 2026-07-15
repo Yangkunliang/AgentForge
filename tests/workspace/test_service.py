@@ -4,20 +4,26 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.bridge.files import BridgeAccessError
 from agent_forge.models import Project, ProjectMount, TaskGraph, TaskNode, User, WorkspaceChangeSet
 from agent_forge.models.session import Session
 from agent_forge.pipeline.service import create_pipeline_run_for_session
 from agent_forge.workspace import (
     FileProposal,
     WorkspaceExecutionError,
+    apply_workspace_change_set,
     create_workspace_preview,
+    load_workspace_change_set_for_user,
     workspace_change_set_to_dict,
 )
+from agent_forge.workspace import service as workspace_service
 
 
 async def _seed_workspace_node(
@@ -279,3 +285,172 @@ async def test_preview_rejects_non_writable_mount(
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.error_code == "mount_not_writable"
+
+
+@pytest.mark.asyncio
+async def test_apply_writes_all_changed_files_and_is_idempotent(
+    db: AsyncSession,
+    fake_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    root = tmp_path / "workspace"
+    (root / "src").mkdir(parents=True)
+    existing = root / "src" / "api.py"
+    existing.write_text("print('old')\n", encoding="utf-8")
+    graph, node, mount = await _seed_workspace_node(db, fake_user, root)
+    change_set = await create_workspace_preview(
+        db,
+        user_id=fake_user.id,
+        graph_id=graph.id,
+        node_key=node.node_key,
+        mount_id=mount.id,
+        proposals=[
+            FileProposal(path="src/api.py", content="print('new')\n"),
+            FileProposal(path="src/new_file.py", content="ENABLED = True\n"),
+        ],
+    )
+    await db.commit()
+
+    applied = await apply_workspace_change_set(db, change_set=change_set)
+    await db.commit()
+
+    payload = workspace_change_set_to_dict(applied)
+    assert payload["status"] == "applied"
+    assert [patch["status"] for patch in payload["patches"]] == [
+        "applied",
+        "applied",
+    ]
+    assert payload["apply_report"]["status"] == "applied"
+    assert payload["apply_report"]["file_count"] == 2
+    assert payload["apply_report"]["changed_count"] == 2
+    assert "proposed_content" not in str(payload["apply_report"])
+    assert existing.read_text(encoding="utf-8") == "print('new')\n"
+    assert (root / "src" / "new_file.py").read_text(encoding="utf-8") == (
+        "ENABLED = True\n"
+    )
+
+    def _unexpected_write(*_args, **_kwargs):
+        raise AssertionError("idempotent apply must not write files")
+
+    monkeypatch.setattr(workspace_service, "write_mount_file", _unexpected_write)
+    retried = await apply_workspace_change_set(db, change_set=applied)
+    assert retried.apply_report_json == applied.apply_report_json
+
+
+@pytest.mark.asyncio
+async def test_apply_loader_locks_only_the_change_set_row():
+    db = AsyncMock(spec=AsyncSession)
+    result = MagicMock()
+    expected = MagicMock(spec=WorkspaceChangeSet)
+    result.unique.return_value.scalar_one_or_none.return_value = expected
+    db.execute.return_value = result
+
+    loaded = await load_workspace_change_set_for_user(
+        db,
+        change_set_id="change-set-1",
+        user_id="user-1",
+        for_update=True,
+    )
+
+    statement = db.execute.await_args.args[0]
+    sql = str(statement.compile(dialect=postgresql.dialect()))
+    assert "FOR UPDATE OF workspace_change_sets" in sql
+    assert loaded is expected
+
+
+@pytest.mark.asyncio
+async def test_apply_rechecks_all_baselines_before_writing(
+    db: AsyncSession,
+    fake_user: User,
+    tmp_path: Path,
+):
+    root = tmp_path / "workspace"
+    (root / "src").mkdir(parents=True)
+    existing = root / "src" / "api.py"
+    existing.write_text("print('old')\n", encoding="utf-8")
+    graph, node, mount = await _seed_workspace_node(db, fake_user, root)
+    change_set = await create_workspace_preview(
+        db,
+        user_id=fake_user.id,
+        graph_id=graph.id,
+        node_key=node.node_key,
+        mount_id=mount.id,
+        proposals=[
+            FileProposal(path="src/api.py", content="print('new')\n"),
+            FileProposal(path="src/new_file.py", content="ENABLED = True\n"),
+        ],
+    )
+    await db.commit()
+    external = root / "src" / "new_file.py"
+    external.write_text("EXTERNAL = True\n", encoding="utf-8")
+
+    with pytest.raises(
+        WorkspaceExecutionError,
+        match="changed since preview",
+    ) as exc_info:
+        await apply_workspace_change_set(db, change_set=change_set)
+    await db.commit()
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.error_code == "baseline_changed"
+    assert existing.read_text(encoding="utf-8") == "print('old')\n"
+    assert external.read_text(encoding="utf-8") == "EXTERNAL = True\n"
+    assert change_set.status == "failed"
+    assert change_set.apply_report_json["phase"] == "consistency_check"
+
+
+@pytest.mark.asyncio
+async def test_apply_rolls_back_files_written_before_failure(
+    db: AsyncSession,
+    fake_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    root = tmp_path / "workspace"
+    (root / "src").mkdir(parents=True)
+    existing = root / "src" / "api.py"
+    existing.write_text("print('old')\n", encoding="utf-8")
+    graph, node, mount = await _seed_workspace_node(db, fake_user, root)
+    change_set = await create_workspace_preview(
+        db,
+        user_id=fake_user.id,
+        graph_id=graph.id,
+        node_key=node.node_key,
+        mount_id=mount.id,
+        proposals=[
+            FileProposal(path="src/api.py", content="print('new')\n"),
+            FileProposal(path="src/new_file.py", content="ENABLED = True\n"),
+        ],
+    )
+    await db.commit()
+    real_write = workspace_service.write_mount_file
+    write_count = 0
+
+    def _fail_second_write(mount, path, content):
+        nonlocal write_count
+        write_count += 1
+        if write_count == 2:
+            raise BridgeAccessError(500, "simulated second write failure")
+        return real_write(mount, path, content)
+
+    monkeypatch.setattr(workspace_service, "write_mount_file", _fail_second_write)
+
+    with pytest.raises(WorkspaceExecutionError, match="simulated") as exc_info:
+        await apply_workspace_change_set(db, change_set=change_set)
+    await db.commit()
+
+    assert exc_info.value.error_code == "bridge_access_error"
+    assert existing.read_text(encoding="utf-8") == "print('old')\n"
+    assert not (root / "src" / "new_file.py").exists()
+    assert change_set.status == "failed"
+    assert change_set.apply_report_json["rollback"] == {
+        "attempted": True,
+        "succeeded": True,
+        "paths": ["src/new_file.py", "src/api.py"],
+        "errors": [],
+    }
+
+    with pytest.raises(WorkspaceExecutionError) as retry_error:
+        await apply_workspace_change_set(db, change_set=change_set)
+    assert retry_error.value.error_code == "change_set_failed"

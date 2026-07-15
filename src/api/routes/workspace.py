@@ -10,11 +10,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.database import get_async_session
+from agent_forge.governance import GovernancePolicy
 from agent_forge.models import AuditLog, User
 from agent_forge.tracing import get_trace_id
 from agent_forge.workspace import (
     FileProposal,
     WorkspaceExecutionError,
+    apply_workspace_change_set,
     create_workspace_preview,
     load_workspace_change_set_for_user,
     workspace_change_set_to_dict,
@@ -34,6 +36,10 @@ class WorkspacePreviewRequest(BaseModel):
     mount_id: str = Field(..., min_length=1, max_length=50)
     source_artifact_id: str | None = Field(default=None, max_length=50)
     files: list[FileProposalRequest] = Field(..., min_length=1, max_length=50)
+
+
+class WorkspaceApplyRequest(BaseModel):
+    confirm_write: bool = False
 
 
 class BaseFingerprintResponse(BaseModel):
@@ -147,6 +153,104 @@ async def get_workspace_change_set(
     return workspace_change_set_to_dict(change_set)
 
 
+@router.post("/{change_set_id}/apply", response_model=WorkspaceChangeSetResponse)
+async def apply_workspace_change_set_api(
+    change_set_id: str,
+    body: WorkspaceApplyRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    try:
+        change_set = await load_workspace_change_set_for_user(
+            db,
+            change_set_id=change_set_id,
+            user_id=current_user.id,
+            for_update=True,
+        )
+    except WorkspaceExecutionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    governance = GovernancePolicy().evaluate_workspace_confirmation(
+        change_set_id=change_set.id,
+        mount_id=change_set.mount_id,
+        target_paths=[patch.target_path for patch in change_set.patches],
+        confirmed=body.confirm_write,
+    )
+    if not governance.allowed:
+        _add_workspace_audit(
+            db,
+            action="workspace.apply.denied",
+            status_value="denied",
+            user_id=current_user.id,
+            change_set_id=change_set.id,
+            graph_id=change_set.task_graph_id,
+            node_key=change_set.task_node.node_key,
+            mount_id=change_set.mount_id,
+            details={
+                "reason": "missing_confirmation",
+                "governance_decision": governance.audit_payload(),
+                "target_paths": [patch.target_path for patch in change_set.patches],
+            },
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=409,
+            detail="Write confirmation is required before workspace apply",
+        )
+
+    was_applied = change_set.status == "applied"
+    try:
+        change_set = await apply_workspace_change_set(db, change_set=change_set)
+    except WorkspaceExecutionError as exc:
+        action = (
+            "workspace.apply.conflict"
+            if exc.error_code == "baseline_changed"
+            else "workspace.apply.failed"
+        )
+        _add_workspace_audit(
+            db,
+            action=action,
+            status_value="failed",
+            user_id=current_user.id,
+            change_set_id=change_set.id,
+            graph_id=change_set.task_graph_id,
+            node_key=change_set.task_node.node_key,
+            mount_id=change_set.mount_id,
+            details={
+                "error_code": exc.error_code,
+                "error_message": exc.detail,
+                "report": exc.report,
+            },
+        )
+        await db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    report = change_set.apply_report_json or {}
+    _add_workspace_audit(
+        db,
+        action=(
+            "workspace.apply.idempotent"
+            if was_applied
+            else "workspace.apply.succeeded"
+        ),
+        status_value="success",
+        user_id=current_user.id,
+        change_set_id=change_set.id,
+        graph_id=change_set.task_graph_id,
+        node_key=change_set.task_node.node_key,
+        mount_id=change_set.mount_id,
+        details={
+            "file_count": report.get("file_count", 0),
+            "changed_count": report.get("changed_count", 0),
+            "total_bytes_written": report.get("total_bytes_written", 0),
+            "target_paths": [patch.target_path for patch in change_set.patches],
+            "governance_decision": governance.audit_payload(),
+        },
+    )
+    await db.commit()
+    return workspace_change_set_to_dict(change_set)
+
+
 def _add_workspace_audit(
     db: AsyncSession,
     *,
@@ -177,4 +281,3 @@ def _add_workspace_audit(
             },
         )
     )
-

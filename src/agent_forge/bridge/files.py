@@ -268,6 +268,34 @@ def write_mount_file(mount: ProjectMount, relative_path: str, content: str) -> d
     }
 
 
+def restore_mount_file(
+    mount: ProjectMount,
+    relative_path: str,
+    original_content: str | None,
+) -> dict[str, Any]:
+    """Restore an attempted workspace write without creating another backup."""
+    if mount.mount_type != "local":
+        raise BridgeAccessError(400, "Only local mounts support file restore")
+    root = root_path_for_mount(mount)
+    target = _resolve_under_root(
+        root,
+        relative_path,
+        allow_root=False,
+        operation_label="restored",
+    )
+    if target.exists() and not target.is_file():
+        raise BridgeAccessError(400, "Path must be a file")
+
+    if original_content is None:
+        if target.exists():
+            target.unlink()
+        return {"path": target.relative_to(root).as_posix(), "restored": True, "removed": True}
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(original_content, encoding="utf-8")
+    return {"path": target.relative_to(root).as_posix(), "restored": True, "removed": False}
+
+
 def list_upload_mount_files(mount: ProjectMount, relative_path: str = "") -> dict[str, Any]:
     """List virtual files/directories from an upload mount manifest."""
     current_path = _normalize_upload_path(relative_path, allow_root=True)
@@ -331,7 +359,14 @@ def read_upload_mount_file(
     """Read UTF-8 text content from an uploaded manifest file."""
     normalized_path = _normalize_upload_path(relative_path)
     manifest = _upload_manifest(mount)
-    item = next((entry for entry in manifest if _normalize_upload_path(str(entry.get("path") or "")) == normalized_path), None)
+    item = next(
+        (
+            entry
+            for entry in manifest
+            if _normalize_upload_path(str(entry.get("path") or "")) == normalized_path
+        ),
+        None,
+    )
     if item is None:
         raise BridgeAccessError(404, "Path not found")
 

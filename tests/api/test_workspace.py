@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_forge.auth.jwt import create_access_token
-from agent_forge.models import Project, ProjectMount, TaskGraph, TaskNode, User
+from agent_forge.models import AuditLog, Project, ProjectMount, TaskGraph, TaskNode, User
 from agent_forge.models.session import Session
 from agent_forge.pipeline.service import create_pipeline_run_for_session
+from api.routes import workspace as workspace_routes
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -157,3 +161,75 @@ async def test_workspace_preview_and_get_are_user_isolated(
         headers=_auth_headers(fake_user),
     )
     assert foreign_preview_response.status_code == 404
+
+
+async def test_workspace_apply_requires_confirmation_and_writes_audit(
+    async_client: TestClient,
+    db_session: AsyncSession,
+    fake_user: User,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    root = tmp_path / "workspace-apply"
+    (root / "src").mkdir(parents=True)
+    target = root / "src" / "api.py"
+    target.write_text("print('old')\n", encoding="utf-8")
+    graph, node, mount = await _seed_api_node(db_session, fake_user, root)
+    preview = async_client.post(
+        f"/api/v1/task-graphs/{graph.id}/nodes/{node.node_key}/workspace/preview",
+        json={
+            "mount_id": mount.id,
+            "files": [{"path": "src/api.py", "content": "print('new-secret')\n"}],
+        },
+        headers=_auth_headers(fake_user),
+    ).json()
+    lock_requests: list[bool] = []
+    real_loader = workspace_routes.load_workspace_change_set_for_user
+
+    async def _record_lock_request(*args, **kwargs):
+        lock_requests.append(kwargs.get("for_update", False))
+        return await real_loader(*args, **kwargs)
+
+    monkeypatch.setattr(
+        workspace_routes,
+        "load_workspace_change_set_for_user",
+        _record_lock_request,
+    )
+
+    denied_response = async_client.post(
+        f"/api/v1/workspace-change-sets/{preview['id']}/apply",
+        json={"confirm_write": False},
+        headers=_auth_headers(fake_user),
+    )
+    assert denied_response.status_code == 409
+    assert target.read_text(encoding="utf-8") == "print('old')\n"
+
+    apply_response = async_client.post(
+        f"/api/v1/workspace-change-sets/{preview['id']}/apply",
+        json={"confirm_write": True},
+        headers=_auth_headers(fake_user),
+    )
+    assert apply_response.status_code == 200
+    applied = apply_response.json()
+    assert applied["status"] == "applied"
+    assert applied["apply_report"]["status"] == "applied"
+    assert target.read_text(encoding="utf-8") == "print('new-secret')\n"
+    assert lock_requests == [True, True]
+
+    audit_result = await db_session.execute(
+        select(AuditLog)
+        .where(AuditLog.resource == "workspace_change_set")
+        .where(AuditLog.details["change_set_id"].as_string() == preview["id"])
+        .order_by(AuditLog.created_at.asc())
+    )
+    audits = audit_result.scalars().all()
+    assert [audit.action for audit in audits] == [
+        "workspace.preview.succeeded",
+        "workspace.apply.denied",
+        "workspace.apply.succeeded",
+    ]
+    assert audits[1].details["governance_decision"]["confirmation_type"] == (
+        "workspace_write"
+    )
+    audit_text = json.dumps([audit.details for audit in audits], ensure_ascii=False)
+    assert "new-secret" not in audit_text
