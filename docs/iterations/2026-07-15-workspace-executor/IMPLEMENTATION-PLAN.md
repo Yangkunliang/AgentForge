@@ -29,10 +29,10 @@ Commit: `feat-实现工作区Patch确认应用`
 
 ## Task 4：验证、文档与集成
 
-- [ ] 执行定向和后端全量测试。
-- [ ] 执行生产代码 lint、migration heads 和 FastAPI 生命周期验证。
-- [ ] 代码评审无阻断问题。
-- [ ] 同步架构、数据库、API、安全、README、MEMORY、CLAUDE 和复盘。
+- [x] 执行定向和后端全量测试。
+- [x] 执行生产代码 lint、migration heads 和 FastAPI 生命周期验证。
+- [x] 代码评审无阻断问题。
+- [x] 同步架构、数据库、API、安全、README、MEMORY、CLAUDE 和复盘。
 - [ ] 推送功能分支，合并并推送 `main`。
 
 Commit: `feat-完成授权工作区执行器迭代`

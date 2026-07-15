@@ -1,20 +1,20 @@
 # AI Runtime 收敛架构
 
-本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-049 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测、StageExecutionContext、私有统计多租户隔离和结构化 TaskGraph 已进入真实运行时。TASK-050～TASK-053 在此基线上继续补齐授权工作区执行、真实测试门禁、统一编排和全链路验收。
+本文档定义 AgentForge 长期 AI 架构的主线、当前实现基线、目标运行时契约和迁移任务边界。它是 TASK-027 的产物，并在 TASK-034 后成为 AI Runtime 当前推荐阅读入口；TASK-050 后，Stage 级 SkillPolicy、Artifact provenance、Eval Feedback、Dashboard 成本观测、StageExecutionContext、私有统计多租户隔离、结构化 TaskGraph 和授权 WorkspaceExecutor 已进入真实运行时。TASK-051～TASK-053 在此基线上继续补齐真实测试门禁、统一编排和全链路验收。
 
 ## 1. 定位
 
 AgentForge 的长期形态不是“多 Agent 聊天页”，而是面向全栈开发工程师的项目级 AI 开发操作系统：
 
 ```text
-Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> TaskGraph/Artifact -> Delivery -> Eval Feedback
+Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> TaskGraph -> WorkspaceChangeSet/Artifact -> Delivery -> Eval Feedback
 ```
 
 这条链路的核心价值是：用稳定的软件工程对象包住不稳定的 AI 行为，让每次执行都能被规划、观察、确认、交付和复盘。
 
 ## 2. 当前真实链路
 
-截至 TASK-049，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、TaskGraph、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；Dashboard Task/Cost/RecentTask 与独立 Cost API 已按当前用户隔离，高风险授权和 LLM 成本可按当前账号观察。
+截至 TASK-050，代码里的主链路已经具备 Project-first 基础，并已把 Pipeline 阶段定义、StageExecutionContext、AgentProfile、ModelRoute、内置/第三方 Skill Runtime、MCP RuntimeSpec、StageSkillPolicy、GovernanceDecision、TaskGraph、WorkspaceChangeSet、Artifact provenance 和 EvalFeedback 接入统一 AI Runtime Contract；Dashboard Task/Cost/RecentTask 与独立 Cost API 已按当前用户隔离，高风险授权和 LLM 成本可按当前账号观察。
 
 ### 2.1 请求到执行
 
@@ -684,7 +684,7 @@ StageExecutionContext
   -> Full-chain E2E
 ```
 
-当前状态：TASK-047～TASK-049 已完成。阶段执行语义已进入真实运行时；Dashboard 私有统计已隔离；`task_split` 已生成可验证、可追溯、可由后续执行器消费的 PipelineRun 级 TaskGraph。下一步 TASK-050 实现受 ProjectMount 授权边界约束的 WorkspaceExecutor。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
+当前状态：TASK-047～TASK-050 已完成。阶段执行语义已进入真实运行时；Dashboard 私有统计已隔离；`task_split` 已生成 PipelineRun 级 TaskGraph；WorkspaceExecutor 已在 ProjectMount、TaskNode target_files、用户确认和基线一致性边界内持久化并应用多文件 Patch。下一步 TASK-051 用真实测试/构建命令建立 VerificationGate。详细边界见 `docs/iterations/2026-07-15-core-workflow-execution-chain/`。
 
 架构约束：
 
@@ -699,7 +699,7 @@ StageExecutionContext
 |------|------|----------|
 | 阶段输入只提示不阻断 | StageExecutionContext 已报告缺失输入，但当前仍允许模型继续执行 | TASK-051 |
 | 任务拆解不可执行 | 已通过 `task_graph_v1`、TaskGraph/TaskNode/Dependency 和用户隔离 API 收敛 | TASK-049 已完成 |
-| 开发阶段没有真实工作区执行 | 通用 SkillExecutionEngine 可回答文本，但没有受 Mount 约束的文件级 Patch 执行闭环 | TASK-050 |
+| 开发阶段没有真实工作区执行 | 已通过 WorkspaceChangeSet/FilePatch、Mount/TaskNode 双重路径边界、确认、基线校验和正常失败回滚收敛 | TASK-050 已完成 |
 | 测试结论不可作为门禁 | 测试阶段尚未用真实命令结果阻断失败交付 | TASK-051 |
 | 阶段推进生命周期分散 | 确认后推进、下一阶段启动、Run 完成和新需求创建尚未统一编排 | TASK-052 |
 | API Key 使用审计不完整 | 认证会尝试更新 `last_used_at`，但 APIKey 模型尚无持久化字段 | 后续增强 |

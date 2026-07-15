@@ -29,6 +29,7 @@ def upgrade() -> None:
         sa.Column("task_graph_id", sa.String(50), nullable=False),
         sa.Column("task_node_id", sa.String(50), nullable=False),
         sa.Column("mount_id", sa.String(50), nullable=False),
+        sa.Column("mount_root_sha256", sa.String(64), nullable=False),
         sa.Column("source_artifact_id", sa.String(50), nullable=True),
         sa.Column("status", sa.String(30), nullable=False, server_default="previewed"),
         sa.Column("apply_report", JSON_VARIANT, nullable=True),
@@ -132,4 +133,3 @@ def downgrade() -> None:
     op.drop_index("ix_workspace_change_sets_task_graph_id", table_name="workspace_change_sets")
     op.drop_index("ix_workspace_change_sets_project_id", table_name="workspace_change_sets")
     op.drop_table("workspace_change_sets")
-

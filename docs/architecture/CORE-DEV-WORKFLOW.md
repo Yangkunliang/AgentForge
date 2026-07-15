@@ -7,7 +7,7 @@
 AgentForge 的核心功能不是单纯聊天，也不是单纯多 Agent 编排，而是围绕用户自己的项目完成开发交付，并把执行事实沉淀为可复盘数据：
 
 ```text
-Project -> Mount -> Session -> PipelineRun -> StageState -> TaskGraph -> Artifact -> Delivery -> Eval Feedback
+Project -> Mount -> Session -> PipelineRun -> StageState -> TaskGraph -> WorkspaceChangeSet -> Artifact -> Delivery -> Eval Feedback
 ```
 
 | 概念 | 定义 | 当前状态 | 后续任务 |
@@ -17,7 +17,8 @@ Project -> Mount -> Session -> PipelineRun -> StageState -> TaskGraph -> Artifac
 | Session | 归属于 Project 的一次对话或开发任务上下文 | 已支持 `project_id`、`intent_type`、`current_pipeline_run_id`，消息可带关联 Artifact，Chat 可显示确认卡片和授权文件上下文 | 可继续增强多阶段自动推进 |
 | PipelineRun | 一次需求按 intent 生成的阶段化执行计划 | 模型、API、chat 首次创建、StageRuntime、Artifact 输出、人工确认暂停与授权文件内容注入已实现 | 可继续增强 Delivery 自动编排 |
 | StageState | PipelineRun 内每个阶段的状态、跳过、确认和输出 | 已支持 pending/running/waiting_confirmation/completed/skipped/failed、确认反馈、StagePreview 后端渲染与真实上下文读取 | 可继续增强交付事件 |
-| TaskGraph | `task_split` 产出的 PipelineRun 级结构化执行计划 | 已支持 task_graph_v1、DAG/路径校验、节点依赖、工程验收契约、原子持久化和用户隔离读取 | TASK-050 起由 WorkspaceExecutor 消费 |
+| TaskGraph | `task_split` 产出的 PipelineRun 级结构化执行计划 | 已支持 task_graph_v1、DAG/路径校验、节点依赖、工程验收契约、原子持久化和用户隔离读取 | 已接 WorkspaceExecutor |
+| WorkspaceChangeSet | TaskNode 在授权代码库内的一次不可覆盖多文件变更版本 | 已支持 Patch 预览、用户确认、全量基线校验、行锁、幂等应用、正常失败回滚和审计 | TASK-051 由 VerificationGate 消费 applied 版本 |
 | Artifact | 阶段输出，如 PRD、架构、代码、测试报告 | StageRuntime 自动归档，Chat / Project / Viewer 可查看并加入上下文；Viewer 可预览 diff 并交付 | 已接 Delivery |
 | Delivery | 将产物写回本地项目、生成 PR、导出 zip 或交付报告 | 已支持本地 Artifact diff preview、`confirm_write` 后写回授权 Mount、写前备份、交付报告和 Markdown 导出；已支持 GitHub PR Delivery preview/apply、base sha 二次校验、branch/commit/PR 创建、失败报告和审计；已支持 zip Delivery preview/apply/download、manifest、sha256、下载权限和过期清理 | 可继续增强发布/回滚编排 |
 | Eval Feedback | 结构化记录阶段、Agent、模型、Skill、高风险授权、确认、Artifact 和 Delivery 执行事实 | 已支持 EvalEvent、EvaluationService、Dashboard 授权指标、Evaluation summary API、Skill 授权聚合和 Eval JSONL 导出 | 可继续增强 LLM token/cost 明细和质量评分 |
@@ -33,10 +34,11 @@ MVP 用户路径按以下顺序落地：
 5. 系统创建 PipelineRun，并根据 intent 初始化 StageState。
 6. 用户可从 connected local 或 upload Mount 选择文件作为上下文；后端在执行前读取授权范围或上传 manifest 内的真实文件内容并注入 Agent。
 7. Agent 执行当前阶段，阶段完成后保存 Artifact；`task_split` 额外原子生成 TaskGraph，Artifact 仅作为其人类可读投影。
-8. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
-9. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
-10. 用户在 Artifact Viewer 中选择本地写回、GitHub PR Delivery 或 zip 包交付：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR；zip 模式生成包含 manifest、delivery report 和文件树的可下载包。
-11. StageRuntime、SkillDispatcher、高风险授权、确认 API 和 Delivery 路径写入 EvalEvent；Dashboard、Evaluation API 和 Export 使用这些事件分析成功率、耗时、失败原因和高风险授权分布。
+8. 开发节点把候选文件内容提交为 WorkspaceChangeSet；服务端只允许 connected local primary Mount 和 TaskNode.target_files 内路径，先预览 diff，用户确认后才应用。
+9. 如阶段需要人工确认，系统进入 `waiting_confirmation`，生成 Artifact 并在 Chat 显示 ConfirmCard。
+10. 用户确认后进入下一阶段；用户提出修改意见后回到同阶段重新执行；用户取消后 run 进入 `cancelled`。
+11. 用户在 Artifact Viewer 中选择本地写回、GitHub PR Delivery 或 zip 包交付：本地模式预览 unified diff 后确认写回授权目录；GitHub 模式预览远程 diff 和 base sha 后确认创建 branch、commit 与 PR；zip 模式生成包含 manifest、delivery report 和文件树的可下载包。
+12. StageRuntime、SkillDispatcher、高风险授权、确认 API、WorkspaceExecutor 和 Delivery 路径写入结构化执行或审计事实，供后续观测和恢复消费。
 
 ## 3. 设计原则
 
@@ -45,9 +47,11 @@ MVP 用户路径按以下顺序落地：
 - Intent 不只是 prompt 文案，必须生成可检查的 PipelineRun。
 - StageState 是状态机，不是纯 UI pill。
 - TaskGraph 是后续工作区执行和验证的结构化事实源，不得从 Markdown Artifact 反向解析任务依赖。
+- WorkspaceChangeSet 是文件变更事实源；Preview 不写文件，Apply 必须确认并在任何写入前校验全部基线。
 - Artifact 是平台产物，不应该只散落在聊天消息里。
 - 人工确认是流程节点，不是普通按钮。
 - Bridge 读取必须始终受 Mount 授权范围约束；Delivery 仍需复用 Mount 边界。
+- WorkspaceExecutor 只写 connected local primary Mount，且目标路径必须同时通过 TaskNode.target_files 和 Bridge 安全规则。
 - GitHub OAuth token 只允许服务端加密存储，ProjectMount、审计日志、前端响应和 Delivery report 不得包含明文 token。
 - Delivery 预览和写入之间必须保持可验证的一致性；若本地目标文件或远程 base ref 已变化，默认拒绝写入并生成失败报告。
 - 写回用户项目、创建远程 PR、导出 zip 的成功、拒绝、冲突和失败都必须进入审计日志，且审计 details 不记录 Artifact 内容、OAuth token 或上传文件正文。
@@ -78,6 +82,7 @@ TASK-012 路线图和状态纠偏
                           -> TASK-048 Dashboard 多租户隔离
                             -> TASK-049 TaskGraph
                               -> TASK-050 WorkspaceExecutor
+                                -> TASK-051 VerificationGate
 ```
 
 ## 5. MVP 非目标
@@ -96,9 +101,10 @@ TASK-012 路线图和状态纠偏
 ```text
 创建项目 -> 创建会话 -> 选择需求类型 -> 生成阶段计划
 -> 选择 AgentProfile / ModelRoute / StageSkillPolicy / SkillRuntime
--> 完成一个阶段 -> 生成 TaskGraph / 保存产物 -> 人工确认 -> 进入下一阶段
+-> 完成一个阶段 -> 生成 TaskGraph -> 预览并确认 WorkspaceChangeSet
+-> 验证真实命令结果 -> 保存产物 -> 人工确认 -> 进入下一阶段
 -> 查看产物 -> 将结果交付到本地、GitHub PR 或 zip 包
 -> 通过 Eval Feedback 复盘成功率、耗时和失败原因
 ```
 
-Delivery 不能绕过用户确认；只有在用户明确确认写入后，Artifact 内容才能写回授权 Mount。
+WorkspaceExecutor 和 Delivery 都不能绕过用户确认；只有在用户明确确认写入后，文件内容才能进入授权 Mount。

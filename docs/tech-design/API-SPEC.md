@@ -902,6 +902,71 @@ Authorization: Bearer <token>
 
 接口先按当前用户校验 PipelineRun 所有权，再加载图。其他用户、Run 不存在或图尚未生成均返回 404，不暴露资源是否属于其他账号。节点按 `order_index` 返回，`depends_on` 使用同图 node key。
 
+### WorkspaceExecutor Preview / Apply
+
+TASK-050 后，TaskNode 可在用户授权的 connected local primary Mount 内生成持久化多文件变更。Preview 不写文件；Apply 必须经过 `workspace_write` GovernancePolicy 确认、WorkspaceChangeSet 行锁和全部文件基线校验。
+
+```http
+POST /api/v1/task-graphs/{graph_id}/nodes/{node_key}/workspace/preview
+GET  /api/v1/workspace-change-sets/{change_set_id}
+POST /api/v1/workspace-change-sets/{change_set_id}/apply
+Authorization: Bearer <token>
+```
+
+Preview 请求：
+
+```json
+{
+  "mount_id": "mount-001",
+  "source_artifact_id": "artifact-code-001",
+  "files": [
+    {
+      "path": "src/api/routes/notifications.py",
+      "content": "..."
+    }
+  ]
+}
+```
+
+**Preview 响应 201 / 查询响应 200**：
+
+```json
+{
+  "id": "change-set-001",
+  "project_id": "project-001",
+  "task_graph_id": "graph-001",
+  "task_node_id": "node-backend",
+  "mount_id": "mount-001",
+  "status": "previewed",
+  "has_changes": true,
+  "apply_report": null,
+  "patches": [
+    {
+      "target_path": "src/api/routes/notifications.py",
+      "operation": "upsert",
+      "status": "previewed",
+      "has_changes": true,
+      "unified_diff": "--- a/src/api/routes/notifications.py\n+++ b/src/api/routes/notifications.py\n...",
+      "base_fingerprint": {
+        "exists": true,
+        "size": 128,
+        "sha256": "..."
+      }
+    }
+  ]
+}
+```
+
+响应不返回 `proposed_content`。Preview 最多 50 个文件，单文件最多 200000 bytes，总候选正文最多 2000000 bytes；路径必须同时属于 TaskNode.target_files 并通过 Bridge 敏感路径和授权根校验。
+
+Apply 请求：
+
+```json
+{"confirm_write": true}
+```
+
+成功返回 200 和 `status=applied` 的同一 ChangeSet；重复 Apply 幂等返回已有 ApplyReport，不再次写文件。未确认、基线冲突、applying/failed 状态返回 409；failed 版本必须重新 Preview。冲突、回滚和审计只记录路径、指纹、字节数与错误元数据，不记录源码正文。
+
 ### 阶段状态操作
 
 ```http

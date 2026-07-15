@@ -401,6 +401,72 @@ async def test_apply_rechecks_all_baselines_before_writing(
 
 
 @pytest.mark.asyncio
+async def test_apply_rejects_mount_root_changed_after_preview(
+    db: AsyncSession,
+    fake_user: User,
+    tmp_path: Path,
+):
+    original_root = tmp_path / "original-workspace"
+    changed_root = tmp_path / "changed-workspace"
+    original_root.mkdir()
+    changed_root.mkdir()
+    graph, node, mount = await _seed_workspace_node(
+        db,
+        fake_user,
+        original_root,
+        target_files=["src/new_file.py"],
+    )
+    change_set = await create_workspace_preview(
+        db,
+        user_id=fake_user.id,
+        graph_id=graph.id,
+        node_key=node.node_key,
+        mount_id=mount.id,
+        proposals=[FileProposal(path="src/new_file.py", content="ENABLED = True\n")],
+    )
+    await db.commit()
+    mount.metadata_json = {"root_path": str(changed_root)}
+    await db.commit()
+
+    with pytest.raises(WorkspaceExecutionError) as exc_info:
+        await apply_workspace_change_set(db, change_set=change_set)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.error_code == "mount_authorization_changed"
+    assert not (original_root / "src" / "new_file.py").exists()
+    assert not (changed_root / "src" / "new_file.py").exists()
+
+
+@pytest.mark.asyncio
+async def test_apply_rejects_mount_revoked_after_preview(
+    db: AsyncSession,
+    fake_user: User,
+    tmp_path: Path,
+):
+    root = tmp_path / "workspace"
+    root.mkdir()
+    graph, node, mount = await _seed_workspace_node(db, fake_user, root)
+    change_set = await create_workspace_preview(
+        db,
+        user_id=fake_user.id,
+        graph_id=graph.id,
+        node_key=node.node_key,
+        mount_id=mount.id,
+        proposals=[FileProposal(path="src/api.py", content="print('new')\n")],
+    )
+    await db.commit()
+    mount.status = "disconnected"
+    await db.commit()
+
+    with pytest.raises(WorkspaceExecutionError) as exc_info:
+        await apply_workspace_change_set(db, change_set=change_set)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.error_code == "mount_not_writable"
+    assert not (root / "src" / "api.py").exists()
+
+
+@pytest.mark.asyncio
 async def test_apply_rolls_back_files_written_before_failure(
     db: AsyncSession,
     fake_user: User,

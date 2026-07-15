@@ -6,7 +6,7 @@
 - Model 提供"思考"能力
 - Harness 负责"让它真的能干活的工程支撑"
 
-> 当前状态（TASK-049）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> TaskGraph/Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源；`task_split` 已通过结构化合同生成 TaskGraph，Artifact metadata 已固化生成 Agent、模型路由和 SkillPolicy 来源，非流式 LLM tool-use 调用的 token、成本和延迟已进入 EvalEvent。
+> 当前状态（TASK-050）：本文保留 Harness 六层架构作为底层工程框架说明。面向产品主链路的新开发应优先阅读 `docs/architecture/AI-RUNTIME-CONVERGENCE.md`，以 `Project -> Intent -> Pipeline -> Stage -> Agent/Profile -> Skill Runtime -> TaskGraph -> WorkspaceChangeSet/Artifact -> Delivery -> Eval Feedback` 为最新运行时事实源；`task_split` 已生成结构化 TaskGraph，WorkspaceExecutor 已在授权 Mount 内完成多文件 Patch 的预览、确认、基线校验和正常失败回滚。
 
 ## 2. 整体架构
 
@@ -261,6 +261,7 @@ src/
 │   │   ├── project.py           # Project / ProjectMount / Artifact
 │   │   ├── pipeline.py          # PipelineRun / PipelineStageState
 │   │   ├── task_graph.py        # TaskGraph / TaskNode / TaskNodeDependency
+│   │   ├── workspace.py         # WorkspaceChangeSet / FilePatch
 │   │   ├── llm.py               # LLM Provider / Model / Credential / Route
 │   │   ├── evaluation.py        # EvalEvent
 │   │   ├── webhook.py           # Webhook

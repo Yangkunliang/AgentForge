@@ -39,6 +39,7 @@ class WorkspaceChangeSet(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
+    mount_root_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     source_artifact_id: Mapped[str | None] = mapped_column(
         ForeignKey("artifacts.id", ondelete="SET NULL"),
         nullable=True,

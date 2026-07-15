@@ -18,6 +18,7 @@ from agent_forge.bridge.files import (
     normalize_mount_relative_path,
     read_mount_file,
     restore_mount_file,
+    root_path_for_mount,
     write_mount_file,
 )
 from agent_forge.models import (
@@ -113,6 +114,7 @@ async def create_workspace_preview(
         task_graph_id=graph.id,
         task_node_id=node.id,
         mount_id=mount.id,
+        mount_root_sha256=_mount_root_sha256(mount),
         source_artifact_id=source_artifact_id,
         status="previewed",
     )
@@ -195,6 +197,8 @@ async def apply_workspace_change_set(
             "change_set_not_ready",
             change_set.apply_report_json,
         )
+
+    _validate_apply_scope(change_set)
 
     patches = sorted(change_set.patches, key=lambda patch: patch.target_path)
     mount = change_set.mount
@@ -539,6 +543,60 @@ def _unified_diff(
 
 def _sha256(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _mount_root_sha256(mount: ProjectMount) -> str:
+    try:
+        root = root_path_for_mount(mount)
+    except BridgeAccessError as exc:
+        raise _workspace_error_from_bridge(exc) from exc
+    return _sha256(str(root))
+
+
+def _validate_apply_scope(change_set: WorkspaceChangeSet) -> None:
+    mount = change_set.mount
+    node = change_set.task_node
+    if (
+        mount.project_id != change_set.project_id
+        or mount.mount_type != "local"
+        or mount.status != "connected"
+        or mount.role != "primary"
+    ):
+        raise WorkspaceExecutionError(
+            409,
+            "Workspace mount is no longer writable",
+            "mount_not_writable",
+        )
+    if _mount_root_sha256(mount) != change_set.mount_root_sha256:
+        raise WorkspaceExecutionError(
+            409,
+            "Workspace mount authorization changed since preview",
+            "mount_authorization_changed",
+        )
+    if node.task_graph_id != change_set.task_graph_id:
+        raise WorkspaceExecutionError(
+            409,
+            "TaskNode scope changed since preview",
+            "task_scope_changed",
+        )
+
+    try:
+        allowed_paths = {
+            normalize_mount_relative_path(mount, path)
+            for path in (node.target_files or [])
+        }
+        patch_paths = {
+            normalize_mount_relative_path(mount, patch.target_path)
+            for patch in change_set.patches
+        }
+    except BridgeAccessError as exc:
+        raise _workspace_error_from_bridge(exc) from exc
+    if not patch_paths.issubset(allowed_paths):
+        raise WorkspaceExecutionError(
+            409,
+            "TaskNode target files changed since preview",
+            "task_scope_changed",
+        )
 
 
 def _patch_fingerprint(patch: FilePatch) -> dict:
