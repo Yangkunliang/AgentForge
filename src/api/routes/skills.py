@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -344,14 +345,18 @@ async def get_marketplace_skills(
     items: list[dict] = []
 
     # ── 1. ClawhHub ──
-    if source in ("all", "clawhub"):
-        clawhub_items = await _fetch_clawhub(q)
-        items.extend(clawhub_items)
+    # 并发拉取，避免 ClawhHub 不可达时阻塞整个响应
+    clawhub_task = _fetch_clawhub(q) if source in ("all", "clawhub") else None
 
     # ── 2. GitHub ──
-    if source in ("all", "github"):
-        github_items = await _fetch_github_skills(q)
-        items.extend(github_items)
+    github_task = _fetch_github_skills(q) if source in ("all", "github") else None
+
+    clawhub_items, github_items = await asyncio.gather(
+        clawhub_task if clawhub_task else _return_empty(),
+        github_task if github_task else _return_empty(),
+    )
+    items.extend(clawhub_items)
+    items.extend(github_items)
 
     # ── 3. 本地已安装 ──
     if source in ("all", "local"):
@@ -402,7 +407,7 @@ async def _fetch_clawhub(q: str) -> list[dict]:
         params: dict = {}
         if q:
             params["q"] = q
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=3) as client:
             resp = await client.get(
                 f"{api_base}/api/v1/skills",
                 params=params,
@@ -435,15 +440,22 @@ async def _fetch_clawhub(q: str) -> list[dict]:
     return []
 
 
+async def _return_empty() -> list[dict]:
+    return []
+
+
 async def _fetch_github_skills(q: str) -> list[dict]:
     """
-    通过 GitHub Search API 查询带 agentforge-skill topic 的仓库。
-    无需 Token（公开 API，60 req/hour 限制）。
-    配置 GITHUB_TOKEN 可提升到 5000 req/hour。
+    通过 GitHub Search API 查询与 AgentForge Skill 相关的仓库。
+
+    默认检索关键词 `agentforge skill`（不带强制 topic 限制，因为社区仓库
+    大多未打 topic 标签），可返回 30+ 个相关仓库；配置 GITHUB_TOKEN
+    可将限流从 60 req/hour 提升到 5000 req/hour。
     """
-    topic_query = "topic:agentforge-skill"
     if q:
-        topic_query = f"{q} {topic_query}"
+        search_query = f"{q} agentforge skill"
+    else:
+        search_query = "agentforge skill"
 
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "AgentForge/1.0"}
     github_token = os.getenv("GITHUB_TOKEN")
@@ -454,7 +466,7 @@ async def _fetch_github_skills(q: str) -> list[dict]:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(
                 "https://api.github.com/search/repositories",
-                params={"q": topic_query, "sort": "stars", "order": "desc", "per_page": 20},
+                params={"q": search_query, "sort": "stars", "order": "desc", "per_page": 20},
                 headers=headers,
             )
             if resp.status_code == 200:

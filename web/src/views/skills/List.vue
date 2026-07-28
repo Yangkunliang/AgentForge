@@ -306,6 +306,14 @@ function formatDate(dateStr: string | undefined): string {
           <span class="marketplace-count">
             共 {{ skillStore.marketplaceTotal }} 个 Skill
           </span>
+          <el-button
+            v-if="canInstallSkills"
+            type="primary"
+            class="import-github-btn"
+            @click="openInstallDialog()"
+          >
+            + 从 GitHub 导入
+          </el-button>
         </div>
 
         <!-- Skill 卡片网格 -->
@@ -380,10 +388,11 @@ function formatDate(dateStr: string | undefined): string {
           <div v-if="!skillStore.marketplaceLoading && skillStore.marketplaceItems.length === 0" class="marketplace-empty">
             <p>未找到 Skill，尝试换个关键词或来源</p>
             <p class="marketplace-tip">
-              💡 在 GitHub 上创建带 <code>agentforge-skill</code> topic 标签的仓库来发布自己的 Skill
+              💡 直接粘贴 GitHub 仓库 URL 即可安装第三方 Skill（点击右上角「+ 从 GitHub 导入」）
             </p>
             <p class="marketplace-tip">
-              🔧 配置 <code>CLAWHUB_API_BASE</code> 环境变量来启用 ClawhHub Skill 市场
+              🌐 市场已聚合 GitHub（搜 <code>agentforge skill</code> 公开仓库）与 ClawhHub；
+              配置 <code>CLAWHUB_API_BASE</code> 可切换 ClawhHub 地址
             </p>
           </div>
         </div>
@@ -528,6 +537,10 @@ function formatDate(dateStr: string | undefined): string {
   color: #909399;
   font-size: 13px;
   margin-left: auto;
+}
+
+.import-github-btn {
+  margin-left: $spacing-sm;
 }
 
 .marketplace-empty {
