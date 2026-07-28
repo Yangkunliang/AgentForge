@@ -22,12 +22,13 @@ import {
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
+import type { ChatIntentType } from '@/types'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
 
-const emit = defineEmits<{ prompt: [text: string] }>()
+const emit = defineEmits<{ prompt: [payload: { prompt: string; intent?: ChatIntentType }] }>()
 
 // ── 时段问候 ─────────────────────────────────────────────────
 const greeting = computed(() => {
@@ -70,6 +71,7 @@ interface PromptCard {
   desc: string
   prompt: string
   color: string   // 图标背景色
+  intent?: ChatIntentType
 }
 
 const cards: PromptCard[] = [
@@ -79,6 +81,7 @@ const cards: PromptCard[] = [
     desc: '从报错、复现到影响范围',
     prompt: '帮我 debug，我来粘贴代码和报错信息：\n\n```\n// 粘贴你的代码或错误堆栈\n```',
     color: '#fff7ed',
+    intent: 'bug_fix',
   },
   {
     icon: MagicStick,
@@ -86,6 +89,7 @@ const cards: PromptCard[] = [
     desc: '先确认需求，再拆 API/UI/测试',
     prompt: '我需要开发一个新功能，请帮我分析需求、拆解任务并生成代码：\n\n【功能描述】：',
     color: '#eff6ff',
+    intent: 'new_feature',
   },
   {
     icon: Refresh,
@@ -93,6 +97,7 @@ const cards: PromptCard[] = [
     desc: '改现有逻辑，先看 Diff 和影响',
     prompt: '我需要对现有功能做迭代优化，请先分析改动范围和影响点，再给出实现方案：\n\n【要改的内容】：',
     color: '#f0f9ff',
+    intent: 'iteration',
   },
   {
     icon: Brush,
@@ -100,6 +105,7 @@ const cards: PromptCard[] = [
     desc: '对齐交互方案并落到组件',
     prompt: '我需要调整 UI 或交互，请帮我生成对应的前端组件代码：\n\n【调整描述】：',
     color: '#fdf4ff',
+    intent: 'ui_adjust',
   },
   {
     icon: Connection,
@@ -107,6 +113,7 @@ const cards: PromptCard[] = [
     desc: '明确模块、数据流和风险点',
     prompt: '我需要设计一个系统，请给出架构方案（技术选型、模块划分、数据流）：\n\n【系统需求】：',
     color: '#fefce8',
+    intent: 'new_feature',
   },
   {
     icon: DocumentChecked,
@@ -114,6 +121,7 @@ const cards: PromptCard[] = [
     desc: '找上线风险和回归缺口',
     prompt: '请帮我做 Code Review，从可读性、性能、安全性三个维度分析，并给出具体改进建议：\n\n```\n// 粘贴你的代码\n```',
     color: '#fff7ed',
+    intent: 'iteration',
   },
 ]
 </script>
@@ -162,7 +170,7 @@ const cards: PromptCard[] = [
         v-for="card in cards"
         :key="card.title"
         class="prompt-card"
-        @click="emit('prompt', card.prompt)"
+        @click="emit('prompt', { prompt: card.prompt, intent: card.intent })"
       >
         <span class="card-icon" :style="{ background: card.color }">
           <component :is="card.icon" />

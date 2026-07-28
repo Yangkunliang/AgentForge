@@ -20,7 +20,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { usePipelineStore } from '@/stores/pipeline'
 import { useSessionStore } from '@/stores/session'
-import type { ChatIntentType, Session } from '@/types'
+import type { ChatIntentType, PipelineQuickAction, Session } from '@/types'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -204,6 +204,30 @@ async function fillPrompt(text: string) {
     textareaRef.value.style.height = Math.min(textareaRef.value.scrollHeight, 160) + 'px'
     textareaRef.value.focus()
   }
+}
+
+// L3：快捷方式（蒸馏层预设）联动 — 填充话术的同时配置 Agent 工作上下文
+async function applyQuickAction(action: PipelineQuickAction) {
+  if (action.intent) advancedSettings.setIntent(action.intent)
+  for (const cf of action.context_files ?? []) {
+    advancedSettings.addContextFile({
+      type: cf.type,
+      value: cf.value,
+      label: cf.label?.trim() || cf.value,
+      active: true,
+      mount_id: cf.mount_id,
+    })
+  }
+  for (const skill of action.skills ?? []) {
+    advancedSettings.addSkill(skill)
+  }
+  await fillPrompt(action.prompt)
+}
+
+// 欢迎页引导卡：除填充话术外，联动设置需求类型（蒸馏层预设）
+async function onWelcomeCard(payload: { prompt: string; intent?: ChatIntentType }) {
+  if (payload.intent) advancedSettings.setIntent(payload.intent)
+  await fillPrompt(payload.prompt)
 }
 
 async function send() {
@@ -433,7 +457,7 @@ function removePendingImage(idx: number) {
       <div ref="messagesEl" class="messages-area">
         <WelcomeScreen
           v-if="!sessionId || sessionStore.messages.length === 0"
-          @prompt="fillPrompt"
+          @prompt="onWelcomeCard"
         />
 
         <template v-for="msg in sessionStore.messages" :key="msg.id">
@@ -503,6 +527,29 @@ function removePendingImage(idx: number) {
                 <ContextChips />
               </div>
 
+              <!-- 关联技能（L3：快捷方式联动预授权）-->
+              <div v-if="advancedSettings.skills.length" class="ap-section">
+                <span class="ap-section__label">关联技能</span>
+                <div class="skill-chips">
+                  <span
+                    v-for="skill in advancedSettings.skills"
+                    :key="skill"
+                    class="skill-chip"
+                    :title="`已关联技能：${skill}（点击移除）`"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z"/>
+                    </svg>
+                    <span class="skill-chip__name">{{ skill }}</span>
+                    <button class="skill-chip__remove" title="移除技能" @click="advancedSettings.removeSkill(skill)">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </span>
+                </div>
+              </div>
+
               <div class="ap-divider" />
 
               <!-- 执行流程 -->
@@ -516,7 +563,7 @@ function removePendingImage(idx: number) {
               <!-- 快捷动作 -->
               <div class="ap-section">
                 <span class="ap-section__label">快捷动作</span>
-                <QuickActions :actions="currentConfig.quickActions" @select="fillPrompt" />
+                <QuickActions :actions="currentConfig.quickActions" @select="applyQuickAction" />
               </div>
 
             </div>
@@ -879,6 +926,58 @@ function removePendingImage(idx: number) {
   height: 1px;
   background: #f1f5f9;
   margin: 0 16px;
+}
+
+// ── 关联技能（L3 快捷方式联动）──────────────────────────────────
+.skill-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 4px 9px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #047857;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+  }
+
+  &__name {
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  &__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #047857;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s;
+
+    &:hover {
+      opacity: 1;
+      background: rgba(4, 120, 87, 0.12);
+    }
+  }
 }
 
 // ── 紧凑需求类型选择器（输入框内）───────────────────────────────

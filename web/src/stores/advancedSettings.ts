@@ -9,6 +9,7 @@ interface PersistedAdvancedSettings {
   intent?: IntentType | null
   contextFiles?: ContextFile[]
   stageOverrides?: Record<string, boolean>
+  skills?: string[]
 }
 
 function createId(): string {
@@ -32,6 +33,7 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
   const intent = ref<IntentType | null>(persisted.intent ?? null)
   const contextFiles = ref<ContextFile[]>(persisted.contextFiles ?? [])
   const stageOverrides = ref<Record<string, boolean>>(persisted.stageOverrides ?? {})
+  const skills = ref<string[]>(persisted.skills ?? [])
   const { getConfig } = usePipeline()
 
   const activeContextFiles = computed(() => contextFiles.value.filter((file) => file.active))
@@ -58,6 +60,14 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
 
     if (Object.keys(stageOverrides.value).length > 0) {
       payload.stage_overrides = { ...stageOverrides.value }
+    }
+
+    if (skills.value.length > 0) {
+      payload.skill_authorization = {
+        authorized_skill_names: [...skills.value],
+        authorized_permissions: [],
+        source: 'quick_action',
+      }
     }
 
     return payload
@@ -93,6 +103,22 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
     contextFiles.value = contextFiles.value.filter((item) => item.id !== id)
   }
 
+  // ── 关联技能（L3：快捷方式联动预授权的 Skill）──────────────────────
+  function addSkill(name: string) {
+    const normalized = name.trim()
+    if (!normalized) return
+    if (skills.value.includes(normalized)) return
+    skills.value = [...skills.value, normalized]
+  }
+
+  function removeSkill(name: string) {
+    skills.value = skills.value.filter((item) => item !== name)
+  }
+
+  function clearSkills() {
+    skills.value = []
+  }
+
   function isStageEnabled(stageId: string): boolean {
     return stageOverrides.value[stageId] ?? true
   }
@@ -116,7 +142,7 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
   })
 
   watch(
-    [intent, contextFiles, stageOverrides],
+    [intent, contextFiles, stageOverrides, skills],
     () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -124,6 +150,7 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
           intent: intent.value,
           contextFiles: contextFiles.value,
           stageOverrides: stageOverrides.value,
+          skills: skills.value,
         }),
       )
     },
@@ -134,6 +161,7 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
     intent,
     contextFiles,
     stageOverrides,
+    skills,
     activeContextFiles,
     activeStages,
     chatPayload,
@@ -141,6 +169,9 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
     addContextFile,
     toggleContextFile,
     removeContextFile,
+    addSkill,
+    removeSkill,
+    clearSkills,
     isStageEnabled,
     toggleStage,
     buildChatPayload,

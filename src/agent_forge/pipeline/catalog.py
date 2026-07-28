@@ -16,11 +16,25 @@ ARTIFACT_TYPES = frozenset(get_args(ArtifactType))
 
 
 @dataclass(frozen=True)
+class QuickActionContextFile:
+    """上下文文件预设：被快捷方式联动注入到蒸馏层上下文。"""
+
+    type: str  # 'branch' | 'file' | 'url' | 'artifact'
+    value: str
+    label: str = ""
+    mount_id: str | None = None
+
+
+@dataclass(frozen=True)
 class QuickAction:
     id: str
     label: str
     prompt: str
     highlighted: bool = False
+    # ── L3：蒸馏层预设（点击快捷方式时联动配置 Agent 工作上下文）────────
+    intent: IntentType | None = None
+    skills: tuple[str, ...] = ()
+    context_files: tuple[QuickActionContextFile, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -169,7 +183,8 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
             ),
         ),
         default_actions=(
-            QuickAction("define_scope", "定义需求范围", "帮我梳理这个新功能的需求范围和验收标准。", True),
+            QuickAction("define_scope", "定义需求范围", "帮我梳理这个新功能的需求范围和验收标准。", True,
+                        intent="new_feature", skills=("product-spec",)),
             QuickAction("tech_design", "技术方案设计", "帮我设计这个功能的技术方案，包括架构图和关键类设计。"),
             QuickAction("api_design", "API 接口设计", "帮我设计这个功能的 RESTful API 接口规范。"),
             QuickAction("estimate", "工作量评估", "帮我评估实现这个功能所需的时间和资源。"),
@@ -248,7 +263,8 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
             ),
         ),
         default_actions=(
-            QuickAction("analyze_diff", "分析需求变更", "帮我分析这次需求变更的具体内容和影响范围。", True),
+            QuickAction("analyze_diff", "分析需求变更", "帮我分析这次需求变更的具体内容和影响范围。", True,
+                        intent="iteration", skills=("code-review",)),
             QuickAction("code_review", "代码审查", "帮我审查这次变更涉及的代码，确保质量。"),
             QuickAction("risk_assess", "风险评估", "帮我评估这次迭代可能带来的风险和应对措施。"),
         ),
@@ -298,7 +314,8 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
             ),
         ),
         default_actions=(
-            QuickAction("design_spec", "设计规范", "帮我制定这个 UI 调整的设计规范和交互细节。", True),
+            QuickAction("design_spec", "设计规范", "帮我制定这个 UI 调整的设计规范和交互细节。", True,
+                        intent="ui_adjust", skills=("ui-design",)),
             QuickAction("component_build", "组件开发", "帮我实现这个 UI 组件，包括响应式适配。"),
             QuickAction("style_refine", "样式优化", "帮我优化这个页面的样式和视觉效果。"),
         ),
@@ -360,7 +377,9 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
             ),
         ),
         default_actions=(
-            QuickAction("debug_log", "日志分析", "帮我分析这段错误日志，找出问题根源。", True),
+            QuickAction("debug_log", "日志分析", "帮我分析这段错误日志，找出问题根源。", True,
+                        intent="bug_fix", skills=("debug",),
+                        context_files=(QuickActionContextFile("url", "https://example.com/error.log", "线上错误日志"),)),
             QuickAction("reproduce", "复现步骤", "帮我梳理这个 Bug 的复现步骤和条件。"),
             QuickAction("fix_verify", "修复验证", "帮我验证这个修复是否正确，有无遗漏。"),
         ),
@@ -385,7 +404,8 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
             ),
         ),
         default_actions=(
-            QuickAction("explain", "帮我解释", "帮我用通俗的方式解释这个概念或问题。", True),
+            QuickAction("explain", "帮我解释", "帮我用通俗的方式解释这个概念或问题。", True,
+                        intent="general"),
             QuickAction("polish", "润色文案", "帮我润色下面这段文案，使其更清晰专业："),
             QuickAction("analyze", "分析整理", "帮我分析并整理下面的信息，给出要点。"),
         ),
@@ -426,6 +446,17 @@ def quick_action_to_dict(action: QuickAction) -> dict:
         "label": action.label,
         "prompt": action.prompt,
         "highlighted": action.highlighted,
+        "intent": action.intent,
+        "skills": list(action.skills),
+        "context_files": [
+            {
+                "type": cf.type,
+                "value": cf.value,
+                "label": cf.label,
+                "mount_id": cf.mount_id,
+            }
+            for cf in action.context_files
+        ],
     }
 
 

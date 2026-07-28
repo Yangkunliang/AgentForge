@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import type { PipelineQuickAction } from '@/types'
+
 defineProps<{
-  actions: Array<{ id: string; label: string; prompt: string; highlighted?: boolean }>
+  actions: PipelineQuickAction[]
 }>()
 
 const emit = defineEmits<{
-  (e: 'select', prompt: string): void
+  (e: 'select', action: PipelineQuickAction): void
 }>()
 </script>
 
@@ -16,7 +18,7 @@ const emit = defineEmits<{
       class="quick-actions__btn"
       :class="{ 'quick-actions__btn--highlighted': action.highlighted }"
       :title="action.label"
-      @click="emit('select', action.prompt)"
+      @click="emit('select', action)"
     >
       <span>{{ action.label }}</span>
     </button>

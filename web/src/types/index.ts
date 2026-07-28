@@ -378,11 +378,22 @@ export interface SkillAuthorizationRequest {
 }
 
 // Pipeline Catalog（后端阶段事实源）
+export interface PipelineQuickActionContextFile {
+  type: ContextFileType
+  value: string
+  label?: string
+  mount_id?: string
+}
+
 export interface PipelineQuickAction {
   id: string
   label: string
   prompt: string
   highlighted?: boolean
+  // ── L3：蒸馏层预设（点击快捷方式时联动配置 Agent 工作上下文）────────
+  intent?: ChatIntentType
+  skills?: string[]
+  context_files?: PipelineQuickActionContextFile[]
 }
 
 export interface PipelineStageDefinition {
