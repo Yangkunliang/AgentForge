@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Link, Lightning } from '@element-plus/icons-vue'
 import { useSkillStore } from '@/stores/skill'
 import { usePermission } from '@/composables'
 import type { InstallSkillForm, MarketplaceSkill, SkillImportPreview } from '@/types'
@@ -47,6 +48,37 @@ function openInstallDialog(prefill?: string) {
   showInstallDialog.value = true
 }
 
+function handleQuickInstall(item: MarketplaceSkill) {
+  // 非 admin 用户：给权限申请引导，不直接进安装
+  if (!canInstallSkills.value) {
+    ElMessageBox.confirm(
+      '安装 Skill 需要管理员权限。是否仍要继续？\n\n提示：联系当前实例的管理员为你开启「安装 Skill」权限后，可一键安装。',
+      '需要管理员权限',
+      {
+        confirmButtonText: '我已知晓，继续',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+      .then(() => handleInstallFromMarket(item))
+      .catch(() => {})
+    return
+  }
+  handleInstallFromMarket(item)
+}
+
+function onAvatarError(event: Event) {
+  // 头像加载失败时（CDN 抖动 / 离线 / 跨域），降级为首字母占位
+  const img = event.target as HTMLImageElement
+  const parent = img.parentElement
+  if (!parent) return
+  const initials = (img.alt || '?').slice(0, 1).toUpperCase()
+  const placeholder = document.createElement('div')
+  placeholder.className = 'skill-card__avatar-placeholder skill-card__avatar-initials'
+  placeholder.textContent = initials
+  parent.replaceChild(placeholder, img)
+}
+
 async function handlePreviewImport() {
   if (!installForm.value.source.trim()) {
     ElMessage.warning('请输入 Skill 来源（GitHub URL / PyPI 包名 / 本地目录）')
@@ -78,8 +110,20 @@ async function handleInstall() {
     installForm.value = { source: '', version: '' }
     importPreview.value = null
     startPolling()
-  } catch {
-    // 错误已在 request 中处理
+  } catch (error: any) {
+    const status = error?.response?.status
+    if (status === 403) {
+      ElMessage.error('权限不足：安装 Skill 需要管理员权限，请联系管理员')
+    } else if (status === 409) {
+      const detail = error?.response?.data?.detail
+      if (detail?.code === 'SKILL_PERMISSION_CONFIRMATION_REQUIRED') {
+        ElMessage.warning('该 Skill 声明了高风险权限，请在预览中确认后安装')
+      } else {
+        ElMessage.error(detail?.message || '安装任务创建失败')
+      }
+    } else {
+      ElMessage.error(error?.response?.data?.detail || '安装失败')
+    }
   } finally {
     installLoading.value = false
   }
@@ -327,10 +371,11 @@ function formatDate(dateStr: string | undefined): string {
               <img
                 v-if="item.icon"
                 :src="item.icon"
+                :alt="item.name"
                 class="skill-card__avatar"
-                alt=""
+                @error="onAvatarError"
               />
-              <div v-else class="skill-card__avatar-placeholder">🔧</div>
+              <div v-else class="skill-card__avatar-placeholder">{{ item.name.slice(0, 1).toUpperCase() }}</div>
               <div class="skill-card__meta">
                 <div class="skill-card__name">{{ item.name }}</div>
                 <div class="skill-card__author">by {{ item.author }}</div>
@@ -358,27 +403,30 @@ function formatDate(dateStr: string | undefined): string {
               <span v-if="item.stars > 0" class="skill-card__stars">⭐ {{ item.stars }}</span>
               <span v-else />
               <div class="skill-card__actions">
+                <el-tooltip content="在 GitHub 查看源码" placement="top">
+                  <el-button
+                    v-if="item.url"
+                    size="small"
+                    link
+                    type="primary"
+                    :href="item.url"
+                    target="_blank"
+                    tag="a"
+                  >
+                    <el-icon style="margin-right: 2px"><Link /></el-icon>查看
+                  </el-button>
+                </el-tooltip>
                 <el-button
-                  v-if="item.url"
-                  size="small"
-                  link
-                  type="primary"
-                  :href="item.url"
-                  target="_blank"
-                  tag="a"
-                >
-                  查看
-                </el-button>
-                <el-button
-                  v-if="canInstallSkills && item.url && item.source !== 'local'"
+                  v-if="item.source !== 'local' && item.url"
                   size="small"
                   type="primary"
-                  @click="handleInstallFromMarket(item)"
+                  :loading="installLoading"
+                  @click="handleQuickInstall(item)"
                 >
-                  安装
+                  <el-icon style="margin-right: 2px"><Lightning /></el-icon>安装
                 </el-button>
                 <el-tag v-else-if="item.source === 'local'" type="success" size="small">
-                  已安装
+                  ✓ 已安装
                 </el-tag>
               </div>
             </div>
@@ -602,12 +650,18 @@ function formatDate(dateStr: string | undefined): string {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: #f0f2f5;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 16px;
+    font-weight: 600;
     flex-shrink: 0;
+  }
+
+  &__avatar-initials {
+    font-size: 14px;
   }
 
   &__meta {
