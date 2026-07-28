@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import type { RegisterForm } from '@/types'
 
 const authStore = useAuthStore()
+const formRef = ref<FormInstance>()
 
 const form = reactive<RegisterForm>({
   username: '',
@@ -11,19 +13,27 @@ const form = reactive<RegisterForm>({
   password: '',
 })
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+const rules: FormRules<RegisterForm> = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 50, message: '用户名长度为3到50个字符', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含英文字母、数字和下划线', trigger: 'blur' },
+  ],
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少6个字符', trigger: 'blur' },
+    { min: 8, max: 128, message: '密码至少8个字符', trigger: 'blur' },
+    { pattern: /[A-Z]/, message: '密码必须包含大写字母', trigger: 'blur' },
+    { pattern: /[a-z]/, message: '密码必须包含小写字母', trigger: 'blur' },
+    { pattern: /\d/, message: '密码必须包含数字', trigger: 'blur' },
   ],
 }
 
 async function handleSubmit() {
+  if (!formRef.value || !(await formRef.value.validate().catch(() => false))) return
   try {
     await authStore.register(form)
   } catch {
@@ -38,7 +48,7 @@ async function handleSubmit() {
       <h1 class="title">注册</h1>
       <p class="subtitle">创建 AgentForge 账号</p>
 
-      <el-form :model="form" :rules="rules" class="register-form" @submit.prevent="handleSubmit">
+      <el-form ref="formRef" :model="form" :rules="rules" class="register-form" @submit.prevent="handleSubmit">
         <el-form-item prop="username">
           <el-input v-model="form.username" placeholder="用户名" size="large" />
         </el-form-item>

@@ -9,6 +9,11 @@ import router from '@/router'
 interface AuthErrorResponse {
   detail?: string | { msg?: string }[]
   message?: string
+  error?: {
+    code?: string
+    message?: string
+    details?: { field?: string; issue?: string }[]
+  }
 }
 
 function showAuthError(error: unknown, fallback: string) {
@@ -18,6 +23,15 @@ function showAuthError(error: unknown, fallback: string) {
   const detail = data?.detail
   const detailStr = Array.isArray(detail) ? detail.map((d) => d.msg).join('；') : detail
   const message = data?.message
+  const validationMessage = data?.error?.details
+    ?.map((item) => item.issue?.replace(/^Value error,\s*/, ''))
+    .filter(Boolean)
+    .join('；')
+
+  if (status === 400 && data?.error?.code === 'VALIDATION_ERROR') {
+    ElMessage.error(validationMessage || data.error.message || '请检查输入格式')
+    return
+  }
 
   if (status === 401) {
     ElMessage.error('用户名或密码错误')
