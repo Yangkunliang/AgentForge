@@ -5,11 +5,10 @@ import { useTaskStore } from '@/stores/task'
 
 const router = useRouter()
 const taskStore = useTaskStore()
-const ALL_FILTER_VALUE = '__all__'
 
 const filterForm = reactive({
-  status: ALL_FILTER_VALUE,
-  priority: ALL_FILTER_VALUE,
+  status: 'all' as string,
+  priority: 'all' as string,
 })
 
 onMounted(() => {
@@ -18,8 +17,8 @@ onMounted(() => {
 
 function handleFilter() {
   taskStore.fetchTasks({
-    status: filterForm.status === ALL_FILTER_VALUE ? undefined : filterForm.status,
-    priority: filterForm.priority === ALL_FILTER_VALUE ? undefined : filterForm.priority,
+    status: filterForm.status === 'all' ? undefined : filterForm.status,
+    priority: filterForm.priority === 'all' ? undefined : filterForm.priority,
   })
 }
 
@@ -66,8 +65,8 @@ function formatDate(dateStr: string): string {
     <div class="card">
       <el-form :inline="true" :model="filterForm" class="filter-form">
         <el-form-item label="状态">
-          <el-select v-model="filterForm.status" @change="handleFilter">
-            <el-option label="全部" :value="ALL_FILTER_VALUE" />
+          <el-select v-model="filterForm.status" class="filter-select" @change="handleFilter">
+            <el-option label="全部" value="all" />
             <el-option label="待处理" value="pending" />
             <el-option label="进行中" value="processing" />
             <el-option label="已完成" value="completed" />
@@ -75,8 +74,8 @@ function formatDate(dateStr: string): string {
           </el-select>
         </el-form-item>
         <el-form-item label="优先级">
-          <el-select v-model="filterForm.priority" @change="handleFilter">
-            <el-option label="全部" :value="ALL_FILTER_VALUE" />
+          <el-select v-model="filterForm.priority" class="filter-select" @change="handleFilter">
+            <el-option label="全部" value="all" />
             <el-option label="低" value="low" />
             <el-option label="中" value="medium" />
             <el-option label="高" value="high" />
@@ -131,6 +130,11 @@ function formatDate(dateStr: string): string {
 
 .filter-form {
   margin-bottom: $spacing-md;
+}
+
+.filter-select {
+  width: 160px;
+  flex-shrink: 0;
 }
 
 .pagination {
