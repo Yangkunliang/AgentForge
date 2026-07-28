@@ -63,6 +63,17 @@ export interface TaskFeedback {
 }
 
 // Agent 相关
+export interface AgentExpertise {
+  role_title?: string
+  summary?: string
+  conventions?: Record<string, string[]>
+  review_checklist?: string[]
+  tech_preferences?: Record<string, string[]>
+  anti_patterns?: string[]
+  debugging_heuristics?: string[]
+  communication_style?: string
+}
+
 export interface Agent {
   id: string
   name: string
@@ -71,6 +82,7 @@ export interface Agent {
   status: 'active' | 'inactive'
   description?: string
   avatar_url?: string
+  expertise?: AgentExpertise
   created_at: string
   updated_at: string
 }
@@ -81,6 +93,8 @@ export interface CreateAgentForm {
   model: string
   description?: string
   avatar_url?: string
+  status?: 'active' | 'inactive'
+  expertise?: AgentExpertise
 }
 
 // Skill 相关
@@ -310,7 +324,7 @@ export interface WebSearchResponse {
 }
 
 // 高级设置（TASK-011）
-export type ChatIntentType = 'new_feature' | 'iteration' | 'ui_adjust' | 'bug_fix'
+export type ChatIntentType = 'new_feature' | 'iteration' | 'ui_adjust' | 'bug_fix' | 'general'
 export type ContextFileType = 'branch' | 'file' | 'url' | 'artifact'
 
 export interface ContextFile {

@@ -3,7 +3,7 @@ import type { IntentType } from '@/composables/usePipeline'
 import { usePipeline } from '@/composables/usePipeline'
 
 defineProps<{
-  modelValue: IntentType
+  modelValue: IntentType | null
 }>()
 
 const emit = defineEmits<{
@@ -12,7 +12,7 @@ const emit = defineEmits<{
 
 const { intentLabels } = usePipeline()
 
-const intents: IntentType[] = ['new_feature', 'iteration', 'ui_adjust', 'bug_fix']
+const intents: IntentType[] = ['new_feature', 'iteration', 'ui_adjust', 'bug_fix', 'general']
 
 function selectIntent(intent: IntentType) {
   emit('update:modelValue', intent)

@@ -39,6 +39,10 @@ const { intent: currentIntent } = storeToRefs(advancedSettings)
 const { getConfig, intentLabels } = usePipeline()
 
 const currentConfig = computed(() => getConfig(currentIntent.value))
+const currentIntentBadge = computed(() => {
+  const key = (currentIntent.value ?? 'general') as ChatIntentType
+  return intentLabels[key]
+})
 const showAdvancedPanel = ref(false)
 
 const waitingConfirmationStage = computed(() =>
@@ -84,6 +88,7 @@ function isChatIntentType(value: string | null | undefined): value is ChatIntent
     || value === 'iteration'
     || value === 'ui_adjust'
     || value === 'bug_fix'
+    || value === 'general'
 }
 
 async function syncPipelineForSession(session: Session | null | undefined) {
@@ -545,8 +550,8 @@ function removePendingImage(idx: number) {
 
           <!-- 紧凑的需求类型选择器 -->
           <button class="intent-pill" @click="showAdvancedPanel = true">
-            <span class="intent-pill__icon">{{ intentLabels[currentIntent].icon }}</span>
-            <span class="intent-pill__label">{{ intentLabels[currentIntent].label }}</span>
+            <span class="intent-pill__icon">{{ currentIntentBadge.icon }}</span>
+            <span class="intent-pill__label">{{ currentIntentBadge.label }}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="intent-pill__arrow">
               <polyline points="6 15 12 9 18 15" />
             </svg>

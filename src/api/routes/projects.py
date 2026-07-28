@@ -60,7 +60,7 @@ from middleware.auth import get_current_user
 router = APIRouter()
 artifact_router = APIRouter()
 
-IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix"]
+IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix", "general"]
 MountType = Literal["local", "github", "upload"]
 MountRole = Literal["primary", "reference", "docs"]
 MountStatus = Literal["connected", "disconnected", "pending", "error"]

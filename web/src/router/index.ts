@@ -86,6 +86,13 @@ const routes: RouteRecordRaw[] = [
         meta: { permission: 'admin' },
       },
       {
+        path: 'agents/:id/edit',
+        name: 'AgentEdit',
+        component: () => import('@/views/agents/Edit.vue'),
+        meta: { permission: 'admin' },
+        props: true,
+      },
+      {
         path: 'skills',
         name: 'SkillList',
         component: () => import('@/views/skills/List.vue'),

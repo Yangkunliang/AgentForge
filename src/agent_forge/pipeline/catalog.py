@@ -10,7 +10,7 @@ from typing import Literal, get_args
 
 from fastapi import HTTPException
 
-IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix"]
+IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix", "general"]
 ArtifactType = Literal["prd", "architecture", "api_spec", "code", "test", "report", "diff"]
 ARTIFACT_TYPES = frozenset(get_args(ArtifactType))
 
@@ -365,13 +365,38 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
             QuickAction("fix_verify", "修复验证", "帮我验证这个修复是否正确，有无遗漏。"),
         ),
     ),
+    "general": IntentPipelineDefinition(
+        intent_type="general",
+        label="通用对话",
+        description="非开发类的一般性交流：问答、解释、写作、分析等。不进入开发流水线，也不强制套用开发类意图。",
+        placeholder="想聊点什么都可以，例如：帮我解释一下这个概念 / 帮我润色一段文案...",
+        stages=(
+            StageDefinition(
+                "chat",
+                "对话",
+                "直接回应用户，不套用需求分析 / 架构 / 代码等开发阶段。",
+                confirmation_required=False,
+                output_artifact_types=("report",),
+                success_criteria=(
+                    "准确理解用户真实意图，不被强制归类为开发任务。",
+                    "按需调用工具或结合 Agent 自身能力倾向作答。",
+                ),
+                default_agent_selector="planner",
+            ),
+        ),
+        default_actions=(
+            QuickAction("explain", "帮我解释", "帮我用通俗的方式解释这个概念或问题。", True),
+            QuickAction("polish", "润色文案", "帮我润色下面这段文案，使其更清晰专业："),
+            QuickAction("analyze", "分析整理", "帮我分析并整理下面的信息，给出要点。"),
+        ),
+    ),
 }
 
 
 def normalize_intent(intent_type: str | None) -> IntentType:
     if intent_type in PIPELINE_CATALOG:
         return intent_type  # type: ignore[return-value]
-    return "iteration"
+    return "general"
 
 
 def list_pipeline_definitions() -> list[IntentPipelineDefinition]:

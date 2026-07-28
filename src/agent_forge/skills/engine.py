@@ -48,6 +48,8 @@ if TYPE_CHECKING:
     from agent_forge.llm.provider import LiteLLMProvider, LLMConfig, LLMResponse
     from agent_forge.skills.dispatcher import SkillDispatcher
 
+from agent_forge.agents.expertise import AgentExpertise
+
 from agent_forge.pipeline.task_graph import get_output_contract_prompt
 
 logger = logging.getLogger(__name__)
@@ -84,6 +86,7 @@ INTENT_LABELS = {
     "iteration": "迭代优化",
     "ui_adjust": "UI 调整",
     "bug_fix": "Bug 修复",
+    "general": "通用对话",
 }
 
 
@@ -123,6 +126,12 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
             capability_text = ", ".join(str(capability) for capability in capabilities if capability)
             if capability_text:
                 lines.append(f"- Agent 能力：{capability_text}")
+
+        expertise = agent_profile.get("expertise")
+        if isinstance(expertise, dict):
+            expertise_section = AgentExpertise.from_dict(expertise).to_prompt_section()
+            if expertise_section:
+                lines.append(expertise_section)
 
     model_route = advanced_context.get("model_route")
     if isinstance(model_route, dict):

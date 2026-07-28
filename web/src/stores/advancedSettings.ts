@@ -6,7 +6,7 @@ import type { ChatAdvancedPayload, ContextFile } from '@/types'
 const STORAGE_KEY = 'agentforge:advanced-settings'
 
 interface PersistedAdvancedSettings {
-  intent?: IntentType
+  intent?: IntentType | null
   contextFiles?: ContextFile[]
   stageOverrides?: Record<string, boolean>
 }
@@ -29,7 +29,7 @@ function readPersistedSettings(): PersistedAdvancedSettings {
 
 export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
   const persisted = readPersistedSettings()
-  const intent = ref<IntentType>(persisted.intent ?? 'iteration')
+  const intent = ref<IntentType | null>(persisted.intent ?? null)
   const contextFiles = ref<ContextFile[]>(persisted.contextFiles ?? [])
   const stageOverrides = ref<Record<string, boolean>>(persisted.stageOverrides ?? {})
   const { getConfig } = usePipeline()
@@ -41,7 +41,11 @@ export const useAdvancedSettingsStore = defineStore('advancedSettings', () => {
   })
 
   const chatPayload = computed<ChatAdvancedPayload>(() => {
-    const payload: ChatAdvancedPayload = { intent: intent.value }
+    const payload: ChatAdvancedPayload = {}
+
+    if (intent.value) {
+      payload.intent = intent.value
+    }
 
     if (activeContextFiles.value.length > 0) {
       payload.context_files = activeContextFiles.value.map((file) => ({

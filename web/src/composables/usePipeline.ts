@@ -20,13 +20,14 @@ const emptyConfig: IntentConfig = {
   stages: [],
   skippedStages: [],
   quickActions: [],
-  placeholder: '描述当前项目里的开发需求...',
+  placeholder: '想聊点什么都可以，或描述你的开发需求...',
 }
 
 export function usePipeline() {
   const pipelineStore = usePipelineStore()
 
-  function getConfig(intent: IntentType): IntentConfig {
+  function getConfig(intent: IntentType | null): IntentConfig {
+    if (!intent) return emptyConfig
     const definition = pipelineStore.catalogForIntent(intent)
     if (!definition) return emptyConfig
     return {
@@ -46,6 +47,7 @@ export function usePipeline() {
     iteration: { label: '迭代优化', icon: '🔄' },
     ui_adjust: { label: 'UI 调整', icon: '🎨' },
     bug_fix: { label: 'Bug 修复', icon: '🐛' },
+    general: { label: '通用对话', icon: '💬' },
   }
 
   return {

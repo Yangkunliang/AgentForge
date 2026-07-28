@@ -6,13 +6,21 @@ import json
 import os
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
 
-def _find_env() -> Path:
-    # 开发环境自动加载 .env
-    return Path(__file__).parent.parent.parent / ".env"
+def _find_env() -> list[Path]:
+    """开发环境自动加载 .env。
+
+    Pydantic 的 ``env_file`` 列表遵循「后者覆盖前者」(last-wins) 规则，
+    因此这里把后端专属配置 ``src/.env`` 放在**最后**，使其对重叠键（如
+    LLM_API_KEY / LLM_MODEL）拥有最高优先级；根 .env 放在前面，承载数据库 /
+    Redis / RabbitMQ / JWT 等共享基础设施配置并作为兜底。
+    ``src/.env`` 缺失时自动回退到根 .env，互不影响。
+    """
+    base = Path(__file__).parent.parent.parent
+    return [base / ".env", base / "src" / ".env"]
 
 
 class Settings(BaseSettings):
@@ -56,8 +64,8 @@ class Settings(BaseSettings):
 
     # LLM
     llm_base_url: str = Field(default="", validation_alias="LLM_BASE_URL")
-    api_key: str = Field(default="", validation_alias="LLM_API_KEY")
-    default_model: str = Field(default="openai/gpt-4o-mini", validation_alias="LLM_MODEL")
+    api_key: str = Field(default="", validation_alias=AliasChoices("LLM_API_KEY", "API_KEY"))
+    default_model: str = Field(default="openai/gpt-4o-mini", validation_alias=AliasChoices("LLM_MODEL", "DEFAULT_MODEL"))
     default_temperature: float = 0.7
     max_tokens: int = 4096
     # 多模型路由: vision / image_gen 自动纳入
@@ -120,7 +128,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",")]
 
     model_config = {
-        "env_file": str(_find_env()),
+        "env_file": _find_env(),
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
         "extra": "ignore",
@@ -195,7 +203,7 @@ class CubeSandboxConfig(BaseSettings):
     sandbox_acquire_timeout: float = Field(default=30.0, validation_alias="SANDBOX_ACQUIRE_TIMEOUT")
 
     model_config = {
-        "env_file": str(_find_env()),
+        "env_file": _find_env(),
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
         "extra": "ignore",

@@ -46,6 +46,7 @@ class Agent(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Agent 功能描述
     status: Mapped[str] = mapped_column(String(20), default=AgentStatus.ACTIVE)  # 状态: "active" / "inactive"
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 头像 URL
+    expertise: Mapped[dict] = mapped_column(JSON, default=dict)  # 蒸馏的专家模型（编码规范/审查清单/技术偏好/反模式/调试套路）
 
     # Relationships
     sub_tasks_assigned: Mapped[list[SubTask]] = relationship(

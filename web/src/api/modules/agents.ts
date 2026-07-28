@@ -1,5 +1,5 @@
 import request from '../request'
-import type { Agent, CreateAgentForm } from '@/types'
+import type { Agent, AgentExpertise, CreateAgentForm } from '@/types'
 
 export interface AgentListParams {
   status?: string
@@ -34,5 +34,10 @@ export const agentsApi = {
 
   updateMySettings: (data: { name?: string; avatar_url?: string | null }) => {
     return request.patch<{ agent_name: string; avatar_url: string | null }>('/agents/settings/me', data)
+  },
+
+  // AI 辅助抽取：从工作素材蒸馏出专家模型草稿
+  extractExpertise: (data: { source_text: string; role_hint?: string }) => {
+    return request.post<AgentExpertise>('/agents/expertise/extract', data)
   },
 }

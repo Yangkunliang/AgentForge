@@ -135,6 +135,7 @@
 - TASK-048 已完成：Dashboard Task/Cost/RecentTask 和 `/api/v1/cost` 均按 `Task.user_id` 在 SQL 层隔离；Cost router 已恢复挂载；真实 JWT 双用户、无 Token 401、active/inactive API Key 已覆盖。
 - TASK-049 已完成：新增 `TaskGraph`、`TaskNode`、`TaskNodeDependency` 和 `020_task_graph` 迁移；`task_split` 通过 `task_graph_v1` 生成结构化 DAG 与可读 Artifact，非法输出原子回滚；`GET /api/v1/pipeline-runs/{run_id}/task-graph` 按当前用户隔离。
 - TASK-050 已完成：新增 `WorkspaceChangeSet`、`FilePatch` 和 `021_workspace_change_sets` 迁移；第一版只写 connected local primary Mount，路径受 TaskNode.target_files 与 Bridge 双重约束；Preview 不写文件，Apply 需要 workspace_write 确认、行锁和全量基线校验，正常失败反向回滚。下一步 TASK-051 实现 VerificationGate。
+- TASK-054 已完成（能力蒸馏层 · AgentProfile 专家模型）：`Agent` 模型新增 `expertise` JSONB 列（`022_agent_expertise.py`）；新增 `src/agent_forge/agents/expertise.py` 的 `AgentExpertise` 结构化专家模型（role_title/summary/conventions/review_checklist/tech_preferences/anti_patterns/debugging_heuristics/communication_style），含 `to_prompt_section()` 渲染进 system prompt 可信区；`AgentProfile` 经 `resolver` 携带 `expertise`，由 `SkillExecutionEngine._format_advanced_context` 注入每个阶段的 system prompt；`api/routes/agents.py` + `api/schemas/agent.py` 暴露 `expertise` 读写。这是把开发者个人工程能力蒸馏进 Agent 的第一个落地抓手。
 
 ---
 

@@ -10,18 +10,40 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.agents.expertise import AgentExpertise
+from agent_forge.agents.expertise_extract import extract_expertise
 from agent_forge.agents.resolver import list_runtime_agent_candidates
 from agent_forge.database import get_async_session
 from agent_forge.models import Agent, User, UserAgentSettings
-from api.schemas.agent import AgentCreateRequest, AgentResponse, AgentUpdateRequest
+from api.schemas.agent import (
+    AgentCreateRequest,
+    AgentExpertise as AgentExpertiseSchema,
+    AgentResponse,
+    AgentUpdateRequest,
+    ExpertiseExtractRequest,
+)
 from middleware.auth import get_current_user, require_permission
 
 router = APIRouter()
 logger = logging.getLogger("agent_forge")
 
 
+def _normalize_expertise(raw: object) -> dict:
+    """Convert an AgentExpertise schema/model/dict into a clean stored dict.
+
+    Drops empty fields so an Agent without distilled expertise stores `{}`.
+    """
+    if raw is None:
+        return {}
+    data = raw.model_dump(exclude_none=True) if hasattr(raw, "model_dump") else raw
+    if not isinstance(data, dict):
+        return {}
+    return AgentExpertise.from_dict(data).to_dict()
+
+
 def _agent_to_dict(agent: Agent) -> dict:
     """将 Agent 模型转为字典"""
+    expertise_obj = AgentExpertise.from_dict(agent.expertise)
     return {
         "id": agent.id,
         "name": agent.name,
@@ -30,9 +52,24 @@ def _agent_to_dict(agent: Agent) -> dict:
         "status": agent.status,
         "description": agent.description,
         "avatar_url": agent.avatar_url,
+        "expertise": expertise_obj if not expertise_obj.is_empty() else None,
         "created_at": agent.created_at,
         "updated_at": agent.updated_at,
     }
+
+
+@router.post("/expertise/extract", response_model=AgentExpertiseSchema)
+async def extract_agent_expertise(
+    body: ExpertiseExtractRequest,
+    current_user: User = Depends(require_permission("read")),
+) -> AgentExpertiseSchema:
+    """AI 辅助抽取：从真实工作素材蒸馏出结构化专家模型。
+
+    接收一个开发者的代码评审 / 提交记录 / 技术讨论文本，调用 LLM 抽取成
+    ``AgentExpertise`` 草稿，供后续回填到 Agent 配置。不落库，仅返回草稿。
+    """
+    expertise = await extract_expertise(body.source_text, body.role_hint)
+    return AgentExpertiseSchema.model_validate(expertise.to_dict())
 
 
 @router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
@@ -54,6 +91,7 @@ async def create_agent(
         model=body.model,
         description=body.description,
         avatar_url=body.avatar_url,
+        expertise=_normalize_expertise(body.expertise),
     )
     db.add(agent)
     await db.commit()
@@ -123,6 +161,8 @@ async def update_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     update_data = body.model_dump(exclude_unset=True)
+    if "expertise" in update_data:
+        update_data["expertise"] = _normalize_expertise(update_data["expertise"])
     for field, value in update_data.items():
         setattr(agent, field, value)
 

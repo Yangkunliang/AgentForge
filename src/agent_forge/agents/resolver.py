@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_forge.agents.expertise import AgentExpertise
 from agent_forge.models import Agent, AgentSkill, Skill
 from agent_forge.pipeline.catalog import StageDefinition
 
@@ -35,6 +36,7 @@ class AgentProfile:
     model_name: str | None = None
     default_model_route_key: str = DEFAULT_MODEL_ROUTE_KEY
     allowed_skill_names: list[str] | None = None
+    expertise: dict | None = None
 
     def to_context(self) -> dict[str, Any]:
         return {
@@ -45,6 +47,7 @@ class AgentProfile:
             "model_name": self.model_name,
             "default_model_route_key": self.default_model_route_key,
             "allowed_skill_names": self.allowed_skill_names or [],
+            "expertise": self.expertise or {},
         }
 
 
@@ -140,6 +143,7 @@ async def _profile_from_agent(db: AsyncSession, agent: Agent, source: str) -> Ag
         model_name=agent.model,
         default_model_route_key=DEFAULT_MODEL_ROUTE_KEY,
         allowed_skill_names=await _get_agent_allowed_skill_names(db, agent.id),
+        expertise=AgentExpertise.from_dict(agent.expertise).to_dict(),
     )
 
 

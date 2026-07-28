@@ -59,6 +59,19 @@ function formatDate(dateStr: string): string {
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
+
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="canManageAgents"
+              text
+              type="primary"
+              @click="router.push(`/agents/${row.id}/edit`)"
+            >
+              编辑
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
   </div>

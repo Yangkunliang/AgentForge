@@ -3,7 +3,8 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAgentStore } from '@/stores/agent'
-import type { CreateAgentForm } from '@/types'
+import type { AgentExpertise, CreateAgentForm } from '@/types'
+import ExpertiseForm from './components/ExpertiseForm.vue'
 
 const router = useRouter()
 const agentStore = useAgentStore()
@@ -13,6 +14,7 @@ const form = reactive<CreateAgentForm>({
   capabilities: [],
   model: 'gpt-4',
   description: '',
+  expertise: {} as AgentExpertise,
 })
 
 const loading = ref(false)
@@ -79,6 +81,10 @@ async function handleSubmit() {
 
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" :rows="3" />
+        </el-form-item>
+
+        <el-form-item label="专家模型">
+          <ExpertiseForm v-model="form.expertise" />
         </el-form-item>
 
         <el-form-item>

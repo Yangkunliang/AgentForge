@@ -7,7 +7,7 @@ import type { PipelineRun, PipelineStageStatus } from '@/types'
 import { computed } from 'vue'
 
 const props = defineProps<{
-  intent: IntentType
+  intent: IntentType | null
   pipelineRun?: PipelineRun | null
 }>()
 

@@ -86,7 +86,7 @@ class SkillAuthorizationRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=50000, description="用户消息（最多 50000 字符）")
-    intent: Literal["new_feature", "iteration", "ui_adjust", "bug_fix"] | None = Field(
+    intent: Literal["new_feature", "iteration", "ui_adjust", "bug_fix", "general"] | None = Field(
         default=None,
         description="用户选择的需求类型",
     )

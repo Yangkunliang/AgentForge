@@ -11,6 +11,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
     iteration: undefined,
     ui_adjust: undefined,
     bug_fix: undefined,
+    general: undefined,
   })
   const loading = ref(false)
   const catalogLoading = ref(false)
@@ -56,6 +57,7 @@ export const usePipelineStore = defineStore('pipeline', () => {
         iteration: undefined,
         ui_adjust: undefined,
         bug_fix: undefined,
+        general: undefined,
       }
       for (const item of data.items) {
         catalog.value[item.intent_type] = item

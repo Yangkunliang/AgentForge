@@ -34,7 +34,7 @@ from middleware.auth import get_current_user
 router = APIRouter()
 session_router = APIRouter()
 
-IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix"]
+IntentType = Literal["new_feature", "iteration", "ui_adjust", "bug_fix", "general"]
 
 
 class PipelineRunCreateRequest(BaseModel):
