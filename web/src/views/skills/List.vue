@@ -324,7 +324,7 @@ function formatDate(dateStr: string | undefined): string {
         <div class="marketplace-toolbar">
           <el-input
             v-model="marketplaceKeyword"
-            placeholder="搜索 Skill..."
+            placeholder="搜索任意 GitHub 关键词（如 cursor rules、claude skill）"
             style="width: 280px"
             clearable
             @keyup.enter="loadMarketplace"
@@ -429,7 +429,8 @@ function formatDate(dateStr: string | undefined): string {
               💡 直接粘贴 GitHub 仓库 URL 即可安装第三方 Skill（点击右上角「+ 从 GitHub 导入」）
             </p>
             <p class="marketplace-tip">
-              🌐 市场已聚合 GitHub（搜 <code>agentforge skill</code> 公开仓库）与 ClawhHub；
+              🌐 市场已聚合 GitHub 公开仓库（搜索框可输入任意关键词，不再限定
+              <code>agentforge skill</code>）与 ClawhHub；
               配置 <code>CLAWHUB_API_BASE</code> 可切换 ClawhHub 地址
             </p>
           </div>

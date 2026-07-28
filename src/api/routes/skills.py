@@ -337,8 +337,11 @@ async def get_marketplace_skills(
     聚合多来源 Skill 市场列表：
 
     1. **clawhub.ai** — 若配置 `CLAWHUB_API_BASE` 则调用其 API
-    2. **GitHub** — 查询 `topic:agentforge-skill` 仓库（公开 API，无需 Token）
+    2. **GitHub** — 以客户端传入的关键词搜索仓库；未传关键词时使用默认词 "skill"（公开 API，无需 Token）
     3. **本地** — 已安装的 Skill 列表
+
+    关键词 `q` 完全由客户端控制，后端不再强制附加 "agentforge skill"，
+    以便客户自由搜索任意第三方仓库（如 cursor rules、claude skill 等）。
 
     source 参数可单独过滤某个来源。
     """
@@ -446,16 +449,15 @@ async def _return_empty() -> list[dict]:
 
 async def _fetch_github_skills(q: str) -> list[dict]:
     """
-    通过 GitHub Search API 查询与 AgentForge Skill 相关的仓库。
+    通过 GitHub Search API 查询仓库，关键词完全由客户端控制。
 
-    默认检索关键词 `agentforge skill`（不带强制 topic 限制，因为社区仓库
-    大多未打 topic 标签），可返回 30+ 个相关仓库；配置 GITHUB_TOKEN
-    可将限流从 60 req/hour 提升到 5000 req/hour。
+    - 传入 `q` 时，直接以该关键词搜索（不再强制附加 "agentforge skill"，
+      以便客户自由搜索任意第三方仓库，如 "cursor rules"、"claude skill"）。
+    - 未传 `q` 时，使用默认词 "skill" 返回通用 Skill 仓库。
+
+    配置 GITHUB_TOKEN 可将限流从 60 req/hour 提升到 5000 req/hour。
     """
-    if q:
-        search_query = f"{q} agentforge skill"
-    else:
-        search_query = "agentforge skill"
+    search_query = q.strip() if q and q.strip() else "skill"
 
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "AgentForge/1.0"}
     github_token = os.getenv("GITHUB_TOKEN")
