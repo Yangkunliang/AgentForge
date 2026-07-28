@@ -271,6 +271,16 @@ const groupedModelOptions = computed(() =>
 
 const capabilityLabel = (c: string) => CAPABILITY_LABELS[c as ModelCapability] ?? c
 
+const providerNameById = (id: string) =>
+  providers.value.find((p) => p.id === id)?.name ?? '—'
+
+const overviewRows = computed(() => [
+  { label: '服务商', count: providers.value.length, hint: '已添加的 LLM 服务提供方（OpenAI、通义千问等）' },
+  { label: '模型',   count: models.value.length,    hint: '服务商下的具体模型（如 qwen-plus、gpt-4o）' },
+  { label: '密钥',   count: credentials.value.length, hint: '按服务商加密存储的 API Key' },
+  { label: '路由',   count: routes.value.length,    hint: '路由=一次调用的可执行组合（含模型+温度+备用链）' },
+])
+
 const connectionReady = computed(
   () =>
     !!defaultModel.value &&
@@ -327,11 +337,111 @@ onMounted(load)
 
     <div v-loading="loading">
       <!-- 概览 -->
-      <div class="stat-row">
-        <div class="stat"><span class="stat__num">{{ providers.length }}</span><span class="stat__label">服务商</span></div>
-        <div class="stat"><span class="stat__num">{{ models.length }}</span><span class="stat__label">模型</span></div>
-        <div class="stat"><span class="stat__num">{{ credentials.length }}</span><span class="stat__label">密钥</span></div>
-        <div class="stat"><span class="stat__num">{{ routes.length }}</span><span class="stat__label">路由</span></div>
+      <h3 class="section-title">配置概览</h3>
+      <el-table :data="overviewRows" size="small" class="overview-table mb16" :show-header="true">
+        <el-table-column prop="label" label="项目" min-width="120" />
+        <el-table-column prop="count" label="数量" width="100" align="center">
+          <template #default="{ row }">
+            <span class="overview-count">{{ row.count }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="hint" label="说明" min-width="220" />
+        <el-table-column label="操作" width="160" align="right">
+          <template #default>
+            <span class="overview-hint">详见下方「已配置资源」</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 已配置资源（服务商/模型/密钥） -->
+      <h3 class="section-title">已配置资源</h3>
+      <div class="resource-grid">
+        <el-card shadow="never" class="resource-card">
+          <div class="resource-card__head">
+            <span class="resource-card__title">已添加的服务商</span>
+            <el-tag size="small" type="info" effect="plain">{{ providers.length }}</el-tag>
+          </div>
+          <el-table :data="providers" size="small" empty-text="尚未添加服务商" height="220">
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column prop="provider_key" label="标识" min-width="120">
+              <template #default="{ row }">
+                <el-tag size="small" effect="plain">{{ row.provider_key }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="base_url" label="Base URL" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="active" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.active ? 'success' : 'info'" size="small">
+                  {{ row.active ? '启用' : '停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
+        <el-card shadow="never" class="resource-card">
+          <div class="resource-card__head">
+            <span class="resource-card__title">已添加的模型</span>
+            <el-tag size="small" type="info" effect="plain">{{ models.length }}</el-tag>
+          </div>
+          <el-table :data="models" size="small" empty-text="尚未添加模型" height="220">
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column label="服务商" min-width="120">
+              <template #default="{ row }">
+                {{ providerNameById(row.provider_id) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="model_key" label="Model Key" min-width="180" show-overflow-tooltip />
+            <el-table-column label="能力" min-width="180">
+              <template #default="{ row }">
+                <div class="cell-caps">
+                  <el-tag
+                    v-for="c in (row.capabilities || [])"
+                    :key="c"
+                    size="small"
+                    type="info"
+                    effect="plain"
+                    class="cap-tag"
+                  >{{ capabilityLabel(c) }}</el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="active" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.active ? 'success' : 'info'" size="small">
+                  {{ row.active ? '启用' : '停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
+        <el-card shadow="never" class="resource-card">
+          <div class="resource-card__head">
+            <span class="resource-card__title">已配置的密钥</span>
+            <el-tag size="small" type="info" effect="plain">{{ credentials.length }}</el-tag>
+          </div>
+          <el-table :data="credentials" size="small" empty-text="尚未配置密钥" height="220">
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column label="服务商" min-width="120">
+              <template #default="{ row }">
+                {{ providerNameById(row.provider_id) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Key" min-width="160">
+              <template #default="{ row }">
+                <span class="key-mask">sk-***{{ (row.id || '').slice(-4) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="active" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.active ? 'success' : 'info'" size="small">
+                  {{ row.active ? '启用' : '停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
       </div>
 
       <!-- 引导式快速配置 -->
@@ -592,32 +702,64 @@ onMounted(load)
   color: #94a3b8;
 }
 
-.stat-row {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
+.overview-table {
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-.stat {
-  flex: 1;
+.overview-count {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.overview-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.resource-card {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #eef2f7;
-  border-radius: 10px;
 
-  &__num {
-    font-size: 22px;
-    font-weight: 700;
-    color: #1d4ed8;
+  :deep(.el-card__body) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 12px 14px 14px;
   }
 
-  &__label {
-    font-size: 12px;
-    color: #94a3b8;
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
   }
+
+  &__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+  }
+}
+
+.cell-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.key-mask {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #64748b;
+  letter-spacing: 0.3px;
 }
 
 .section-title {
