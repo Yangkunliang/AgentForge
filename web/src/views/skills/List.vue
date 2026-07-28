@@ -113,7 +113,12 @@ async function handleInstall() {
   } catch (error: any) {
     const status = error?.response?.status
     if (status === 403) {
-      ElMessage.error('权限不足：安装 Skill 需要管理员权限，请联系管理员')
+      ElMessage({
+        type: 'error',
+        message: '权限不足：安装 Skill 需要管理员权限。请刷新页面或重新登录后再试（如果账号刚刚被授予管理员权限）',
+        duration: 5000,
+        showClose: true,
+      })
     } else if (status === 409) {
       const detail = error?.response?.data?.detail
       if (detail?.code === 'SKILL_PERMISSION_CONFIRMATION_REQUIRED') {
