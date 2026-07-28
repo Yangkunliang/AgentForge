@@ -1,0 +1,23 @@
+name: my-first-skill
+version: 1.0.0
+description: 一个最小可装的 AgentForge Skill 示例，演示如何声明 tools 与 executor
+permissions:
+  - network
+executor:
+  kind: python
+  entry_point: executor:run
+audit:
+  level: standard
+tools:
+  - type: function
+    function:
+      name: hello_world
+      description: 向指定名字问好，并返回当前时间
+      parameters:
+        type: object
+        properties:
+          name:
+            type: string
+            description: 要问候的名字
+        required:
+          - name
