@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import DateTime, JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, TimestampMixin
@@ -86,8 +86,8 @@ class PipelineStageState(Base, TimestampMixin):
     model_route_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     model_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     model_route_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     pipeline_run: Mapped[PipelineRun] = relationship("PipelineRun", back_populates="stages")
 

@@ -262,13 +262,16 @@ default_model_route_key
 allowed_skill_names
 system_policy_key
 stage_preferences
+expertise
 enabled
 ```
 
 当前映射：
 
 - `Agent` 模型已有 name、capabilities、model、status、avatar_url。
-- `AgentResolver` 已把 active Agent 解析成运行时 AgentProfile。
+- `Agent` 模型新增 `expertise` 列（JSONB，默认 `{}`），承载蒸馏的专家模型（编码规范 / 审查清单 / 技术偏好 / 反模式 / 调试套路 / 输出风格）。
+- `AgentResolver` 已把 active Agent 解析成运行时 AgentProfile，并把 `expertise` 结构化后带入 `AgentProfile.to_context()`。
+- `AgentProfile.expertise` 经 `_merge_runtime_context` 进入 `advanced_context["agent_profile"]["expertise"]`，由 `SkillExecutionEngine._format_advanced_context` 渲染进 **system prompt 可信区**，使每个阶段按开发者的个人工程标准执行。
 - `PipelineStageState` 已记录 agent_profile_id、agent_profile_name、agent_profile_source。
 - `UserAgentSettings` 当前只影响 assistant 名称和头像。
 - StageRuntime 接收 fallback `agent_name`，但会优先使用 AgentResolver 返回的 AgentProfile name 和上下文。
@@ -277,6 +280,7 @@ enabled
 
 - AgentProfile 的 model_name / default_model_route_key 已交给 ModelRouter 做 fallback。
 - AgentProfile 的 allowed_skill_names 来自启用的 `AgentSkill` 绑定，并参与 SkillPolicy 工具过滤。
+- `AgentProfile.expertise`（蒸馏的专家模型）已结构化进入运行时，并在 `SkillExecutionEngine` 的可信区渲染，是「能力蒸馏层」的核心载体（详见 `src/agent_forge/agents/expertise.py`）。
 - `UserAgentSettings` 继续负责个人助手展示名，不等同于 AgentProfile。
 
 ### 3.5 ModelRoute
