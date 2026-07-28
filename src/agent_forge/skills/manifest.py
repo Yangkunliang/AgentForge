@@ -232,7 +232,11 @@ def _preview_from_manifest(
 
     tools = _normalize_tools(raw_manifest)
     if not tools:
-        raise SkillManifestError("Skill manifest must declare at least one tool")
+        raise SkillManifestError(
+            "Skill manifest declares no tools. An AgentForge skill must expose at "
+            "least one tool under the 'tools' field (a list). The repository may not "
+            "be an AgentForge skill (e.g. a rules/harness package for another tool)."
+        )
     tool_defs = [_to_openai_tool_def(tool) for tool in tools]
 
     manifest_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
@@ -289,10 +293,19 @@ def _compat_manifest_from_skill_md(parsed: dict[str, Any], fallback_name: str) -
 
 def _normalize_tools(raw_manifest: dict[str, Any]) -> list[dict[str, Any]]:
     raw_tools = raw_manifest.get("tools")
-    if raw_tools is None and raw_manifest.get("tool"):
-        raw_tools = [raw_manifest["tool"]]
+    if raw_tools is None:
+        # 旧的单体写法：manifest 里用 `tool`（单数）声明一个工具
+        single_tool = raw_manifest.get("tool")
+        if single_tool is not None:
+            raw_tools = [single_tool]
+        else:
+            # 未声明任何工具 —— 视为空列表，交由上层检查是否至少需 1 个工具
+            return []
     if not isinstance(raw_tools, list):
-        raise SkillManifestError("Skill manifest field 'tools' must be a list")
+        raise SkillManifestError(
+            "Skill manifest field 'tools' must be a list; "
+            "found type '{}'".format(type(raw_tools).__name__)
+        )
 
     tools: list[dict[str, Any]] = []
     for raw_tool in raw_tools:
