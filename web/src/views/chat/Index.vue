@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { skillsApi } from '@/api/modules/skills'
 import { uploadApi } from '@/api/modules/sessions'
 import AssistantMessage from '@/components/chat/AssistantMessage.vue'
 import ConfirmCard from '@/components/chat/ConfirmCard.vue'
@@ -39,6 +40,32 @@ const { intent: currentIntent } = storeToRefs(advancedSettings)
 const { getConfig, intentLabels } = usePipeline()
 
 const currentConfig = computed(() => getConfig(currentIntent.value))
+
+// 已安装 Skill 集合（关联技能角标用）
+const installedSkills = ref<Set<string>>(new Set())
+const isSkillInstalled = (name: string) => installedSkills.value.has(name)
+
+// 蒸馏层专长维度中文标签（强调项展示用）
+const EMPHASIS_LABELS: Record<string, string> = {
+  role_title: '角色定位',
+  summary: '能力摘要',
+  conventions: '代码规范',
+  review_checklist: '审查要点',
+  tech_preferences: '技术偏好',
+  anti_patterns: '反模式',
+  debugging_heuristics: '调试经验',
+  communication_style: '沟通风格',
+}
+const emphasisLabel = (dim: string) => EMPHASIS_LABELS[dim] ?? dim
+
+async function fetchInstalledSkills() {
+  try {
+    const { data } = await skillsApi.list()
+    installedSkills.value = new Set((data.items ?? []).map((s) => s.name))
+  } catch {
+    installedSkills.value = new Set()
+  }
+}
 const currentIntentBadge = computed(() => {
   const key = (currentIntent.value ?? 'general') as ChatIntentType
   return intentLabels[key]
@@ -131,6 +158,7 @@ async function syncProjectMounts(projectId?: string | null) {
 
 onMounted(async () => {
   await pipelineStore.fetchCatalog()
+  await fetchInstalledSkills()
   await projectStore.fetchProjects()
   await syncProjectMounts(projectStore.currentProjectId)
   await sessionStore.fetchSessions(projectStore.currentProjectId)
@@ -206,28 +234,10 @@ async function fillPrompt(text: string) {
   }
 }
 
-// L3：快捷方式（蒸馏层预设）联动 — 填充话术的同时配置 Agent 工作上下文
+// L3：快捷方式（蒸馏层预设）联动 — 整体替换 Agent 工作上下文 + 填充话术
 async function applyQuickAction(action: PipelineQuickAction) {
-  if (action.intent) advancedSettings.setIntent(action.intent)
-  for (const cf of action.context_files ?? []) {
-    advancedSettings.addContextFile({
-      type: cf.type,
-      value: cf.value,
-      label: cf.label?.trim() || cf.value,
-      active: true,
-      mount_id: cf.mount_id,
-    })
-  }
-  for (const skill of action.skills ?? []) {
-    advancedSettings.addSkill(skill)
-  }
+  advancedSettings.applyPreset(action)
   await fillPrompt(action.prompt)
-}
-
-// 欢迎页引导卡：除填充话术外，联动设置需求类型（蒸馏层预设）
-async function onWelcomeCard(payload: { prompt: string; intent?: ChatIntentType }) {
-  if (payload.intent) advancedSettings.setIntent(payload.intent)
-  await fillPrompt(payload.prompt)
 }
 
 async function send() {
@@ -457,7 +467,7 @@ function removePendingImage(idx: number) {
       <div ref="messagesEl" class="messages-area">
         <WelcomeScreen
           v-if="!sessionId || sessionStore.messages.length === 0"
-          @prompt="onWelcomeCard"
+          @select="applyQuickAction"
         />
 
         <template v-for="msg in sessionStore.messages" :key="msg.id">
@@ -528,24 +538,40 @@ function removePendingImage(idx: number) {
               </div>
 
               <!-- 关联技能（L3：快捷方式联动预授权）-->
-              <div v-if="advancedSettings.skills.length" class="ap-section">
-                <span class="ap-section__label">关联技能</span>
-                <div class="skill-chips">
+              <div v-if="advancedSettings.skills.length || advancedSettings.emphasis.length" class="ap-section">
+                <span class="ap-section__label">关联技能 / 蒸馏层</span>
+
+                <div v-if="advancedSettings.skills.length" class="skill-chips">
                   <span
                     v-for="skill in advancedSettings.skills"
-                    :key="skill"
+                    :key="skill.name"
                     class="skill-chip"
-                    :title="`已关联技能：${skill}（点击移除）`"
+                    :class="{
+                      'skill-chip--qa': skill.source === 'quick_action',
+                      'skill-chip--missing': !isSkillInstalled(skill.name),
+                    }"
+                    :title="`来源：${skill.source === 'quick_action' ? '快捷方式预设' : '手动添加'} · ${isSkillInstalled(skill.name) ? '已安装' : '未安装（需先安装该 Skill）'}`"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z"/>
                     </svg>
-                    <span class="skill-chip__name">{{ skill }}</span>
-                    <button class="skill-chip__remove" title="移除技能" @click="advancedSettings.removeSkill(skill)">
+                    <span class="skill-chip__name">{{ skill.name }}</span>
+                    <span
+                      class="skill-chip__badge"
+                      :class="isSkillInstalled(skill.name) ? 'is-ok' : 'is-warn'"
+                    >{{ isSkillInstalled(skill.name) ? '已安装' : '未安装' }}</span>
+                    <button class="skill-chip__remove" title="移除技能" @click="advancedSettings.removeSkill(skill.name)">
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                       </svg>
                     </button>
+                  </span>
+                </div>
+
+                <div v-if="advancedSettings.emphasis.length" class="emphasis-chips">
+                  <span class="emphasis-hint">强调专长：</span>
+                  <span v-for="dim in advancedSettings.emphasis" :key="dim" class="emphasis-chip">
+                    {{ emphasisLabel(dim) }}
                   </span>
                 </div>
               </div>
@@ -563,7 +589,11 @@ function removePendingImage(idx: number) {
               <!-- 快捷动作 -->
               <div class="ap-section">
                 <span class="ap-section__label">快捷动作</span>
-                <QuickActions :actions="currentConfig.quickActions" @select="applyQuickAction" />
+                <QuickActions
+                  :actions="currentConfig.quickActions"
+                  :applied-id="advancedSettings.appliedPresetId"
+                  @select="applyQuickAction"
+                />
               </div>
 
             </div>
@@ -953,9 +983,39 @@ function removePendingImage(idx: number) {
     border-color: #86efac;
   }
 
+  // 快捷方式预设注入
+  &--qa {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+
+    .skill-chip__remove { color: #1d4ed8; &:hover { background: rgba(29, 78, 216, 0.12); } }
+  }
+
+  // 未安装（预授权将静默失效）
+  &--missing {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #b45309;
+
+    .skill-chip__remove { color: #b45309; &:hover { background: rgba(180, 83, 9, 0.12); } }
+  }
+
   &__name {
     font-weight: 500;
     white-space: nowrap;
+  }
+
+  &__badge {
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 8px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &.is-ok { background: #dcfce7; color: #15803d; }
+    &.is-warn { background: #fef3c7; color: #b45309; }
   }
 
   &__remove {
@@ -978,6 +1038,31 @@ function removePendingImage(idx: number) {
       background: rgba(4, 120, 87, 0.12);
     }
   }
+}
+
+// ── 蒸馏层强调专长 ─────────────────────────────────────────────
+.emphasis-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.emphasis-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.emphasis-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
+  white-space: nowrap;
 }
 
 // ── 紧凑需求类型选择器（输入框内）───────────────────────────────

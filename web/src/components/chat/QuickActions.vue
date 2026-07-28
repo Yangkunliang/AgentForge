@@ -3,6 +3,7 @@ import type { PipelineQuickAction } from '@/types'
 
 defineProps<{
   actions: PipelineQuickAction[]
+  appliedId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -16,11 +17,21 @@ const emit = defineEmits<{
       v-for="action in actions"
       :key="action.id"
       class="quick-actions__btn"
-      :class="{ 'quick-actions__btn--highlighted': action.highlighted }"
+      :class="{
+        'quick-actions__btn--highlighted': action.highlighted,
+        'quick-actions__btn--applied': appliedId === action.id,
+      }"
       :title="action.label"
       @click="emit('select', action)"
     >
       <span>{{ action.label }}</span>
+      <svg
+        v-if="appliedId === action.id"
+        class="quick-actions__check"
+        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+      >
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
     </button>
   </div>
 </template>
@@ -55,5 +66,16 @@ const emit = defineEmits<{
   background: #eff6ff;
   color: #1d4ed8;
   font-weight: 700;
+}
+
+.quick-actions__btn--applied {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.quick-actions__check {
+  margin-left: 4px;
+  vertical-align: middle;
 }
 </style>

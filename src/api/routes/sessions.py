@@ -102,6 +102,10 @@ class ChatRequest(BaseModel):
         default=None,
         description="当前阶段一次性 Skill 授权上下文",
     )
+    expertise_emphasis: list[str] | None = Field(
+        default=None,
+        description="快捷方式预设强调的 AgentExpertise 维度（如 conventions/review_checklist/debugging_heuristics），注入 system prompt 作为本次重点",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -392,6 +396,8 @@ async def _build_advanced_context(
         authorization = body.skill_authorization.model_dump()
         if authorization["authorized_skill_names"] or authorization["authorized_permissions"]:
             context["skill_authorization"] = authorization
+    if body.expertise_emphasis:
+        context["expertise_emphasis"] = [str(d).strip() for d in body.expertise_emphasis if str(d).strip()]
     return context
 
 

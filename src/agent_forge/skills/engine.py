@@ -89,6 +89,18 @@ INTENT_LABELS = {
     "general": "通用对话",
 }
 
+# AgentExpertise 维度中文标签，供快捷方式预设的 expertise_emphasis 渲染强调指令
+EXPERTISE_DIMENSION_LABELS = {
+    "role_title": "角色定位",
+    "summary": "简介",
+    "conventions": "编码规范",
+    "review_checklist": "代码审查必查项",
+    "tech_preferences": "技术栈偏好",
+    "anti_patterns": "反模式 / 雷区",
+    "debugging_heuristics": "调试套路",
+    "communication_style": "输出风格",
+}
+
 
 def _build_system_prompt(
     agent_name: str = "CodeSoul",
@@ -132,6 +144,21 @@ def _format_advanced_context(advanced_context: dict[str, Any] | None) -> str:
             expertise_section = AgentExpertise.from_dict(expertise).to_prompt_section()
             if expertise_section:
                 lines.append(expertise_section)
+
+    # 快捷方式预设强调的 AgentExpertise 维度（触达蒸馏层）
+    emphasis = advanced_context.get("expertise_emphasis")
+    if isinstance(emphasis, list) and emphasis:
+        labels = [
+            EXPERTISE_DIMENSION_LABELS.get(str(dim).strip(), str(dim).strip())
+            for dim in emphasis
+            if str(dim).strip()
+        ]
+        if labels:
+            lines.append(
+                "- 本次对话重点强调（来自快捷方式预设）：请优先遵循并运用以下专家维度 —— "
+                + "、".join(labels)
+                + "。若对应维度在专家配置中无具体内容，则按该维度的通用最佳实践执行。"
+            )
 
     model_route = advanced_context.get("model_route")
     if isinstance(model_route, dict):

@@ -35,6 +35,8 @@ class QuickAction:
     intent: IntentType | None = None
     skills: tuple[str, ...] = ()
     context_files: tuple[QuickActionContextFile, ...] = ()
+    # 强调的 AgentExpertise 维度（触达蒸馏层），如 conventions / review_checklist
+    emphasis: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -184,7 +186,7 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
         ),
         default_actions=(
             QuickAction("define_scope", "定义需求范围", "帮我梳理这个新功能的需求范围和验收标准。", True,
-                        intent="new_feature", skills=("product-spec",)),
+                        intent="new_feature", skills=("web-search", "code-executor"), emphasis=("conventions", "tech_preferences")),
             QuickAction("tech_design", "技术方案设计", "帮我设计这个功能的技术方案，包括架构图和关键类设计。"),
             QuickAction("api_design", "API 接口设计", "帮我设计这个功能的 RESTful API 接口规范。"),
             QuickAction("estimate", "工作量评估", "帮我评估实现这个功能所需的时间和资源。"),
@@ -264,7 +266,7 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
         ),
         default_actions=(
             QuickAction("analyze_diff", "分析需求变更", "帮我分析这次需求变更的具体内容和影响范围。", True,
-                        intent="iteration", skills=("code-review",)),
+                        intent="iteration", skills=("code-executor",), emphasis=("review_checklist", "anti_patterns")),
             QuickAction("code_review", "代码审查", "帮我审查这次变更涉及的代码，确保质量。"),
             QuickAction("risk_assess", "风险评估", "帮我评估这次迭代可能带来的风险和应对措施。"),
         ),
@@ -315,7 +317,7 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
         ),
         default_actions=(
             QuickAction("design_spec", "设计规范", "帮我制定这个 UI 调整的设计规范和交互细节。", True,
-                        intent="ui_adjust", skills=("ui-design",)),
+                        intent="ui_adjust", skills=("web-search",), emphasis=("conventions", "tech_preferences")),
             QuickAction("component_build", "组件开发", "帮我实现这个 UI 组件，包括响应式适配。"),
             QuickAction("style_refine", "样式优化", "帮我优化这个页面的样式和视觉效果。"),
         ),
@@ -378,7 +380,7 @@ PIPELINE_CATALOG: dict[IntentType, IntentPipelineDefinition] = {
         ),
         default_actions=(
             QuickAction("debug_log", "日志分析", "帮我分析这段错误日志，找出问题根源。", True,
-                        intent="bug_fix", skills=("debug",),
+                        intent="bug_fix", skills=("code-executor",), emphasis=("debugging_heuristics", "anti_patterns"),
                         context_files=(QuickActionContextFile("url", "https://example.com/error.log", "线上错误日志"),)),
             QuickAction("reproduce", "复现步骤", "帮我梳理这个 Bug 的复现步骤和条件。"),
             QuickAction("fix_verify", "修复验证", "帮我验证这个修复是否正确，有无遗漏。"),
@@ -448,6 +450,7 @@ def quick_action_to_dict(action: QuickAction) -> dict:
         "highlighted": action.highlighted,
         "intent": action.intent,
         "skills": list(action.skills),
+        "emphasis": list(action.emphasis),
         "context_files": [
             {
                 "type": cf.type,

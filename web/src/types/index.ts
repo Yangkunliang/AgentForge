@@ -341,6 +341,14 @@ export interface ContextFile {
   value: string
   active: boolean
   mount_id?: string
+  /** 来源：快捷方式预设注入 或 用户手动添加 */
+  source?: 'quick_action' | 'manual'
+}
+
+/** 关联技能（L3 快捷方式预设预授权 / 用户手动） */
+export interface LinkedSkill {
+  name: string
+  source: 'quick_action' | 'manual'
 }
 
 export interface ChatAdvancedPayload {
@@ -353,6 +361,8 @@ export interface ChatAdvancedPayload {
   }>
   stage_overrides?: Record<string, boolean>
   skill_authorization?: SkillAuthorizationPayload
+  /** L3 触达蒸馏层：快捷方式预设强调的 AgentExpertise 维度 */
+  expertise_emphasis?: string[]
 }
 
 export interface SkillAuthorizationPayload {
@@ -394,6 +404,8 @@ export interface PipelineQuickAction {
   intent?: ChatIntentType
   skills?: string[]
   context_files?: PipelineQuickActionContextFile[]
+  /** 强调的 AgentExpertise 维度（触达蒸馏层） */
+  emphasis?: string[]
 }
 
 export interface PipelineStageDefinition {
