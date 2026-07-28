@@ -21,6 +21,8 @@ from api.schemas.agent import (
     AgentResponse,
     AgentUpdateRequest,
     ExpertiseExtractRequest,
+    ExpertisePreviewRequest,
+    ExpertisePreviewResponse,
 )
 from middleware.auth import get_current_user, require_permission
 
@@ -70,6 +72,40 @@ async def extract_agent_expertise(
     """
     expertise = await extract_expertise(body.source_text, body.role_hint)
     return AgentExpertiseSchema.model_validate(expertise.to_dict())
+
+
+@router.post(
+    "/{agent_id}/expertise/preview",
+    response_model=ExpertisePreviewResponse,
+)
+async def preview_agent_expertise(
+    agent_id: str,
+    body: ExpertisePreviewRequest | None = None,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(require_permission("read")),
+) -> ExpertisePreviewResponse:
+    """注入预览：用与运行时完全相同的渲染函数，预览将注入 system prompt 的原文。
+
+    传入 ``body.expertise`` 时预览「当前编辑中」的内容，不传则预览 Agent 已保存的内容。
+    这让蒸馏结果「可见即可信」——无需发起真实对话即可确认 Agent 确实带上了你的工程标准。
+    """
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if body and body.expertise is not None:
+        raw = body.expertise.model_dump(exclude_none=True)
+    else:
+        raw = agent.expertise or {}
+
+    expertise = AgentExpertise.from_dict(raw)
+    return ExpertisePreviewResponse(
+        agent_id=agent.id,
+        agent_name=agent.name,
+        is_empty=expertise.is_empty(),
+        prompt_section=expertise.to_prompt_section(),
+    )
 
 
 @router.post("", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)

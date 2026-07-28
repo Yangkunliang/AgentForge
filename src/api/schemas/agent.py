@@ -64,3 +64,21 @@ class ExpertiseExtractRequest(BaseModel):
                              description="代码评审 / 提交记录 / 技术讨论等素材")
     role_hint: str | None = Field(default=None, max_length=200,
                                    description="可选的角色提示，辅助 LLM 定位")
+
+
+class ExpertisePreviewRequest(BaseModel):
+    """注入预览请求：用与运行时完全相同的渲染函数预览专家模型文本。
+
+    传入 ``expertise`` 时预览「当前编辑中」的内容；不传则预览 Agent 已保存的内容。
+    """
+
+    expertise: AgentExpertise | None = None
+
+
+class ExpertisePreviewResponse(BaseModel):
+    """注入预览响应：返回将注入 system prompt 可信区的专家工作标准原文。"""
+
+    agent_id: str
+    agent_name: str
+    is_empty: bool
+    prompt_section: str

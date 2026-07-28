@@ -74,6 +74,13 @@ export interface AgentExpertise {
   communication_style?: string
 }
 
+export interface ExpertisePreview {
+  agent_id: string
+  agent_name: string
+  is_empty: boolean
+  prompt_section: string
+}
+
 export interface Agent {
   id: string
   name: string
