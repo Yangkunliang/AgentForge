@@ -49,21 +49,7 @@ function openInstallDialog(prefill?: string) {
 }
 
 function handleQuickInstall(item: MarketplaceSkill) {
-  // 非 admin 用户：给权限申请引导，不直接进安装
-  if (!canInstallSkills.value) {
-    ElMessageBox.confirm(
-      '安装 Skill 需要管理员权限。是否仍要继续？\n\n提示：联系当前实例的管理员为你开启「安装 Skill」权限后，可一键安装。',
-      '需要管理员权限',
-      {
-        confirmButtonText: '我已知晓，继续',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    )
-      .then(() => handleInstallFromMarket(item))
-      .catch(() => {})
-    return
-  }
+  // 安装 Skill 已对所有登录用户开放（后端不再要求 admin）
   handleInstallFromMarket(item)
 }
 
@@ -115,7 +101,7 @@ async function handleInstall() {
     if (status === 403) {
       ElMessage({
         type: 'error',
-        message: '权限不足：安装 Skill 需要管理员权限。请刷新页面或重新登录后再试（如果账号刚刚被授予管理员权限）',
+        message: '登录状态已失效，请重新登录后再试',
         duration: 5000,
         showClose: true,
       })
@@ -241,7 +227,7 @@ function formatDate(dateStr: string | undefined): string {
   <div class="skill-list">
     <div class="page-header">
       <h1 class="page-title">Skill 管理</h1>
-      <el-button v-if="canInstallSkills" type="primary" @click="openInstallDialog()">
+      <el-button type="primary" @click="openInstallDialog()">
         + 安装 Skill
       </el-button>
     </div>
@@ -356,7 +342,6 @@ function formatDate(dateStr: string | undefined): string {
             共 {{ skillStore.marketplaceTotal }} 个 Skill
           </span>
           <el-button
-            v-if="canInstallSkills"
             type="primary"
             class="import-github-btn"
             @click="openInstallDialog()"

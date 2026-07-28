@@ -162,7 +162,7 @@ async def list_skills(
 @router.post("/import/preview", response_model=SkillImportPreviewResponse, summary="预览第三方 Skill 导入风险")
 async def preview_skill_import(
     body: SkillImportPreviewRequest,
-    _: User = Depends(require_permission("admin")),
+    _: User = Depends(get_current_user),
 ) -> dict:
     try:
         preview = await SkillInstaller.preview_import(body.source, body.version)
@@ -175,7 +175,7 @@ async def preview_skill_import(
 async def install_skill_import(
     body: SkillImportInstallRequest,
     db: AsyncSession = Depends(get_async_session),
-    _: User = Depends(require_permission("admin")),
+    _: User = Depends(get_current_user),
 ) -> dict:
     try:
         install_task = await SkillInstaller.install_from_source(
@@ -223,7 +223,7 @@ async def get_install_status(
 async def install_skill(
     body: InstallSkillRequest,
     db: AsyncSession = Depends(get_async_session),
-    _: User = Depends(require_permission("admin")),
+    _: User = Depends(get_current_user),
 ) -> dict:
     """
     安装 Skill，自动识别 source 类型：
@@ -258,7 +258,7 @@ async def install_skill(
 async def install_skill_from_url(
     body: InstallSkillRequest,
     db: AsyncSession = Depends(get_async_session),
-    _: User = Depends(require_permission("admin")),
+    _: User = Depends(get_current_user),
 ) -> dict:
     if not body.source.startswith(("https://github.com/", "git+https://github.com/")):
         raise HTTPException(
