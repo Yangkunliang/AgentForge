@@ -21,9 +21,9 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { path: '/dashboard',   label: 'Dashboard', title: '数据看板',           icon: 'dashboard' },
   { path: '/projects',     label: '项目',     title: '我的项目',           icon: 'folder' },
   { path: '/chat',         label: '会话',     title: 'AI 对话',           icon: 'chat' },
-  { path: '/dashboard',   label: 'Dashboard', title: '数据看板',           icon: 'dashboard' },
   { path: '/tasks',       label: '任务',      title: '任务管理',           icon: 'tasks' },
   { path: '/agents',      label: 'Agent',     title: 'Agent 管理',         icon: 'agents', adminOnly: true },
   { path: '/skills',      label: 'Skill',     title: '技能市场',           icon: 'skills' },

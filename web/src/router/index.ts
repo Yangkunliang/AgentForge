@@ -21,7 +21,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/chat',
+        redirect: '/dashboard',
       },
       {
         path: 'projects',
@@ -153,7 +153,7 @@ router.beforeEach((to, _from, next) => {
   }
 
   if ((to.path === '/login' || to.path === '/register') && authStore.token) {
-    next('/chat')
+    next('/dashboard')
     return
   }
 
